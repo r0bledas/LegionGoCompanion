@@ -59,8 +59,11 @@ namespace HandheldCompanion.Views
             {
                 lblStatus.Text = "Switching to DualShock 4...";
                 PlayDisconnectSound();
-                await VirtualManager.SetControllerMode(HIDmode.DualShock4Controller);
-                await VirtualManager.SetControllerStatus(HIDstatus.Connected);
+                SetLegionPassthrough(false);
+                bool modeChanged = await VirtualManager.SetControllerMode(HIDmode.DualShock4Controller);
+                bool connected = modeChanged && await VirtualManager.SetControllerStatus(HIDstatus.Connected);
+                if (!connected)
+                    throw new InvalidOperationException("DualShock 4 emulation could not be connected. Make sure VIIPER is enabled and running.");
                 PlayConnectSound();
                 lblStatus.Text = "Active Emulation: DualShock 4 (Gyro Active)";
             }, VirtualManager.HIDmode == HIDmode.DualShock4Controller);
@@ -70,8 +73,11 @@ namespace HandheldCompanion.Views
             {
                 lblStatus.Text = "Switching to Xbox 360...";
                 PlayDisconnectSound();
-                await VirtualManager.SetControllerMode(HIDmode.Xbox360Controller);
-                await VirtualManager.SetControllerStatus(HIDstatus.Connected);
+                SetLegionPassthrough(false);
+                bool modeChanged = await VirtualManager.SetControllerMode(HIDmode.Xbox360Controller);
+                bool connected = modeChanged && await VirtualManager.SetControllerStatus(HIDstatus.Connected);
+                if (!connected)
+                    throw new InvalidOperationException("Xbox 360 emulation could not be connected. Make sure VIIPER is enabled and running.");
                 PlayConnectSound();
                 lblStatus.Text = "Active Emulation: Xbox 360 (XInput)";
             }, VirtualManager.HIDmode == HIDmode.Xbox360Controller);
@@ -81,12 +87,11 @@ namespace HandheldCompanion.Views
             {
                 lblStatus.Text = "Switching to Native Passthrough...";
                 PlayDisconnectSound();
-                await VirtualManager.SetControllerMode(HIDmode.NoController);
-                await VirtualManager.SetControllerStatus(HIDstatus.Disconnected);
-                if (IDevice.GetCurrent() is LegionGo lego)
-                {
-                    lego.SetPassthrough(true);
-                }
+                bool modeChanged = await VirtualManager.SetControllerMode(HIDmode.NoController);
+                bool disconnected = modeChanged && await VirtualManager.SetControllerStatus(HIDstatus.Disconnected);
+                if (!disconnected)
+                    throw new InvalidOperationException("The virtual controller could not be disconnected.");
+                SetLegionPassthrough(true);
                 PlayConnectSound();
                 lblStatus.Text = "Active Mode: Direct Native Passthrough";
             }, VirtualManager.HIDmode == HIDmode.NoController);
@@ -108,6 +113,12 @@ namespace HandheldCompanion.Views
             try { SystemSounds.Exclamation.Play(); } catch { }
         }
 
+        private static void SetLegionPassthrough(bool enabled)
+        {
+            if (IDevice.GetCurrent() is LegionGo lego)
+                lego.SetPassthrough(enabled);
+        }
+
         private void AddButton(string text, Func<Task> onClick, bool isInitialActive)
         {
             Button btn = new Button
@@ -127,7 +138,16 @@ namespace HandheldCompanion.Views
             btn.Click += async (s, e) =>
             {
                 HighlightButton(btn);
-                await onClick();
+                try
+                {
+                    await onClick();
+                }
+                catch (Exception ex)
+                {
+                    LogManager.LogError("Controller mode switch failed: {0}", ex.Message);
+                    lblStatus.Text = "Controller switch failed: " + ex.Message;
+                    MessageBox.Show(ex.Message, "Controller Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
             };
 
             this.flowPanel.Controls.Add(btn);

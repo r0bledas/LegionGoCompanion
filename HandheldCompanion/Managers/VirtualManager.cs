@@ -402,45 +402,53 @@ namespace HandheldCompanion.Managers
             return true;
         }
 
-        public static async Task SetControllerMode(HIDmode mode)
+        public static async Task<bool> SetControllerMode(HIDmode mode)
         {
             await controllerLock.WaitAsync().ConfigureAwait(false);
 
             try
             {
-                SetControllerModeCore(mode);
+                return SetControllerModeCore(mode);
             }
-            catch { }
+            catch (Exception ex)
+            {
+                LogManager.LogError("Failed to set controller mode to {0}: {1}", mode, ex.Message);
+                return false;
+            }
             finally
             {
                 controllerLock.Release();
             }
         }
 
-        public static async Task SetControllerStatus(HIDstatus status)
+        public static async Task<bool> SetControllerStatus(HIDstatus status)
         {
             await controllerLock.WaitAsync().ConfigureAwait(false);
 
             try
             {
-                SetControllerStatusCore(status);
+                return SetControllerStatusCore(status);
             }
-            catch { }
+            catch (Exception ex)
+            {
+                LogManager.LogError("Failed to set controller status to {0}: {1}", status, ex.Message);
+                return false;
+            }
             finally
             {
                 controllerLock.Release();
             }
         }
 
-        private static void SetControllerModeCore(HIDmode mode)
+        private static bool SetControllerModeCore(HIDmode mode)
         {
             // If the requested mode is already active, do nothing
             if (HIDmode == mode)
             {
                 if (HIDstatus == HIDstatus.Connected && (vTarget is not null && vTarget.IsConnected))
-                    return;
+                    return true;
                 else if (HIDstatus == HIDstatus.Disconnected && (vTarget is null || !vTarget.IsConnected))
-                    return;
+                    return true;
             }
 
             // Disconnect and dispose the current virtual controller if it exists
@@ -464,9 +472,9 @@ namespace HandheldCompanion.Managers
                         HIDmode = mode;
                         ControllerSelected?.Invoke(mode);
                         NotifyMasterIntervalOverrideChanged();
-                        SetControllerStatusCore(HIDstatus);
-                    }
-                    return;
+                    SetControllerStatusCore(HIDstatus);
+                    return true;
+                }
 
                 case HIDmode.DualShock4Controller:
                     vTarget = new DualShock4Target(0x054C, 0x05C4); // DualShock 4 [CUH-ZCT1x]
@@ -499,7 +507,7 @@ namespace HandheldCompanion.Managers
                 if (mode != HIDmode.NoController)
                     LogManager.LogError("Failed to initialise virtual controller with HIDmode: {0}", mode);
                 NotifyMasterIntervalOverrideChanged();
-                return;
+                return false;
             }
 
             if (!CanUseControllerMode(mode))
@@ -507,7 +515,7 @@ namespace HandheldCompanion.Managers
                 HIDmode = mode;
                 ControllerSelected?.Invoke(mode);
                 NotifyMasterIntervalOverrideChanged();
-                return;
+                return false;
             }
 
             // Subscribe to target events
@@ -524,16 +532,20 @@ namespace HandheldCompanion.Managers
             NotifyMasterIntervalOverrideChanged();
 
             SetControllerStatusCore(HIDstatus);
+            return true;
         }
 
-        private static void SetControllerStatusCore(HIDstatus status)
+        private static bool SetControllerStatusCore(HIDstatus status)
         {
             if (vTarget is null)
             {
                 if (status == HIDstatus.Disconnected)
+                {
                     HIDstatus = status;
+                    return true;
+                }
 
-                return;
+                return false;
             }
 
             bool success = false;
@@ -553,6 +565,8 @@ namespace HandheldCompanion.Managers
             // Only update the internal status if the operation was successful
             if (success)
                 HIDstatus = status;
+
+            return success;
         }
 
         private static void OnTargetConnectStatusChanged(VIIPERTarget target, VirtualManagerStatus status, int attempt, int maxAttempts)
