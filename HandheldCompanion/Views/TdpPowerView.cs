@@ -89,10 +89,20 @@ namespace HandheldCompanion.Views
                 // 1. Direct RyzenSMU application (PawnIO)
                 PerformanceManager.SetTDP(tdp, true);
 
-                // 2. Lenovo WMI native EC power limit call
+                // 2. Lenovo WMI native EC power limit & OEM power mode LED colors
                 if (IDevice.GetCurrent() is LegionGo lego)
                 {
-                    lego.SetSmartFanMode((int)LegionGo.LegionMode.Custom);
+                    // Lenovo Legion Go OEM Power Button LED Mapping:
+                    // Quiet (Blue) = 8W - 10W (0x01)
+                    // Balanced (White) = 15W (0x02)
+                    // Performance (Red) = 25W - 30W (0x03)
+                    // Custom (Purple) = Any other custom wattage (0xFF)
+                    int oemMode = (int)LegionGo.LegionMode.Custom;
+                    if (tdp <= 10) oemMode = (int)LegionGo.LegionMode.Quiet;
+                    else if (tdp == 15) oemMode = (int)LegionGo.LegionMode.Balanced;
+                    else if (tdp == 25 || tdp == 30) oemMode = (int)LegionGo.LegionMode.Performance;
+
+                    lego.SetSmartFanMode(oemMode);
                     lego.set_long_limit(tdp);
                     lego.set_short_limit(tdp);
                 }
