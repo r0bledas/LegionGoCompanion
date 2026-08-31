@@ -13,14 +13,14 @@ namespace HandheldCompanion.Controllers.MSI
         public bool Enable()
         {
             if (false)
-                return rogAlly.XBoxController(false);
+                return false // rogAlly.XBoxController(false);
             return false;
         }
 
         public bool Disable()
         {
             if (false)
-                return rogAlly.XBoxController(true);
+                return false // rogAlly.XBoxController(true);
             return false;
         }
     }

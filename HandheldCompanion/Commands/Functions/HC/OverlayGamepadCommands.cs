@@ -27,7 +27,7 @@ namespace HandheldCompanion.Commands.Functions.HC
             base.Execute(IsKeyDown, IsKeyUp, false);
         }
 
-        public override bool IsToggled => // App.overlayModel.Visibility == System.Windows.Visibility.Visible;
+        public override bool IsToggled => false;
 
         public override object Clone()
         {

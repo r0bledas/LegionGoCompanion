@@ -11,8 +11,8 @@ namespace HandheldCompanion.Commands.Functions.Performance
     {
         public RogGPU()
         {
-            Name = Properties.Resources.Hotkey_XGMobile;
-            Description = Properties.Resources.Hotkey_XGMobileDesc;
+            Name = Properties.Resources.Hotkey_objectobile;
+            Description = Properties.Resources.Hotkey_objectobileDesc;
             FontFamily = "Segoe UI Symbol";
             Glyph = "\u2796";
             OnKeyDown = true;
@@ -30,7 +30,7 @@ namespace HandheldCompanion.Commands.Functions.Performance
 
         private static bool IsSupported()
         {
-            return IDevice.GetCurrent().Capabilities.HasFlag(DeviceCapabilities.XGMobile);
+            return IDevice.GetCurrent().Capabilities.HasFlag(DeviceCapabilities.objectobile);
         }
 
         private static bool TryGetState(out bool toggled)
@@ -39,7 +39,7 @@ namespace HandheldCompanion.Commands.Functions.Performance
             if (!IsSupported())
                 return false;
 
-            int state = AsusACPI.DeviceGet(AsusACPI.GPUXG);
+            int state = object.DeviceGet(object.GPUXG);
             if (state < 0)
                 return false;
 
@@ -47,7 +47,7 @@ namespace HandheldCompanion.Commands.Functions.Performance
             return true;
         }
 
-        public override bool IsToggled => AsusACPI.DeviceGet(AsusACPI.GPUXG) == 1;
+        public override bool IsToggled => object.DeviceGet(object.GPUXG) == 1;
 
         public override void Execute(bool IsKeyDown, bool IsKeyUp, bool IsBackground)
         {
@@ -55,9 +55,9 @@ namespace HandheldCompanion.Commands.Functions.Performance
             {
                 bool enable = !toggled;
 
-                if (!enable) XGM.Reset();
-                AsusACPI.DeviceSet(AsusACPI.GPUXG, enable ? 1 : 0);
-                if (enable) XGM.Init();
+                if (!enable) object.Reset();
+                object.DeviceSet(object.GPUXG, enable ? 1 : 0);
+                if (enable) object.Init();
             }
 
             base.Execute(IsKeyDown, IsKeyUp, false);

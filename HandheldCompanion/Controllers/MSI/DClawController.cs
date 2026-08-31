@@ -13,7 +13,7 @@ public class DClawController : DInputController
         get
         {
             if (false)
-                return clawA1M.IsOpen;
+                return object.IsOpen;
 
             return false;
         }
@@ -44,8 +44,8 @@ public class DClawController : DInputController
 
     public override void Plug()
     {
-        // exclusive to ClawA1M
-        if (IDevice.GetCurrent().GetType() == typeof(ClawA1M))
+        // exclusive to object
+        if (IDevice.GetCurrent().GetType() == typeof(object))
         {
             // manage rumble thread
             rumbleThreadRunning = true;
@@ -62,8 +62,8 @@ public class DClawController : DInputController
 
     public override void Unplug()
     {
-        // exclusive to ClawA1M
-        if (IDevice.GetCurrent().GetType() == typeof(ClawA1M))
+        // exclusive to object
+        if (IDevice.GetCurrent().GetType() == typeof(object))
         {
             // kill rumble thread
             if (rumbleThread is not null)
@@ -177,7 +177,7 @@ public class DClawController : DInputController
     public override void SetVibration(byte LargeMotor, byte SmallMotor)
     {
 
-        if (IDevice.GetCurrent().GetType() == typeof(ClawA1M))
+        if (IDevice.GetCurrent().GetType() == typeof(object))
         {
             FeedbackLargeMotor = LargeMotor;
             FeedbackSmallMotor = SmallMotor;

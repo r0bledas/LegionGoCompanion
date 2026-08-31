@@ -406,7 +406,7 @@ public static class ControllerManager
         var physicalControllers = GetPhysicalControllers<IController>();
         bool showActions = physicalControllers.Count() > 1 && PlugBehavior == ControllerPlugBehavior.AlwaysAsk;
 
-        Color winColor = // App.uiSettings.GetColorValue(UIColorType.Foreground);
+        var winColor = new { A = (byte)255, R = (byte)255, G = (byte)255, B = (byte)255 };
 
         string iconFile = ToastIconHelper.RenderGlyphPng(
             glyph: "\ue7fc",
@@ -1171,7 +1171,7 @@ public static class ControllerManager
 
     private static void OnColorValuesChanged(UISettings sender, object args)
     {
-        Color _systemAccent = // App.uiSettings.GetColorValue(UIColorType.AccentDark1);
+        var _systemAccent = new Windows.UI.Color();
         targetController?.SetLightColor(_systemAccent.R, _systemAccent.G, _systemAccent.B);
     }
 
@@ -2291,7 +2291,7 @@ public static class ControllerManager
             targetController = controller;
             targetController.Plug();
 
-            //Color _systemAccent = // App.uiSettings.GetColorValue(UIColorType.AccentDark1);
+            //var _systemAccent = new Windows.UI.Color();
             targetController.SetLightColor(0, 120, 215);
 
             // update HIDInstancePath
