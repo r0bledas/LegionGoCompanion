@@ -1022,7 +1022,13 @@ public static class PerformanceManager
         }
     }
 
-    private static async void RequestTDP(double[] values, bool immediate = false)
+    public static void SetTDP(double tdpWatts, bool immediate = true)
+    {
+        double[] values = new double[] { tdpWatts, tdpWatts, tdpWatts };
+        RequestTDP(values, immediate);
+    }
+
+    public static async void RequestTDP(double[] values, bool immediate = false)
     {
         // Handle null or insufficient array scenario
         if (values == null || values.Length <= (int)PowerType.Fast)

@@ -121,7 +121,7 @@ public class LegionGo : IDevice
         }
     }
 
-    protected void SetFanTable(FanTable fanTable)
+    public void SetFanTable(FanTable fanTable)
     {
         try
         {
@@ -136,7 +136,7 @@ public class LegionGo : IDevice
         }
     }
 
-    protected int GetSmartFanMode()
+    public int GetSmartFanMode()
     {
         try
         {
@@ -153,7 +153,7 @@ public class LegionGo : IDevice
         }
     }
 
-    protected void SetSmartFanMode(int fanMode)
+    public void SetSmartFanMode(int fanMode)
     {
         try
         {

@@ -91,8 +91,8 @@ namespace HandheldCompanion.Views
             LogManager.LogInformation("Applying TDP: " + targetTdp + "W");
             try
             {
-                //((HandheldCompanion.Devices.Lenovo.LegionGoTablet)HandheldCompanion.Devices.IDevice.GetCurrent()).TDP_Set(targetTdp);
-                MessageBox.Show("Successfully applied " + targetTdp + "W TDP!", "TDP Applied", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                PerformanceManager.SetTDP(targetTdp, true);
+                MessageBox.Show("Successfully applied " + targetTdp + "W TDP via RyzenSMU!", "TDP Applied", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             catch (Exception ex)
             {

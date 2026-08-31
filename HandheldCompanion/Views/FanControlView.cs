@@ -1,6 +1,7 @@
 using System;
 using System.Drawing;
 using System.Windows.Forms;
+using HandheldCompanion.Devices;
 using HandheldCompanion.Managers;
 using HandheldCompanion.Shared;
 namespace HandheldCompanion.Views
@@ -104,8 +105,30 @@ namespace HandheldCompanion.Views
             
             try
             {
-                // TODO: Wire up to IDevice Fan_Set / Fan_SetAuto
-                MessageBox.Show("Fan curve applied!", "Fan Applied", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                if (IDevice.GetCurrent() is HandheldCompanion.Devices.Lenovo.LegionGo lego)
+                {
+                    if (chkFullSpeed.Checked)
+                    {
+                        lego.SetFanFullSpeed(true);
+                    }
+                    else if (auto)
+                    {
+                        lego.SetFanFullSpeed(false);
+                        lego.SetSmartFanMode(2); // Balanced mode default
+                    }
+                    else
+                    {
+                        lego.SetFanFullSpeed(false);
+                        ushort clampedSpeed = (ushort)Math.Clamp(targetFan, 0, 100);
+                        lego.SetFanTable(new HandheldCompanion.Devices.Lenovo.FanTable(new ushort[] { clampedSpeed, clampedSpeed, clampedSpeed, clampedSpeed, clampedSpeed, clampedSpeed, clampedSpeed, clampedSpeed, clampedSpeed, clampedSpeed }));
+                    }
+
+                    MessageBox.Show("Fan setting applied via Lenovo WMI!", "Fan Applied", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+                else
+                {
+                    MessageBox.Show("Device is not recognized as a Legion Go.", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                }
             }
             catch (Exception ex)
             {
