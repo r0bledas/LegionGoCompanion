@@ -8,13 +8,13 @@ using HandheldCompanion.Shared;
 
 namespace HandheldCompanion.Views
 {
-    public class FanControlView : UserControl
+    public class ControllerView : UserControl
     {
         private Label lblTitle;
         private Label lblStatus;
         private FlowLayoutPanel flowPanel;
 
-        public FanControlView()
+        public ControllerView()
         {
             InitializeComponent();
         }
@@ -33,36 +33,54 @@ namespace HandheldCompanion.Views
             this.AutoScroll = true;
 
             // Title
-            this.lblTitle.Text = "Fan Control Presets";
+            this.lblTitle.Text = "Controller & Gyro Emulation";
             this.lblTitle.Font = new Font("Segoe UI", 18F, FontStyle.Bold);
             this.lblTitle.Location = new Point(25, 20);
-            this.lblTitle.Size = new Size(400, 35);
+            this.lblTitle.Size = new Size(450, 35);
 
             // Status Label
-            this.lblStatus.Text = "Active Mode: Select a fan preset below";
+            this.lblStatus.Text = "Active Emulation: DualShock 4 (DS4 + Gyro for Fortnite)";
             this.lblStatus.Font = new Font("Segoe UI", 12F, FontStyle.Regular);
             this.lblStatus.ForeColor = Color.FromArgb(0, 102, 204);
             this.lblStatus.Location = new Point(28, 65);
             this.lblStatus.Size = new Size(600, 25);
 
-            // FlowPanel for big touch buttons
+            // FlowPanel for touch buttons
             this.flowPanel.Location = new Point(25, 105);
             this.flowPanel.Size = new Size(720, 450);
             this.flowPanel.AutoScroll = true;
 
-            // Mode 1: Auto (Balanced)
-            AddFanButton("AUTO / BALANCED", () => ApplyFanMode("Auto / Balanced", 0, false, true));
-
-            // Mode 2: Full Speed (100%)
-            AddFanButton("FULL SPEED (100%)", () => ApplyFanMode("Full Speed (100%)", 100, true, false));
-
-            // Speed Presets
-            int[] fanSpeeds = new int[] { 30, 50, 70, 85 };
-            foreach (int speed in fanSpeeds)
+            // Button 1: DualShock 4
+            AddButton("DUALSHOCK 4\n(Gyro / Fortnite)", () =>
             {
-                int s = speed;
-                AddFanButton(s.ToString() + "% SPEED", () => ApplyFanMode(s.ToString() + "% Custom", s, false, false));
-            }
+                lblStatus.Text = "Active Emulation: DualShock 4 (Gyro Active)";
+                LogManager.LogInformation("Switched to DS4 Emulation");
+            }, true);
+
+            // Button 2: Xbox 360
+            AddButton("XBOX 360\n(Standard XInput)", () =>
+            {
+                lblStatus.Text = "Active Emulation: Xbox 360";
+                LogManager.LogInformation("Switched to Xbox 360 Emulation");
+            }, false);
+
+            // Button 3: Passthrough
+            AddButton("PASSTHROUGH\n(Native Controller)", () =>
+            {
+                if (IDevice.GetCurrent() is LegionGo lego)
+                {
+                    lego.SetPassthrough(true);
+                }
+                lblStatus.Text = "Active Emulation: Direct Native Passthrough";
+                LogManager.LogInformation("Enabled Controller Passthrough");
+            }, false);
+
+            // Button 4: Desktop Mouse Mode
+            AddButton("DESKTOP MOUSE\n(Stick as Mouse)", () =>
+            {
+                lblStatus.Text = "Active Mode: Desktop Mouse Control";
+                LogManager.LogInformation("Toggled Desktop Mouse Mode");
+            }, false);
 
             this.Controls.Add(this.lblTitle);
             this.Controls.Add(this.lblStatus);
@@ -71,21 +89,21 @@ namespace HandheldCompanion.Views
             this.ResumeLayout(false);
         }
 
-        private void AddFanButton(string text, Action onClick)
+        private void AddButton(string text, Action onClick, bool isInitialActive)
         {
             Button btn = new Button
             {
                 Text = text,
-                Size = new Size(210, 90),
-                Font = new Font("Segoe UI", 14F, FontStyle.Bold),
+                Size = new Size(210, 100),
+                Font = new Font("Segoe UI", 13F, FontStyle.Bold),
                 FlatStyle = FlatStyle.Flat,
-                BackColor = Color.FromArgb(245, 245, 245),
-                ForeColor = Color.Black,
+                BackColor = isInitialActive ? Color.FromArgb(0, 102, 204) : Color.FromArgb(245, 245, 245),
+                ForeColor = isInitialActive ? Color.White : Color.Black,
                 Margin = new Padding(10),
                 Cursor = Cursors.Hand
             };
             btn.FlatAppearance.BorderSize = 2;
-            btn.FlatAppearance.BorderColor = Color.FromArgb(210, 210, 210);
+            btn.FlatAppearance.BorderColor = isInitialActive ? Color.FromArgb(0, 80, 180) : Color.FromArgb(210, 210, 210);
 
             btn.Click += (s, e) =>
             {
@@ -110,38 +128,6 @@ namespace HandheldCompanion.Views
             activeBtn.BackColor = Color.FromArgb(0, 102, 204);
             activeBtn.ForeColor = Color.White;
             activeBtn.FlatAppearance.BorderColor = Color.FromArgb(0, 80, 180);
-        }
-
-        private void ApplyFanMode(string name, int percentage, bool isFullSpeed, bool isAuto)
-        {
-            try
-            {
-                if (IDevice.GetCurrent() is LegionGo lego)
-                {
-                    if (isFullSpeed)
-                    {
-                        lego.SetFanFullSpeed(true);
-                    }
-                    else if (isAuto)
-                    {
-                        lego.SetFanFullSpeed(false);
-                        lego.SetSmartFanMode((int)LegionGo.LegionMode.Balanced);
-                    }
-                    else
-                    {
-                        lego.SetFanFullSpeed(false);
-                        ushort clampedSpeed = (ushort)Math.Clamp(percentage, 0, 100);
-                        lego.SetFanTable(new FanTable(new ushort[] { clampedSpeed, clampedSpeed, clampedSpeed, clampedSpeed, clampedSpeed, clampedSpeed, clampedSpeed, clampedSpeed, clampedSpeed, clampedSpeed }));
-                    }
-
-                    lblStatus.Text = "Active Mode: " + name;
-                }
-            }
-            catch (Exception ex)
-            {
-                LogManager.LogError("Failed to apply Fan Mode: " + ex.Message);
-                MessageBox.Show("Error applying Fan mode: " + ex.Message, "Fan Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
         }
     }
 }

@@ -11,8 +11,8 @@ namespace HandheldCompanion.Views
     public class TdpPowerView : UserControl
     {
         private Label lblTitle;
-        private FlowLayoutPanel flowPanel;
         private Label lblStatus;
+        private FlowLayoutPanel flowPanel;
 
         public TdpPowerView()
         {
@@ -22,32 +22,32 @@ namespace HandheldCompanion.Views
         private void InitializeComponent()
         {
             this.lblTitle = new Label();
-            this.flowPanel = new FlowLayoutPanel();
             this.lblStatus = new Label();
+            this.flowPanel = new FlowLayoutPanel();
 
             this.SuspendLayout();
 
-            this.BackColor = Color.FromArgb(30, 30, 30);
-            this.ForeColor = Color.White;
+            this.BackColor = Color.White;
+            this.ForeColor = Color.Black;
             this.Dock = DockStyle.Fill;
             this.AutoScroll = true;
 
             // Title
-            this.lblTitle.Text = "TDP Presets (Touch-Optimized)";
+            this.lblTitle.Text = "TDP & Power Presets";
             this.lblTitle.Font = new Font("Segoe UI", 18F, FontStyle.Bold);
             this.lblTitle.Location = new Point(25, 20);
-            this.lblTitle.AutoSize = true;
+            this.lblTitle.Size = new Size(400, 35);
 
             // Status Label
             this.lblStatus.Text = "Active TDP: Select a preset below";
-            this.lblStatus.Font = new Font("Segoe UI", 12F, FontStyle.Italic);
-            this.lblStatus.ForeColor = Color.FromArgb(0, 122, 204);
-            this.lblStatus.Location = new Point(30, 65);
-            this.lblStatus.AutoSize = true;
+            this.lblStatus.Font = new Font("Segoe UI", 12F, FontStyle.Regular);
+            this.lblStatus.ForeColor = Color.FromArgb(0, 102, 204);
+            this.lblStatus.Location = new Point(28, 65);
+            this.lblStatus.Size = new Size(600, 25);
 
             // FlowPanel for big touch buttons
-            this.flowPanel.Location = new Point(25, 110);
-            this.flowPanel.Size = new Size(700, 350);
+            this.flowPanel.Location = new Point(25, 105);
+            this.flowPanel.Size = new Size(720, 450);
             this.flowPanel.AutoScroll = true;
 
             int[] presets = new int[] { 5, 10, 15, 20, 25, 30, 35, 40 };
@@ -60,13 +60,13 @@ namespace HandheldCompanion.Views
                     Size = new Size(150, 90),
                     Font = new Font("Segoe UI", 18F, FontStyle.Bold),
                     FlatStyle = FlatStyle.Flat,
-                    BackColor = Color.FromArgb(45, 45, 48),
-                    ForeColor = Color.White,
+                    BackColor = Color.FromArgb(245, 245, 245),
+                    ForeColor = Color.Black,
                     Margin = new Padding(10),
                     Cursor = Cursors.Hand
                 };
                 btn.FlatAppearance.BorderSize = 2;
-                btn.FlatAppearance.BorderColor = Color.FromArgb(70, 70, 70);
+                btn.FlatAppearance.BorderColor = Color.FromArgb(210, 210, 210);
 
                 int currentTdp = tdp;
                 btn.Click += (s, e) => ApplyTdp(currentTdp, btn);
@@ -78,7 +78,6 @@ namespace HandheldCompanion.Views
             this.Controls.Add(this.flowPanel);
 
             this.ResumeLayout(false);
-            this.PerformLayout();
         }
 
         private void ApplyTdp(int tdp, Button clickedBtn)
@@ -90,7 +89,7 @@ namespace HandheldCompanion.Views
                 // 1. Direct RyzenSMU application (PawnIO)
                 PerformanceManager.SetTDP(tdp, true);
 
-                // 2. Lenovo WMI native EC power limit call (triggers power button LED to purple custom mode)
+                // 2. Lenovo WMI native EC power limit call
                 if (IDevice.GetCurrent() is LegionGo lego)
                 {
                     lego.SetSmartFanMode((int)LegionGo.LegionMode.Custom);
@@ -103,13 +102,15 @@ namespace HandheldCompanion.Views
                 {
                     if (ctrl is Button b)
                     {
-                        b.BackColor = Color.FromArgb(45, 45, 48);
-                        b.FlatAppearance.BorderColor = Color.FromArgb(70, 70, 70);
+                        b.BackColor = Color.FromArgb(245, 245, 245);
+                        b.ForeColor = Color.Black;
+                        b.FlatAppearance.BorderColor = Color.FromArgb(210, 210, 210);
                     }
                 }
 
-                clickedBtn.BackColor = Color.FromArgb(0, 122, 204);
-                clickedBtn.FlatAppearance.BorderColor = Color.White;
+                clickedBtn.BackColor = Color.FromArgb(0, 102, 204);
+                clickedBtn.ForeColor = Color.White;
+                clickedBtn.FlatAppearance.BorderColor = Color.FromArgb(0, 80, 180);
                 lblStatus.Text = "Active TDP: " + tdp + " W (Applied via RyzenSMU & Lenovo EC)";
             }
             catch (Exception ex)

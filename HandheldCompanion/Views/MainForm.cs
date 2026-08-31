@@ -33,23 +33,23 @@ namespace HandheldCompanion.Views
 
             // Form
             this.Text = "Legion Go Companion";
-            this.Size = new Size(1000, 600);
-            this.BackColor = Color.FromArgb(30, 30, 30);
-            this.ForeColor = Color.White;
-            this.Font = new Font("Segoe UI", 10F, FontStyle.Regular, GraphicsUnit.Point);
+            this.Size = new Size(1000, 650);
+            this.BackColor = Color.White;
+            this.ForeColor = Color.Black;
+            this.Font = new Font("Segoe UI", 11F, FontStyle.Regular, GraphicsUnit.Point);
             this.StartPosition = FormStartPosition.CenterScreen;
 
             // Sidebar
             this.sidebarPanel.Dock = DockStyle.Left;
             this.sidebarPanel.Width = 220;
-            this.sidebarPanel.BackColor = Color.FromArgb(45, 45, 48);
+            this.sidebarPanel.BackColor = Color.FromArgb(240, 240, 240);
             
             this.lblTitle.Text = "LEGION GO";
             this.lblTitle.Font = new Font("Segoe UI", 16F, FontStyle.Bold);
             this.lblTitle.Dock = DockStyle.Top;
-            this.lblTitle.Height = 80;
+            this.lblTitle.Height = 70;
             this.lblTitle.TextAlign = ContentAlignment.MiddleCenter;
-            this.lblTitle.ForeColor = Color.FromArgb(0, 122, 204); // Accent blue
+            this.lblTitle.ForeColor = Color.FromArgb(0, 102, 204);
 
             this.sidebarPanel.Controls.Add(this.btnSettings);
             this.sidebarPanel.Controls.Add(this.btnController);
@@ -62,12 +62,14 @@ namespace HandheldCompanion.Views
             {
                 btn.Text = text;
                 btn.Dock = DockStyle.Top;
-                btn.Height = 60;
+                btn.Height = 65;
                 btn.FlatStyle = FlatStyle.Flat;
                 btn.FlatAppearance.BorderSize = 0;
                 btn.TextAlign = ContentAlignment.MiddleLeft;
                 btn.Padding = new Padding(20, 0, 0, 0);
-                btn.Font = new Font("Segoe UI", 11F);
+                btn.Font = new Font("Segoe UI", 12F, FontStyle.Bold);
+                btn.ForeColor = Color.FromArgb(40, 40, 40);
+                btn.BackColor = Color.FromArgb(240, 240, 240);
                 btn.Cursor = Cursors.Hand;
             }
 
@@ -78,29 +80,28 @@ namespace HandheldCompanion.Views
 
             // Content Panel
             this.contentPanel.Dock = DockStyle.Fill;
-            this.contentPanel.BackColor = Color.FromArgb(30, 30, 30);
+            this.contentPanel.BackColor = Color.White;
             this.contentPanel.Padding = new Padding(20);
 
-            // Add basic placeholder text to content panel
-            var placeholder = new Label { 
-                Text = "Select a tab from the left.", 
-                AutoSize = true, 
-                Location = new Point(30, 30),
-                Font = new Font("Segoe UI", 14F)
-            };
-            this.contentPanel.Controls.Add(new TdpPowerView { Dock = DockStyle.Fill });
+            // Navigation actions
+            this.btnPower.Click += (s, e) => ShowView(new TdpPowerView());
+            this.btnFans.Click += (s, e) => ShowView(new FanControlView());
+            this.btnController.Click += (s, e) => ShowView(new ControllerView());
+            this.btnSettings.Click += (s, e) => ShowView(new SettingsView());
 
-                        this.btnPower.Click += (s, e) => { this.contentPanel.Controls.Clear(); this.contentPanel.Controls.Add(new TdpPowerView { Dock = DockStyle.Fill }); };
-            this.btnFans.Click += (s, e) => { this.contentPanel.Controls.Clear(); this.contentPanel.Controls.Add(new FanControlView { Dock = DockStyle.Fill }); };
-            
-            this.contentPanel.Controls.Clear();
-            this.contentPanel.Controls.Add(new TdpPowerView { Dock = DockStyle.Fill });
             this.Controls.Add(this.contentPanel);
             this.Controls.Add(this.sidebarPanel);
 
+            ShowView(new TdpPowerView());
+
             this.ResumeLayout(false);
+        }
+
+        private void ShowView(UserControl view)
+        {
+            this.contentPanel.Controls.Clear();
+            view.Dock = DockStyle.Fill;
+            this.contentPanel.Controls.Add(view);
         }
     }
 }
-
-
