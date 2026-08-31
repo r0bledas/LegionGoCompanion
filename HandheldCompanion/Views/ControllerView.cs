@@ -8,6 +8,7 @@ using HandheldCompanion.Devices.Lenovo;
 using HandheldCompanion.Helpers;
 using HandheldCompanion.Managers;
 using HandheldCompanion.Shared;
+using HandheldCompanion.Utils;
 
 namespace HandheldCompanion.Views
 {
