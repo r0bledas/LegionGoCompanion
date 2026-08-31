@@ -2,10 +2,8 @@ using HandheldCompanion.Controllers;
 using HandheldCompanion.Controllers.Dummies;
 using HandheldCompanion.Controllers.GameSir;
 using HandheldCompanion.Controllers.Lenovo;
-using HandheldCompanion.Controllers.MSI;
 using HandheldCompanion.Controllers.SDL;
 using HandheldCompanion.Controllers.Steam;
-using HandheldCompanion.Controllers.Zotac;
 using HandheldCompanion.Devices;
 using HandheldCompanion.Helpers;
 using HandheldCompanion.Inputs;
@@ -733,15 +731,6 @@ public static class ControllerManager
                                 }
                                 break;
 
-                            case 0x0DB0:
-                                switch (ProductId)
-                                {
-                                    case 0x1902:
-                                    case 0x1903:
-                                        try { controller = new DClawController(details); } catch { }
-                                        break;
-                                }
-                                break;
                         }
                     }
 
@@ -898,18 +887,6 @@ public static class ControllerManager
                     {
                         switch (details.GetVendorID())
                         {
-                            // Asus
-                            case "0x0B05":
-                                {
-                                    switch (details.GetProductID())
-                                    {
-                                        case "0x1ABE": // ASUS Xbox Adaptive Controller
-                                        case "0x1B4C": // ASUS Xbox Adaptive Controller
-                                            try { controller = new XboxAdaptiveController(details); } catch { }
-                                            break;
-                                    }
-                                }
-                                break;
 
                             // Lenovo
                             case "0x17EF":
@@ -945,23 +922,6 @@ public static class ControllerManager
                                 }
                                 break;
 
-                            case "0x0DB0":
-                                switch (details.GetProductID())
-                                {
-                                    case "0x1901":
-                                        try { controller = new XClawController(details); } catch { }
-                                        break;
-                                }
-                                break;
-
-                            case "0x1EE9":
-                                switch (details.GetProductID())
-                                {
-                                    case "0x1590":
-                                        try { controller = new ZoneController(details); } catch { }
-                                        break;
-                                }
-                                break;
                         }
                     }
 
@@ -2386,12 +2346,6 @@ public static class ControllerManager
                 controller.IsBusy = true;
                 PowerCyclers[baseContainerDeviceInstanceId] = true;
 
-                if (controller is XboxAdaptiveController xboxController)
-                {
-                    return xboxController.Disable();
-                }
-                else
-                {
                     string enumerator = pnPDevice.GetProperty<string>(DevicePropertyKey.Device_EnumeratorName) ?? string.Empty;
                     switch (enumerator)
                     {
@@ -2406,7 +2360,7 @@ public static class ControllerManager
                             }
                             break;
                     }
-                }
+                
 
                 // cycle controller
                 return controller.CyclePort();
@@ -2598,9 +2552,6 @@ public static class ControllerManager
         foreach (string baseContainerDeviceInstanceId in DriverStore.GetPaths())
             ResumeController(baseContainerDeviceInstanceId);
 
-        // edge case
-        foreach (XboxAdaptiveController xboxAdaptiveController in GetPhysicalControllers<XboxAdaptiveController>())
-            xboxAdaptiveController.Enable();
 
         /*
         if (HostRadioDisabled)

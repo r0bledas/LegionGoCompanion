@@ -275,7 +275,7 @@ public class LegionGo : IDevice
         OEMChords.Add(new KeyboardChord("LegionL", [], [], false, ButtonFlags.OEM2));
 
         // prepare hotkeys
-        DeviceHotkeys[typeof(MainWindowCommands)].inputsChord.ButtonState[ButtonFlags.OEM2] = true;
+
         DeviceHotkeys[typeof(QuickToolsCommands)].inputsChord.ButtonState[ButtonFlags.OEM1] = true;
     }
 

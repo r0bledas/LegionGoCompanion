@@ -88,8 +88,13 @@ namespace HandheldCompanion.Views
                 Location = new Point(30, 30),
                 Font = new Font("Segoe UI", 14F)
             };
-            this.contentPanel.Controls.Add(placeholder);
+            this.contentPanel.Controls.Add(new TdpPowerView { Dock = DockStyle.Fill });
 
+                        this.btnPower.Click += (s, e) => { this.contentPanel.Controls.Clear(); this.contentPanel.Controls.Add(new TdpPowerView { Dock = DockStyle.Fill }); };
+            this.btnFans.Click += (s, e) => { this.contentPanel.Controls.Clear(); this.contentPanel.Controls.Add(new FanControlView { Dock = DockStyle.Fill }); };
+            
+            this.contentPanel.Controls.Clear();
+            this.contentPanel.Controls.Add(new TdpPowerView { Dock = DockStyle.Fill });
             this.Controls.Add(this.contentPanel);
             this.Controls.Add(this.sidebarPanel);
 
@@ -97,3 +102,5 @@ namespace HandheldCompanion.Views
         }
     }
 }
+
+

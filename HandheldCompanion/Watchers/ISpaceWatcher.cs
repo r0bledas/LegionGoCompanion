@@ -72,7 +72,6 @@ namespace HandheldCompanion.Watchers
         {
             return device switch
             {
-                ClawA1M or ClawA2VM or ClawBZ2EM or ClawCG3EM => new ClawCenterWatcher(),
                 LegionGo => new LegionSpaceWatcher(),
                 _ => null
             };

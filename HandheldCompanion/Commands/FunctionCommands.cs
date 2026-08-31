@@ -1,4 +1,4 @@
-﻿using HandheldCompanion.Commands.Functions.HC;
+using HandheldCompanion.Commands.Functions.HC;
 using HandheldCompanion.Commands.Functions.Multimedia;
 using HandheldCompanion.Commands.Functions.Multitasking;
 using HandheldCompanion.Commands.Functions.Performance;
@@ -17,9 +17,7 @@ namespace HandheldCompanion.Commands
         [
             Resources.Hotkey_FunctionCategory_HandheldCompanion,
             typeof(QuickToolsCommands),
-            typeof(MainWindowCommands),
             typeof(OverlayGamepadCommands),
-            typeof(OverlayTrackpadCommands),
             typeof(HIDModeCommands),
             typeof(HIDStatusCommands),
             typeof(DesktopLayoutCommands),
@@ -29,7 +27,6 @@ namespace HandheldCompanion.Commands
             Resources.Hotkey_FunctionCategory_PowerAndBattery,
             typeof(TDPIncrease),
             typeof(TDPDecrease),
-            typeof(RogGPU),
             Resources.Hotkey_FunctionCategory_Windows,
             typeof(OnScreenKeyboardCommands),
             typeof(OnScreenKeyboardLegacyCommands),
