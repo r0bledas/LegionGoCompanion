@@ -1,0 +1,101 @@
+name: Build HandheldCompanion
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+defaults:
+  run:
+    shell: pwsh
+
+permissions:
+  actions: write
+  checks: write
+  contents: write
+  deployments: none
+  id-token: none
+  issues: none
+  discussions: none
+  packages: none
+  pages: none
+  pull-requests: write
+  repository-projects: none
+  security-events: none
+  statuses: none    
+
+jobs:
+  build:
+    name: Build and Release
+    runs-on: windows-latest
+
+    env:
+      SOLUTION_NAME: HandheldCompanion
+      INNO_VERSION: 7.1.0
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Validate Release
+        if: inputs.releaseVersion != ''
+        run: |
+          if ('${{ inputs.releaseVersion }}' -notmatch '^\d+(?:\.\d+){3}$') {
+            Write-Error "Version ${{ inputs.releaseVersion }} is not valid, please use format Major.Minor.Revision.Build"
+            Exit 1
+          }
+
+          if ('${{ github.ref }}' -ne 'refs/heads/main') {
+            Write-Error "Release may only be created from main"
+            Exit 1
+          }
+
+      - name: Set Release Version in Repo
+        if: inputs.releaseVersion != ''
+        run: |
+          (Get-Content -Path ./HandheldCompanion.iss) -replace '#define MyAppVersion\s+"\d+(?:\.\d+){3}"', "#define MyAppVersion `"${{ inputs.releaseVersion }}`"" | Out-File ./HandheldCompanion.iss
+          (Get-Content -Path ./HandheldCompanion/HandheldCompanion.csproj) -replace "<Version>\d+(?:\.\d+){3}</Version>", "<Version>${{ inputs.releaseVersion }}</Version>" | Out-File ./HandheldCompanion/HandheldCompanion.csproj
+
+      - name: Set Unofficial Build Version
+        if: inputs.releaseVersion == ''
+        run: |
+          $issContent = Get-Content -Path ./HandheldCompanion.iss -Raw
+          $baseVersion = ([regex]'#define MyAppVersion\s+"(\d+\.\d+\.\d+)\.\d+"').Match($issContent).Groups[1].Value
+          $unofficialVersion = "$baseVersion.${{ github.run_number }}"
+          Write-Host "Stamping unofficial build version: $unofficialVersion"
+          ($issContent -replace '#define MyAppVersion\s+"\d+(?:\.\d+){3}"', "#define MyAppVersion `"$unofficialVersion`"") | Out-File ./HandheldCompanion.iss
+
+      - name: Install Innosetup
+        run: |
+          choco install innosetup --version=${{ env.INNO_VERSION }} --force
+          
+      - name: Setup dotnet 10 SDK
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: '10.x'
+
+      - name: Restore Solution
+        run: dotnet restore ${{ env.SOLUTION_NAME }}.sln
+
+      - name: Build Solution
+        run: dotnet build ${{ env.SOLUTION_NAME }}.sln /p:Configuration=Release
+
+      - name: Create Installer
+        run: |
+          iscc.exe ${{ env.SOLUTION_NAME }}.iss
+
+      - name: Read Installer Version
+        id: version
+        run: |
+          $version = (Select-String -Path './${{ env.SOLUTION_NAME }}.iss' -Pattern '#define MyAppVersion\s+"([\d.]+)"').Matches[0].Groups[1].Value
+          echo "value=$version" >> $env:GITHUB_OUTPUT
+
+      - name: Upload Installer Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: HandheldCompanion-${{ steps.version.outputs.value }}
+          path: ./install/HandheldCompanion-${{ steps.version.outputs.value }}.exe
+          if-no-files-found: error

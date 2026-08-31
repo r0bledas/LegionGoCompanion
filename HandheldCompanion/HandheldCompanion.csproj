@@ -1,0 +1,476 @@
+<Project Sdk="Microsoft.NET.Sdk">
+	<PropertyGroup>
+		<OutputType>WinExe</OutputType>
+		<TargetFrameworks>net10.0-windows10.0.19041.0</TargetFrameworks>
+		<GenerateRuntimeConfigDevFile>true</GenerateRuntimeConfigDevFile>
+		<AppendTargetFrameworkToOutputPath>true</AppendTargetFrameworkToOutputPath>
+		<PlatformTarget>x64</PlatformTarget>
+		<AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+		<Nullable>enable</Nullable>
+		<UseWindowsForms>true</UseWindowsForms>
+		<StartupObject>HandheldCompanion.App</StartupObject>
+		<OutputPath>$(SolutionDir)bin\$(Configuration)</OutputPath>
+		<ApplicationIcon>Resources\icon.ico</ApplicationIcon>
+		<Version>0.32.4.0</Version>
+		<Platforms>x64</Platforms>
+		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+		<RunPostBuildEvent>OnBuildSuccess</RunPostBuildEvent>
+		<NeutralResourcesLanguage>en-US</NeutralResourcesLanguage>
+		<Prefer32Bit>false</Prefer32Bit>
+		<ServerGarbageCollection>true</ServerGarbageCollection>
+		<ConcurrentGarbageCollection>true</ConcurrentGarbageCollection>
+	</PropertyGroup>
+	<PropertyGroup Condition="'$(Configuration)' == 'Debug'">
+		<ApplicationManifest>DEBUG.manifest</ApplicationManifest>
+	</PropertyGroup>
+	<PropertyGroup Condition="'$(Configuration)' == 'Release'">
+		<ApplicationManifest>RELEASE.manifest</ApplicationManifest>
+		<PublishTrimmed>false</PublishTrimmed>
+		<PublishReadyToRun>true</PublishReadyToRun>
+		<ReadyToRunUseCrossgen2>true</ReadyToRunUseCrossgen2>
+		<TieredCompilation>true</TieredCompilation>
+		<TieredPGO>true</TieredPGO>
+		<RuntimeIdentifier>win-x64</RuntimeIdentifier>
+		<RollForward>LatestPatch</RollForward>
+		<TieredCompilationQuickJit>true</TieredCompilationQuickJit>
+		<TieredCompilationQuickJitForLoops>true</TieredCompilationQuickJitForLoops>
+	</PropertyGroup>
+	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+		<DebugType>full</DebugType>
+		<Optimize>false</Optimize>
+		<DebugSymbols>true</DebugSymbols>
+		<DefineConstants>DEBUG;TRACE</DefineConstants>
+	</PropertyGroup>
+	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+		<DebugType>portable</DebugType>
+		<Optimize>true</Optimize>
+		<DebugSymbols>true</DebugSymbols>
+		<DefineConstants>TRACE</DefineConstants>
+	</PropertyGroup>
+	<ItemGroup>
+		<!-- Prevent Server GC from scaling back heaps during idle; avoids ramp-up latency on sudden load -->
+		<RuntimeHostConfigurationOption Include="System.GC.GarbageCollectionAdaptationMode" Value="0" Trim="true" />
+	</ItemGroup>
+	<ItemGroup>
+		<Page Remove="Properties\DesignTimeResources.xaml" />
+	</ItemGroup>
+	<ItemGroup>
+		<None Include="Properties\DesignTimeResources.xaml">
+			<ContainsDesignTimeResources>True</ContainsDesignTimeResources>
+			<SubType>Designer</SubType>
+		</None>
+		<None Include="SecretKeys.cs" />
+	</ItemGroup>
+	<ItemGroup>
+		<None Remove="HandheldCompanion.json" />
+		<None Remove="Resources\controller_0_big.png" />
+		<None Remove="Resources\controller_1_big.png" />
+		<None Remove="Resources\controller_2_big.png" />
+		<None Remove="Resources\controller_3_big.png" />
+		<None Remove="Resources\controller_4_big.png" />
+		<None Remove="Resources\controller_6_big.png" />
+		<None Remove="Resources\DeviceImages\device_gpd5.png" />
+		<None Remove="Resources\DeviceImages\device_legion_go2.png" />
+		<None Remove="Resources\DeviceImages\device_msi_claw8ex.png" />
+		<None Remove="Resources\DeviceImages\device_onexplayer_apex.png" />
+		<None Remove="Resources\DeviceImages\device_onexplayer_g1.png" />
+		<None Remove="Resources\DeviceImages\device_onexplayer_x2.png" />
+		<None Remove="Resources\DeviceImages\device_onexplayer_x2minipro.png" />
+		<None Remove="Resources\DeviceImages\device_suiplay_0x1.png" />
+		<None Remove="Resources\DeviceImages\device_xbox_rog_ally.png" />
+		<None Remove="Resources\DeviceImages\device_xbox_rog_ally_x.png" />
+		<None Remove="Resources\device_legion_go_s.png" />
+		<None Remove="Resources\device_minisforum_v3.png" />
+		<None Remove="Resources\device_msi_claw8.png" />
+		<None Remove="Resources\device_rog_ally_x.png" />
+		<None Remove="Resources\device_zotac_zone.png" />
+		<None Remove="Resources\device_aokzoe_a1.png" />
+		<None Remove="Resources\device_aya_2.png" />
+		<None Remove="Resources\device_aya_2021.png" />
+		<None Remove="Resources\device_aya_air.png" />
+		<None Remove="Resources\device_aya_flip_ds.png" />
+		<None Remove="Resources\device_aya_flip_kb.png" />
+		<None Remove="Resources\device_aya_kun.png" />
+		<None Remove="Resources\device_aya_next.png" />
+		<None Remove="Resources\device_aya_slide.png" />
+		<None Remove="Resources\device_ayn_loki.png" />
+		<None Remove="Resources\device_cncdan_nucdeck.png" />
+		<None Remove="Resources\device_generic.png" />
+		<None Remove="Resources\device_gpd3.png" />
+		<None Remove="Resources\device_gpd4.png" />
+		<None Remove="Resources\device_gpd_win2.png" />
+		<None Remove="Resources\device_gpd_winmax2.png" />
+		<None Remove="Resources\device_gpd_winmini.png" />
+		<None Remove="Resources\device_legion_go.png" />
+		<None Remove="Resources\device_msi_claw.png" />
+		<None Remove="Resources\device_onexplayer_2.png" />
+		<None Remove="Resources\device_onexplayer_mini.png" />
+		<None Remove="Resources\device_onexplayer_onexfly.png" />
+		<None Remove="Resources\device_onexplayer_x1.png" />
+		<None Remove="Resources\device_rog_ally.png" />
+		<None Remove="Resources\device_valve_jupiter.png" />
+		<None Remove="Resources\icon.png" />
+		<None Remove="Resources\led_presets\onexplayer\preset01.png" />
+		<None Remove="Resources\led_presets\onexplayer\preset02.png" />
+		<None Remove="Resources\led_presets\onexplayer\preset03.png" />
+		<None Remove="Resources\led_presets\onexplayer\preset04.png" />
+		<None Remove="Resources\led_presets\onexplayer\preset05.png" />
+		<None Remove="Resources\led_presets\onexplayer\preset06.png" />
+		<None Remove="Resources\led_presets\onexplayer\preset07.png" />
+		<None Remove="Resources\led_presets\onexplayer\preset08.png" />
+		<None Remove="Resources\led_presets\onexplayer\preset09.png" />
+		<None Remove="Resources\led_presets\onexplayer\preset10.png" />
+		<None Remove="Resources\led_presets\onexplayer\preset11.png" />
+		<None Remove="Resources\MainBody.mtl" />
+		<None Remove="Resources\MainBody.obj" />
+		<None Remove="Resources\MissingArtwork.png" />
+		<None Remove="Resources\msiapcfg.dll" />
+		<None Remove="Resources\PawnIO\RyzenSMU.bin" />
+		<None Remove="Resources\Screen.mtl" />
+		<None Remove="Resources\Screen.obj" />
+		<None Remove="Resources\seguiemj.ttf" />
+		<None Remove="Resources\ShoulderButtonLeft.mtl" />
+		<None Remove="Resources\ShoulderButtonLeft.obj" />
+		<None Remove="Resources\ShoulderButtonRight.mtl" />
+		<None Remove="Resources\ShoulderButtonRight.obj" />
+		<None Remove="Resources\xinput1_x64.dll" />
+		<None Remove="Views\Pages\overlay_back.webp" />
+	</ItemGroup>
+	<ItemGroup>
+		<Content Include="HandheldCompanion.json">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+			<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+		</Content>
+		<Content Include="Resources\icon.ico" />
+		<Content Include="Resources\xinput1_x64.dll" />
+	</ItemGroup>
+	<ItemGroup>
+		<EmbeddedResource Include="Resources\PawnIO\RyzenSMU.bin" />
+	</ItemGroup>
+	<ItemGroup>
+		<Resource Include="Resources\Controllers\controller_0_big.png" />
+		<Resource Include="Resources\Controllers\controller_1_big.png" />
+		<Resource Include="Resources\Controllers\controller_2_big.png" />
+		<Resource Include="Resources\Controllers\controller_3_big.png" />
+		<Resource Include="Resources\Controllers\controller_4_big.png" />
+		<Resource Include="Resources\Controllers\controller_6_big.png" />
+		<Resource Include="Resources\DeviceImages\device_gpd5.png" />
+		<Resource Include="Resources\DeviceImages\device_legion_go2.png" />
+		<Resource Include="Resources\DeviceImages\device_legion_go_s.png" />
+		<Resource Include="Resources\DeviceImages\device_msi_claw8.png" />
+	</ItemGroup>
+	<ItemGroup>
+		<Resource Include="Resources\DeviceImages\device_aya_flip_ds.png" />
+		<Resource Include="Resources\DeviceImages\device_aya_flip_kb.png" />
+		<Resource Include="Resources\DeviceImages\device_aya_kun.png" />
+		<Resource Include="Resources\DeviceImages\device_aya_slide.png" />
+		<Resource Include="Resources\DeviceImages\device_gpd_winmini.png" />
+		<Resource Include="Resources\DeviceImages\device_legion_go.png" />
+	</ItemGroup>
+	<ItemGroup>
+		<Resource Include="Resources\DeviceImages\device_aokzoe_a1.png" />
+		<Resource Include="Resources\DeviceImages\device_aya_2.png" />
+		<Resource Include="Resources\DeviceImages\device_aya_air.png" />
+		<Resource Include="Resources\DeviceImages\device_ayn_loki.png" />
+		<Resource Include="Resources\DeviceImages\device_generic.png" />
+	</ItemGroup>
+	<ItemGroup>
+		<Resource Include="Resources\DeviceImages\device_aya_2021.png" />
+		<Resource Include="Resources\DeviceImages\device_aya_next.png" />
+		<Resource Include="Resources\DeviceImages\device_gpd3.png" />
+		<Resource Include="Resources\DeviceImages\device_gpd4.png" />
+		<Resource Include="Resources\DeviceImages\device_gpd_win2.png" />
+		<Resource Include="Resources\DeviceImages\device_gpd_winmax2.png" />
+		<Resource Include="Resources\DeviceImages\device_minisforum_v3.png" />
+		<Resource Include="Resources\DeviceImages\device_msi_claw.png" />
+		<Resource Include="Resources\DeviceImages\device_msi_claw8ex.png" />
+		<Resource Include="Resources\DeviceImages\device_onexplayer_2.png" />
+		<Resource Include="Resources\DeviceImages\device_onexplayer_apex.png" />
+		<Resource Include="Resources\DeviceImages\device_onexplayer_g1.png" />
+		<Resource Include="Resources\DeviceImages\device_onexplayer_mini.png" />
+		<Resource Include="Resources\DeviceImages\device_onexplayer_onexfly.png" />
+		<Resource Include="Resources\DeviceImages\device_onexplayer_x1.png" />
+		<Resource Include="Resources\DeviceImages\device_onexplayer_x2.png" />
+		<Resource Include="Resources\DeviceImages\device_onexplayer_x2minipro.png" />
+		<Resource Include="Resources\DeviceImages\device_rog_ally.png" />
+		<Resource Include="Resources\DeviceImages\device_rog_ally_x.png" />
+		<Resource Include="Resources\DeviceImages\device_suiplay_0x1.png" />
+		<Resource Include="Resources\DeviceImages\device_valve_jupiter.png" />
+		<Resource Include="Resources\DeviceImages\device_xbox_rog_ally.png" />
+		<Resource Include="Resources\DeviceImages\device_xbox_rog_ally_x.png" />
+		<Resource Include="Resources\DeviceImages\device_zotac_zone.png" />
+		<Resource Include="Resources\icon.png" />
+		<Resource Include="Resources\MissingArtwork.png" />
+		<Resource Include="Resources\MissingCover.png" />
+		<Resource Include="Resources\led_presets\onexplayer\preset01.png" />
+		<Resource Include="Resources\led_presets\onexplayer\preset02.png" />
+		<Resource Include="Resources\led_presets\onexplayer\preset03.png" />
+		<Resource Include="Resources\led_presets\onexplayer\preset04.png" />
+		<Resource Include="Resources\led_presets\onexplayer\preset05.png" />
+		<Resource Include="Resources\led_presets\onexplayer\preset06.png" />
+		<Resource Include="Resources\led_presets\onexplayer\preset07.png" />
+		<Resource Include="Resources\led_presets\onexplayer\preset08.png" />
+		<Resource Include="Resources\led_presets\onexplayer\preset09.png" />
+		<Resource Include="Resources\led_presets\onexplayer\preset10.png" />
+		<Resource Include="Resources\led_presets\onexplayer\preset11.png" />
+		<Resource Include="Resources\msiapcfg.dll" />
+	</ItemGroup>
+	<ItemGroup>
+		<PackageReference Include="craftersmine.SteamGridDB.Net" Version="1.1.7" />
+		<PackageReference Include="Crc32.NET" Version="1.2.0" />
+		<PackageReference Include="dotnetCampus.Microsoft.Expression.Effects" Version="2.0.20525-alpha02" />
+		<PackageReference Include="Fastenshtein" Version="1.0.12" />
+		<PackageReference Include="GameFinder" Version="4.9.0" />
+		<PackageReference Include="GameFinder.StoreHandlers.Xbox" Version="4.9.0" />
+		<PackageReference Include="gong-wpf-dragdrop" Version="4.0.0" />
+		<PackageReference Include="GregsStack.InputSimulatorStandard" Version="1.3.5" />
+		<PackageReference Include="HelixToolkit.Core.Wpf" Version="2.27.3" />
+		<PackageReference Include="IGDB" Version="6.1.0" />
+		<PackageReference Include="iNKORE.UI.WPF.Emojis" Version="0.3.6.4" />
+		<PackageReference Include="Interop.IWshRuntimeLibrary" Version="1.0.1" />
+		<PackageReference Include="LiveCharts.Wpf.Core" Version="0.9.8" />
+		<PackageReference Include="MathConverter" Version="3.0.0" />
+		<PackageReference Include="Microsoft.Toolkit.Uwp.Notifications" Version="7.1.3" />
+		<PackageReference Include="Microsoft.Xaml.Behaviors.Wpf" Version="1.1.142" />
+		<PackageReference Include="Mono.Posix.NETStandard" Version="1.0.0" />
+		<PackageReference Include="NAudio" Version="2.3.0" />
+		<PackageReference Include="NAudio.Vorbis" Version="1.5.0" />
+		<PackageReference Include="Nefarius.Drivers.HidHide" Version="3.4.0" />
+		<PackageReference Include="Nefarius.Utilities.Bluetooth" Version="1.8.2" />
+		<PackageReference Include="Nefarius.Utilities.DeviceManagement" Version="5.2.0" />
+		<PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+		<PackageReference Include="NJsonSchema.Annotations" Version="11.6.1" />
+		<PackageReference Include="PInvoke.Kernel32" Version="0.7.124" />
+		<PackageReference Include="PixiEditor.ColorPicker" Version="3.4.2.3" />
+		<PackageReference Include="PrecisionTimer.NET" Version="3.0.0.7" />
+		<PackageReference Include="protobuf-net" Version="3.2.56" />
+		<PackageReference Include="protobuf-net.Core" Version="3.3.0-g6785ecbb35" />
+		<PackageReference Include="RAMSPDToolkit-NDD" Version="1.5.0" />
+		<PackageReference Include="SDL3-CS" Version="3.4.10.5" />
+		<PackageReference Include="Sentry" Version="6.6.0" />
+		<PackageReference Include="SharpDX" Version="4.2.0" />
+		<PackageReference Include="SharpDX.Direct3D9" Version="4.2.0" />
+		<PackageReference Include="SharpDX.DirectInput" Version="4.2.0" />
+		<PackageReference Include="SharpDX.XInput" Version="4.2.0" />
+		<PackageReference Include="System.Drawing.Common" Version="10.0.9" />
+		<PackageReference Include="System.IO.Ports" Version="10.0.9" />
+		<PackageReference Include="System.ServiceProcess.ServiceController" Version="10.0.9" />
+		<PackageReference Include="System.Text.Json" Version="10.0.9" />
+		<PackageReference Include="WindowsAPICodePack" Version="8.0.15.2" />
+		<PackageReference Include="WindowsDisplayAPI" Version="1.3.0.13" />
+		<PackageReference Include="WindowsInput" Version="6.4.1" />
+		<PackageReference Include="WpfScreenHelper" Version="2.1.1" />
+		<PackageReference Include="YamlDotNet" Version="18.1.0" />
+	</ItemGroup>
+	<ItemGroup>
+		<ProjectReference Include="..\controller-hidapi.net\controller-hidapi.net.csproj" />
+		<ProjectReference Include="..\Shared\Shared.csproj" />
+		<ProjectReference Include="..\steam-hidapi.net\steam-hidapi.net.csproj" />
+	</ItemGroup>
+	<ItemGroup>
+		<Compile Update="Properties\Resources.Designer.cs">
+			<DependentUpon>Resources.resx</DependentUpon>
+			<DesignTime>True</DesignTime>
+			<AutoGen>True</AutoGen>
+		</Compile>
+		<Compile Update="Properties\Settings.Designer.cs">
+			<DesignTimeSharedInput>True</DesignTimeSharedInput>
+			<AutoGen>True</AutoGen>
+			<DependentUpon>Settings.settings</DependentUpon>
+		</Compile>
+	</ItemGroup>
+	<ItemGroup>
+		<EmbeddedResource Update="Properties\Resources.ja-JP.resx">
+			<SubType>Designer</SubType>
+			<LastGenOutput>Resources.fr.Designer.cs</LastGenOutput>
+			<Generator>PublicResXFileCodeGenerator</Generator>
+		</EmbeddedResource>
+		<EmbeddedResource Update="Properties\Resources.fr-FR.resx">
+			<SubType>Designer</SubType>
+			<LastGenOutput>Resources.fr.Designer.cs</LastGenOutput>
+			<Generator>PublicResXFileCodeGenerator</Generator>
+		</EmbeddedResource>
+		<EmbeddedResource Update="Properties\Resources.resx">
+			<LastGenOutput>Resources.Designer.cs</LastGenOutput>
+			<Generator>PublicResXFileCodeGenerator</Generator>
+		</EmbeddedResource>
+	</ItemGroup>
+	<ItemGroup>
+		<None Update="GamepadMotion.dll">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="IGCL_Wrapper.dll">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="JoyShockLibrary.dll">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="libVIIPER.dll">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="PerformanceMetrics.dll">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="PresentationCore.dll">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="Resources\AMD\ADLX_Wrapper.dll">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="Resources\controller_0_0.png">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="Resources\controller_0_1.png">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="Resources\controller_1_0.png">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="Resources\controller_1_1.png">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="Resources\devcon.exe">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="Properties\Settings.settings">
+			<Generator>SettingsSingleFileGenerator</Generator>
+			<LastGenOutput>Settings.Designer.cs</LastGenOutput>
+		</None>
+		<None Update="Resources\inpoutx64.dll">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="Resources\Intel\KX\KX.exe">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="Resources\PromptFont.otf">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="Resources\Segoe Fluent Icons.ttf">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="RTSSHooks.dll">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="RTSSHooks64.dll">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="Resources\RTSSSharedMemoryNET.dll">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="SapientiaUsb.dll">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="SDL3.dll">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="ucrtbased.dll">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="UEFIVaribleDll.dll">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="UI\Audio\bong_001.ogg">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="UI\Audio\drop_001.ogg">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="UI\Audio\drop_002.ogg">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="UI\Audio\glitch_004.ogg">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="UI\Audio\switch_004.ogg">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="UI\Audio\switch_005.ogg">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="UI\Audio\switch_007.ogg">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="vcruntime140d.dll">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="vcruntime140_1d.dll">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="WinRing0x64.sys">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="Xinput1_4.dll">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+	</ItemGroup>
+	<ItemGroup>
+		<Reference Include="GameLib">
+			<HintPath>..\Resources\GameLib.dll</HintPath>
+		</Reference>
+		<Reference Include="GameLib.Core">
+			<HintPath>..\Resources\GameLib.Core.dll</HintPath>
+		</Reference>
+		<Reference Include="GameLib.Plugin.BattleNet">
+			<HintPath>..\Resources\GameLib.Plugin.BattleNet.dll</HintPath>
+		</Reference>
+		<Reference Include="GameLib.Plugin.EA">
+			<HintPath>..\Resources\GameLib.Plugin.EA.dll</HintPath>
+		</Reference>
+		<Reference Include="GameLib.Plugin.Epic">
+			<HintPath>..\Resources\GameLib.Plugin.Epic.dll</HintPath>
+		</Reference>
+		<Reference Include="GameLib.Plugin.Gog">
+			<HintPath>..\Resources\GameLib.Plugin.Gog.dll</HintPath>
+		</Reference>
+		<Reference Include="GameLib.Plugin.Origin">
+			<HintPath>..\Resources\GameLib.Plugin.Origin.dll</HintPath>
+		</Reference>
+		<Reference Include="GameLib.Plugin.RiotGames">
+			<HintPath>..\Resources\GameLib.Plugin.RiotGames.dll</HintPath>
+		</Reference>
+		<Reference Include="GameLib.Plugin.Rockstar">
+			<HintPath>..\Resources\GameLib.Plugin.Rockstar.dll</HintPath>
+		</Reference>
+		<Reference Include="GameLib.Plugin.Steam">
+			<HintPath>..\Resources\GameLib.Plugin.Steam.dll</HintPath>
+		</Reference>
+		<Reference Include="GameLib.Plugin.Ubisoft">
+			<HintPath>..\Resources\GameLib.Plugin.Ubisoft.dll</HintPath>
+		</Reference>
+		<Reference Include="Gma.System.MouseKeyHook">
+			<HintPath>..\Resources\Gma.System.MouseKeyHook.dll</HintPath>
+		</Reference>
+		<Reference Include="HidLibrary">
+			<HintPath>..\Resources\HidLibrary.dll</HintPath>
+		</Reference>
+		<Reference Include="iNKORE.UI.WPF">
+			<HintPath>..\Resources\iNKORE.UI.WPF.dll</HintPath>
+		</Reference>
+		<Reference Include="iNKORE.UI.WPF.Modern">
+			<HintPath>..\Resources\iNKORE.UI.WPF.Modern.dll</HintPath>
+		</Reference>
+		<Reference Include="iNKORE.UI.WPF.Modern.Controls">
+			<HintPath>..\Resources\iNKORE.UI.WPF.Modern.Controls.dll</HintPath>
+		</Reference>
+		<Reference Include="LibreHardwareMonitorLib">
+			<HintPath>..\Resources\LibreHardwareMonitorLib.dll</HintPath>
+		</Reference>
+		<Reference Include="Microsoft.Win32.TaskScheduler">
+			<HintPath>..\Resources\Microsoft.Win32.TaskScheduler.dll</HintPath>
+		</Reference>
+		<Reference Include="Nefarius.ViGEm.Client">
+			<HintPath>..\Resources\Nefarius.ViGEm.Client.dll</HintPath>
+		</Reference>
+		<Reference Include="RTSSSharedMemoryNET">
+			<HintPath>Resources\RTSSSharedMemoryNET.dll</HintPath>
+		</Reference>
+	</ItemGroup>
+	<Target Name="PreBuild" BeforeTargets="PreBuildEvent">
+		<Exec Command="if exist &quot;%25LocalAppData%25\HandheldCompanion\SecretKeys.cs&quot; (&#xA;    copy &quot;.\SecretKeys.cs&quot; &quot;.\SecretKeys.cs.bak&quot;&#xA;    copy &quot;%25LocalAppData%25\HandheldCompanion\SecretKeys.cs&quot; &quot;.\SecretKeys.cs&quot;&#xA;)" />
+	</Target>
+	<Target Name="PostBuild" AfterTargets="PostBuildEvent">
+		<Exec Command="if exist &quot;.\SecretKeys.cs.bak&quot; (&#xA;    copy &quot;.\SecretKeys.cs.bak&quot; &quot;.\SecretKeys.cs&quot;&#xA;    del &quot;.\SecretKeys.cs.bak&quot;&#xA;)&#xD;&#xA;&#xD;&#xA;if exist &quot;%25LocalAppData%25\HandheldCompanion\Certificate.pfx&quot; (&#xA;  echo Signing executable...&#xA;  &quot;C:\Program Files (x86)\Windows Kits\10\bin\$(TargetPlatformVersion)\x64\signtool.exe&quot; sign /fd SHA256 /f &quot;%25LocalAppData%25\HandheldCompanion\Certificate.pfx&quot; /p HandheldCompanion /d &quot;Handheld Companion&quot; /du &quot;https://github.com/Valkirie/HandheldCompanion&quot; /t http://timestamp.digicert.com &quot;$(OutDir)HandheldCompanion.exe&quot;&#xA;  if errorlevel 1 (&#xA;    echo Post-build signing failed.&#xA;    exit /B 1&#xA;  ) else (&#xA;    echo Post-build signing succeeded.&#xA;  )&#xA;)" />
+	</Target>
+</Project>
+

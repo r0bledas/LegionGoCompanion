@@ -1,0 +1,55 @@
+
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 18
+VisualStudioVersion = 18.3.11520.95
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{4A4F8C55-09C7-4B4C-9752-E2E05AF25E30}"
+	ProjectSection(SolutionItems) = preProject
+		.editorconfig = .editorconfig
+	EndProjectSection
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HandheldCompanion", "HandheldCompanion\HandheldCompanion.csproj", "{535BAAF9-AA89-4505-A9E9-122A368ADD3C}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Shared", "Shared\Shared.csproj", "{54DCC6E7-611F-471C-835E-7ADEFE2FE102}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "hidapi.net", "hidapi.net\hidapi.net.csproj", "{9B860078-9AD1-45DD-8F85-E6D806E5DC9B}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "steam-hidapi.net", "steam-hidapi.net\steam-hidapi.net.csproj", "{F7283783-81EF-4CD2-BD86-598FE193C11F}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "controller-hidapi.net", "controller-hidapi.net\controller-hidapi.net.csproj", "{62E9B011-2D07-4A7E-8C71-33A26A5E5B34}"
+EndProject
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x64 = Debug|x64
+		Release|x64 = Release|x64
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{535BAAF9-AA89-4505-A9E9-122A368ADD3C}.Debug|x64.ActiveCfg = Debug|x64
+		{535BAAF9-AA89-4505-A9E9-122A368ADD3C}.Debug|x64.Build.0 = Debug|x64
+		{535BAAF9-AA89-4505-A9E9-122A368ADD3C}.Release|x64.ActiveCfg = Release|x64
+		{535BAAF9-AA89-4505-A9E9-122A368ADD3C}.Release|x64.Build.0 = Release|x64
+		{54DCC6E7-611F-471C-835E-7ADEFE2FE102}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{54DCC6E7-611F-471C-835E-7ADEFE2FE102}.Debug|x64.Build.0 = Debug|Any CPU
+		{54DCC6E7-611F-471C-835E-7ADEFE2FE102}.Release|x64.ActiveCfg = Release|Any CPU
+		{54DCC6E7-611F-471C-835E-7ADEFE2FE102}.Release|x64.Build.0 = Release|Any CPU
+		{9B860078-9AD1-45DD-8F85-E6D806E5DC9B}.Debug|x64.ActiveCfg = Debug|x64
+		{9B860078-9AD1-45DD-8F85-E6D806E5DC9B}.Debug|x64.Build.0 = Debug|x64
+		{9B860078-9AD1-45DD-8F85-E6D806E5DC9B}.Release|x64.ActiveCfg = Release|x64
+		{9B860078-9AD1-45DD-8F85-E6D806E5DC9B}.Release|x64.Build.0 = Release|x64
+		{F7283783-81EF-4CD2-BD86-598FE193C11F}.Debug|x64.ActiveCfg = Debug|x64
+		{F7283783-81EF-4CD2-BD86-598FE193C11F}.Debug|x64.Build.0 = Debug|x64
+		{F7283783-81EF-4CD2-BD86-598FE193C11F}.Release|x64.ActiveCfg = Release|x64
+		{F7283783-81EF-4CD2-BD86-598FE193C11F}.Release|x64.Build.0 = Release|x64
+		{62E9B011-2D07-4A7E-8C71-33A26A5E5B34}.Debug|x64.ActiveCfg = Debug|x64
+		{62E9B011-2D07-4A7E-8C71-33A26A5E5B34}.Debug|x64.Build.0 = Debug|x64
+		{62E9B011-2D07-4A7E-8C71-33A26A5E5B34}.Release|x64.ActiveCfg = Release|x64
+		{62E9B011-2D07-4A7E-8C71-33A26A5E5B34}.Release|x64.Build.0 = Release|x64
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {AD9A944E-70E1-4512-9F51-8786F866BACA}
+	EndGlobalSection
+EndGlobal
