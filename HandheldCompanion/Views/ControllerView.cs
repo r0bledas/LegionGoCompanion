@@ -1,8 +1,11 @@
 using System;
 using System.Drawing;
+using System.Media;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 using HandheldCompanion.Devices;
 using HandheldCompanion.Devices.Lenovo;
+using HandheldCompanion.Helpers;
 using HandheldCompanion.Managers;
 using HandheldCompanion.Shared;
 
@@ -36,10 +39,10 @@ namespace HandheldCompanion.Views
             this.lblTitle.Text = "Controller & Gyro Emulation";
             this.lblTitle.Font = new Font("Segoe UI", 18F, FontStyle.Bold);
             this.lblTitle.Location = new Point(25, 20);
-            this.lblTitle.Size = new Size(450, 35);
+            this.lblTitle.Size = new Size(500, 35);
 
             // Status Label
-            this.lblStatus.Text = "Active Emulation: DualShock 4 (DS4 + Gyro for Fortnite)";
+            this.lblStatus.Text = "Active Mode: " + (VirtualManager.HIDmode != HIDmode.NoController ? VirtualManager.HIDmode.ToString() : "Passthrough / Native");
             this.lblStatus.Font = new Font("Segoe UI", 12F, FontStyle.Regular);
             this.lblStatus.ForeColor = Color.FromArgb(0, 102, 204);
             this.lblStatus.Location = new Point(28, 65);
@@ -51,36 +54,41 @@ namespace HandheldCompanion.Views
             this.flowPanel.AutoScroll = true;
 
             // Button 1: DualShock 4
-            AddButton("DUALSHOCK 4\n(Gyro / Fortnite)", () =>
+            AddButton("DUALSHOCK 4\n(Gyro / Fortnite)", async () =>
             {
+                lblStatus.Text = "Switching to DualShock 4...";
+                PlayDisconnectSound();
+                await VirtualManager.SetControllerMode(HIDmode.DualShock4Controller);
+                await VirtualManager.SetControllerStatus(HIDstatus.Connected);
+                PlayConnectSound();
                 lblStatus.Text = "Active Emulation: DualShock 4 (Gyro Active)";
-                LogManager.LogInformation("Switched to DS4 Emulation");
-            }, true);
+            }, VirtualManager.HIDmode == HIDmode.DualShock4Controller);
 
             // Button 2: Xbox 360
-            AddButton("XBOX 360\n(Standard XInput)", () =>
+            AddButton("XBOX 360\n(Standard XInput)", async () =>
             {
-                lblStatus.Text = "Active Emulation: Xbox 360";
-                LogManager.LogInformation("Switched to Xbox 360 Emulation");
-            }, false);
+                lblStatus.Text = "Switching to Xbox 360...";
+                PlayDisconnectSound();
+                await VirtualManager.SetControllerMode(HIDmode.Xbox360Controller);
+                await VirtualManager.SetControllerStatus(HIDstatus.Connected);
+                PlayConnectSound();
+                lblStatus.Text = "Active Emulation: Xbox 360 (XInput)";
+            }, VirtualManager.HIDmode == HIDmode.Xbox360Controller);
 
             // Button 3: Passthrough
-            AddButton("PASSTHROUGH\n(Native Controller)", () =>
+            AddButton("PASSTHROUGH\n(Native Controller)", async () =>
             {
+                lblStatus.Text = "Switching to Native Passthrough...";
+                PlayDisconnectSound();
+                await VirtualManager.SetControllerMode(HIDmode.NoController);
+                await VirtualManager.SetControllerStatus(HIDstatus.Disconnected);
                 if (IDevice.GetCurrent() is LegionGo lego)
                 {
                     lego.SetPassthrough(true);
                 }
-                lblStatus.Text = "Active Emulation: Direct Native Passthrough";
-                LogManager.LogInformation("Enabled Controller Passthrough");
-            }, false);
-
-            // Button 4: Desktop Mouse Mode
-            AddButton("DESKTOP MOUSE\n(Stick as Mouse)", () =>
-            {
-                lblStatus.Text = "Active Mode: Desktop Mouse Control";
-                LogManager.LogInformation("Toggled Desktop Mouse Mode");
-            }, false);
+                PlayConnectSound();
+                lblStatus.Text = "Active Mode: Direct Native Passthrough";
+            }, VirtualManager.HIDmode == HIDmode.NoController);
 
             this.Controls.Add(this.lblTitle);
             this.Controls.Add(this.lblStatus);
@@ -89,7 +97,17 @@ namespace HandheldCompanion.Views
             this.ResumeLayout(false);
         }
 
-        private void AddButton(string text, Action onClick, bool isInitialActive)
+        private void PlayDisconnectSound()
+        {
+            try { SystemSounds.Asterisk.Play(); } catch { }
+        }
+
+        private void PlayConnectSound()
+        {
+            try { SystemSounds.Exclamation.Play(); } catch { }
+        }
+
+        private void AddButton(string text, Func<Task> onClick, bool isInitialActive)
         {
             Button btn = new Button
             {
@@ -105,10 +123,10 @@ namespace HandheldCompanion.Views
             btn.FlatAppearance.BorderSize = 2;
             btn.FlatAppearance.BorderColor = isInitialActive ? Color.FromArgb(0, 80, 180) : Color.FromArgb(210, 210, 210);
 
-            btn.Click += (s, e) =>
+            btn.Click += async (s, e) =>
             {
-                onClick();
                 HighlightButton(btn);
+                await onClick();
             };
 
             this.flowPanel.Controls.Add(btn);
