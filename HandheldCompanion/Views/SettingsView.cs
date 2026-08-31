@@ -62,7 +62,7 @@ namespace HandheldCompanion.Views
             });
 
             // Button 2: Open Logs
-            AddAction"OPEN LOGS\nFOLDER", () =>
+            AddAction("OPEN LOGS\nFOLDER", () =>
             {
                 string logPath = Environment.GetEnvironmentVariable("LOG_PATH") ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "HandheldCompanion", "logs");
                 if (System.IO.Directory.Exists(logPath))
@@ -72,7 +72,7 @@ namespace HandheldCompanion.Views
             });
 
             // Button 3: Restart App
-            AddAction"RESTART\nCOMPANION", () =>
+            AddAction("RESTART\nCOMPANION", () =>
             {
                 Application.Restart();
                 Environment.Exit(0);
