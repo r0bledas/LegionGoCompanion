@@ -117,6 +117,13 @@ namespace HandheldCompanion.Managers
             // Retrieve the default HID mode from settings
             HIDmode selectedHIDMode = (HIDmode)ManagerFactory.settingsManager.GetInt("HIDmode");
 
+            // If DesktopLayoutOnStart is disabled, default to x360 controller
+            bool desktopOnStart = ManagerFactory.settingsManager.GetBoolean("DesktopLayoutOnStart");
+            if (!desktopOnStart && (selectedHIDMode == HIDmode.NoController || selectedHIDMode == HIDmode.NotSelected))
+            {
+                selectedHIDMode = HIDmode.Xbox360Controller;
+            }
+
             // Check if ProfileManager is initialized and a valid profile is available
             if (ManagerFactory.profileManager.IsReady)
             {

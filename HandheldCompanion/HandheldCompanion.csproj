@@ -11,7 +11,9 @@
 		<StartupObject>HandheldCompanion.Program</StartupObject>
 		<OutputPath>$(SolutionDir)bin\$(Configuration)</OutputPath>
 		<ApplicationIcon>Resources\icon.ico</ApplicationIcon>
-		<Version>0.32.4.0</Version>
+		<Version>1.1.0</Version>
+		<AssemblyVersion>1.1.0.0</AssemblyVersion>
+		<FileVersion>1.1.0.0</FileVersion>
 		<Platforms>x64</Platforms>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 		<RunPostBuildEvent>OnBuildSuccess</RunPostBuildEvent>
@@ -264,9 +266,16 @@
 		<PackageReference Include="YamlDotNet" Version="18.1.0" />
 	</ItemGroup>
 	<ItemGroup>
-		<ProjectReference Include="..\controller-hidapi.net\controller-hidapi.net.csproj" />
+		<Reference Include="hidapi.net">
+			<HintPath>..\Resources\hidapi.net.dll</HintPath>
+		</Reference>
+		<Reference Include="controller-hidapi.net">
+			<HintPath>..\Resources\controller-hidapi.net.dll</HintPath>
+		</Reference>
+		<Reference Include="steam-hidapi.net">
+			<HintPath>..\Resources\steam-hidapi.net.dll</HintPath>
+		</Reference>
 		<ProjectReference Include="..\Shared\Shared.csproj" />
-		<ProjectReference Include="..\steam-hidapi.net\steam-hidapi.net.csproj" />
 	</ItemGroup>
 	<ItemGroup>
 		<Compile Update="Properties\Resources.Designer.cs">

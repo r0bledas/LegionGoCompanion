@@ -215,8 +215,8 @@ public class LayoutManager : IManager
         bool desktopLayoutOnStart = ManagerFactory.settingsManager.GetBoolean("DesktopLayoutOnStart");
         if (desktopLayoutOnStart)
             ManagerFactory.settingsManager.SetProperty("LayoutMode", (int)LayoutModes.Desktop);
-        else if ((LayoutModes)ManagerFactory.settingsManager.GetInt("LayoutMode") == LayoutModes.Desktop)
-            ManagerFactory.settingsManager.SetProperty("LayoutMode", (int)LayoutModes.Auto);
+        else
+            ManagerFactory.settingsManager.SetProperty("LayoutMode", (int)LayoutModes.Gamepad);
     }
 
     private void SettingsManager_SettingValueChanged(string? name, object? value, bool temporary, bool initializing)
@@ -888,6 +888,14 @@ public class LayoutManager : IManager
     public Layout? GetDefault() => defaultLayout;
     public Layout? GetCurrent() => currentLayout;
     public Layout? GetDesktop() => desktopLayout;
+
+    public LayoutModes GetCurrentMode() => (LayoutModes)ManagerFactory.settingsManager.GetInt("LayoutMode");
+
+    public void SetLayoutMode(LayoutModes mode)
+    {
+        ManagerFactory.settingsManager.SetProperty("LayoutMode", (int)mode);
+        CheckProfileLayout();
+    }
 
     //  Events
     public event LayoutChangedEventHandler? LayoutChanged;

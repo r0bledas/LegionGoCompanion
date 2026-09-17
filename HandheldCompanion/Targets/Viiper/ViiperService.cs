@@ -2,6 +2,7 @@ using HandheldCompanion.Shared;
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
+using System.Threading.Tasks;
 
 namespace HandheldCompanion.Targets.Viiper
 {
@@ -114,12 +115,24 @@ namespace HandheldCompanion.Targets.Viiper
 
             RegisterFeedbackCallback(busId, deviceId);
             LogManager.LogInformation("VIIPER device added: {0} (bus={1}, dev={2}, vid=0x{3:X4}, pid=0x{4:X4})", typeName, busId, deviceId, vid, pid);
+
+            try
+            {
+                Task.Run(() => UsbipCli.AttachExportedDevices());
+            }
+            catch { }
+
             return new ViiperAddDeviceResult(true, deviceId);
         }
 
         public bool RemoveDevice(uint busId, uint deviceId)
         {
             _feedbackDelegates.Remove(Tuple.Create(busId, deviceId));
+            try
+            {
+                UsbipCli.DetachAll();
+            }
+            catch { }
             int result = LibViiper.viiper_device_remove(busId, deviceId);
             if (result != 0)
             {
@@ -171,6 +184,12 @@ namespace HandheldCompanion.Targets.Viiper
             {
                 if (!_initialized)
                     return;
+
+                try
+                {
+                    UsbipCli.DetachAll();
+                }
+                catch { }
 
                 try
                 {

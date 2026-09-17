@@ -9,7 +9,7 @@ using System.Windows.Media;
 
 namespace HandheldCompanion.Controllers;
 
-public class XInputController : IController
+public class XInputController : IController, IXInputController
 {
     private Controller? Controller;
     private Gamepad Gamepad;

@@ -1,3 +1,4 @@
+using HandheldCompanion.Devices;
 using HandheldCompanion.Devices.Lenovo;
 using HandheldCompanion.Helpers;
 using HandheldCompanion.Inputs;
@@ -6,6 +7,7 @@ using HandheldCompanion.Shared;
 using HandheldCompanion.Utils;
 using System;
 using System.Runtime.InteropServices;
+using System.Threading;
 
 namespace HandheldCompanion.Controllers.Lenovo
 {
@@ -214,7 +216,7 @@ namespace HandheldCompanion.Controllers.Lenovo
             if (IsBusy || !IsPlugged || _disposing || _disposed)
                 return;
 
-            if (!UpdateXInputState())
+            if (!UpdateState())
                 return;
 
             FrontEnum frontButton = (FrontEnum)data[FRONT_IDX];
@@ -453,6 +455,32 @@ namespace HandheldCompanion.Controllers.Lenovo
         public void SetGyroIndex(int idx)
         {
             gamepadIndex = (byte)idx;
+        }
+
+        public override bool CyclePort()
+        {
+            if (IsWireless())
+            {
+                if (IDevice.GetCurrent() is LegionGoTablet device)
+                {
+                    // set status
+                    IsBusy = true;
+                    ControllerManager.PowerCyclers[GetContainerInstanceId()] = true;
+
+                    device.ApplyGamepadMode(this.GetType() == typeof(LegionControllerDInput) ? 1 : 2);
+                    Thread.Sleep(3000);
+                    device.ApplyGamepadMode(this.GetType() == typeof(LegionControllerDInput) ? 2 : 1);
+                    Thread.Sleep(3000);
+
+                    // set status
+                    IsBusy = false;
+                    ControllerManager.PowerCyclers[GetContainerInstanceId()] = false;
+
+                    return true;
+                }
+            }
+
+            return base.CyclePort();
         }
 
         public override string GetFontFamily(ButtonFlags button)

@@ -115,22 +115,22 @@ public class SettingsManager : IManager
 
         try
         {
-            if (!temporary)
+            if (!temporary && PropertyExists(name))
             {
                 Properties.Settings.Default[name] = value;
                 Properties.Settings.Default.Save();
             }
-
-            // update internal settings dictionary (used for temporary settings)
-            Settings[name] = value;
-
-            // raise event
-            if (Status.HasFlag(ManagerStatus.Initialized) || force)
-                SettingValueChanged?.Invoke(name, value, temporary, false);
-
-            LogManager.LogDebug("Settings {0} set to {1}", name, value ?? "null");
         }
         catch (Exception) { }
+
+        // update internal settings dictionary
+        Settings[name] = value;
+
+        // raise event
+        if (Status.HasFlag(ManagerStatus.Initialized) || force)
+            SettingValueChanged?.Invoke(name, value, temporary, false);
+
+        LogManager.LogDebug("Settings {0} set to {1}", name, value ?? "null");
     }
 
     private bool PropertyExists(string name)
@@ -211,6 +211,8 @@ public class SettingsManager : IManager
                         return property ?? false;
                     if (PropertyExists(name))
                         return Properties.Settings.Default[name] ?? false;
+                    if (Settings.TryGetValue(name, out var customVal))
+                        return customVal ?? false;
 
                     return false;
                 }

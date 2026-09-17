@@ -119,7 +119,8 @@ public static class ControllerManager
     private static readonly DummyDualSenseController dummyDualSense = new();
     private static readonly DummySteamDeckController dummySteamDeck = new();
     private static readonly DummySwitchProController dummySwitchPro = new();
-    public static bool HasTargetController => GetTarget() != null;
+    public static bool HasTargetController => targetController != null;
+    public static IController? TargetController => targetController;
 
     private static IController? targetController;
     private static ProcessEx? foregroundProcess;
@@ -670,7 +671,7 @@ public static class ControllerManager
 
                     if (controller is not null)
                     {
-                        if (controller is XInputController) return;
+                        if (controller is XInputController or LegionControllerXInput) return;
                         if (controller is SDLController) return;
 
                         controller.AttachDetails(details);
@@ -721,10 +722,22 @@ public static class ControllerManager
                             case 0x17EF:
                                 switch (ProductId)
                                 {
-                                    case 0x6183:
-                                    case 0x6184:
-                                    case 0x61EC:
-                                    case 0x61ED:
+                                    case 0x6184: // dual_dinput
+                                    case 0x61ED: // dual_dinput (2025 FW)
+                                        if (details.GetMI() == 2 || details.isBluetooth)
+                                        {
+                                            details.isDongle = true;
+                                            try { controller = new LegionControllerDInput(details); } catch { }
+                                        }
+                                        else
+                                        {
+                                            // Auxiliary interface of composite HID device, ignore silently
+                                            return;
+                                        }
+                                        break;
+                                    case 0x6183: // dinput
+                                    case 0x61EC: // dinput (2025 FW)
+                                        try { controller = new LegionControllerDInput(details); } catch { }
                                         break;
                                     case 0xE311:
                                         break;
@@ -808,7 +821,7 @@ public static class ControllerManager
                     }
 
                     if (controller == null) return;
-                    if (controller is XInputController) return;
+                    if (controller is XInputController or LegionControllerXInput) return;
                     if (controller is SDLController) return;
 
                     PowerCyclers.TryGetValue(details.baseContainerDeviceInstanceId, out bool IsPowerCycling);
@@ -867,10 +880,11 @@ public static class ControllerManager
 
                     if (controller != null)
                     {
-                        if (controller is DInputController) return;
+                        if (controller is DInputController or LegionControllerDInput) return;
                         if (controller is SDLController) return;
+                        if (controller is not IXInputController) return;
 
-                        ((XInputController)controller).AttachDetails(details);
+                        controller.AttachDetails(details);
 
                         if (controller.GetInstanceId() != details.deviceInstanceId)
                         {
@@ -895,7 +909,7 @@ public static class ControllerManager
                                 {
                                     case "0x6182":
                                     case "0x61EB":
-                                        try { controller = new LegionController(details); } catch { }
+                                        try { controller = new LegionControllerXInput(details); } catch { }
                                         break;
 
                                     case "0xE310":
@@ -1006,7 +1020,7 @@ public static class ControllerManager
                     }
 
                     if (controller == null) return;
-                    if (controller is DInputController) return;
+                    if (controller is DInputController or LegionControllerDInput) return;
                     if (controller is SDLController) return;
 
                     PowerCyclers.TryGetValue(details.baseContainerDeviceInstanceId, out bool IsPowerCycling);
@@ -1605,7 +1619,7 @@ public static class ControllerManager
         catch { }
     }
 
-    private static List<XInputController> InvalidSlotAssignments = new();
+    private static List<IController> InvalidSlotAssignments = new();
 
     private sealed record SlotProbeResult(
         bool NeedsFix,
@@ -1660,11 +1674,11 @@ public static class ControllerManager
         await slotStateSemaphore.WaitAsync().ConfigureAwait(false);
         try
         {
-            var slotOwners = new Dictionary<byte, XInputController>();
-            var newInvalid = new List<XInputController>();
+            var slotOwners = new Dictionary<byte, IController>();
+            var newInvalid = new List<IController>();
 
-            var tasks = GetControllers<XInputController>()
-                .Where(c => !c.IsDummy() && !c.IsBusy)
+            var tasks = GetControllers<IController>()
+                .Where(c => c is IXInputController && !c.IsDummy() && !c.IsBusy)
                 .Select(controller => Task.Run(() =>
                 {
                     byte index = DeviceManager.GetXInputIndex(controller.GetContainerPath());
@@ -1677,7 +1691,7 @@ public static class ControllerManager
                     if (index == byte.MaxValue)
                         return;
 
-                    controller.AttachController(index);
+                    ((IXInputController)controller).AttachController(index);
 
                     lock (slotOwners)
                     {
@@ -1707,7 +1721,7 @@ public static class ControllerManager
             bool ensureVirtualSlot1 =
                 VirtualManager.HIDmode == HIDmode.Xbox360Controller &&
                 VirtualManager.HIDstatus == HIDstatus.Connected &&
-                (HasPhysicalController<XInputController>() || HasVirtualController<XInputController>());
+                (HasPhysicalController<XInputController>() || GetPhysicalControllers<IController>().Any(c => c is IXInputController) || HasVirtualController<XInputController>());
 
             bool virtualInSlot1 = !ensureVirtualSlot1 ||
                 GetControllerFromSlot<XInputController>(UserIndex.One, false) is not null;

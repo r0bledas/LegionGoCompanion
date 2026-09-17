@@ -28,47 +28,195 @@ namespace HandheldCompanion
         [DllImport("user32.dll")]
         private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
 
+        [DllImport("user32.dll")]
+        private static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
+        private delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
+
+        [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
+        private static extern int RegisterWindowMessage(string lpString);
+
+        [DllImport("user32.dll")]
+        private static extern bool PostMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
+
+        [DllImport("user32.dll")]
+        private static extern bool ChangeWindowMessageFilter(uint message, uint dwFlag);
+
+        private const uint MSGFLT_ADD = 1;
+        private static readonly IntPtr HWND_BROADCAST = new IntPtr(0xffff);
+        public static uint WM_SHOWME = 0;
+
+        private static bool CheckExistingInstanceAndSignal()
+        {
+            try
+            {
+                int currentPid = Process.GetCurrentProcess().Id;
+                string currentName = Process.GetCurrentProcess().ProcessName;
+                var processes = Process.GetProcessesByName(currentName);
+                if (processes.Length > 1)
+                {
+                    uint wm = (uint)RegisterWindowMessage("HANDHELD_COMPANION_SHOW_WINDOW");
+                    PostMessage(HWND_BROADCAST, wm, IntPtr.Zero, IntPtr.Zero);
+                    return true;
+                }
+            }
+            catch { }
+            return false;
+        }
+
+        [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
+        private static extern int GetWindowText(IntPtr hWnd, System.Text.StringBuilder lpString, int nMaxCount);
+
+        [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
+        private static extern int GetClassName(IntPtr hWnd, System.Text.StringBuilder lpClassName, int nMaxCount);
+
         private static void StartWindowSuppressor()
         {
-            Task.Run(() =>
+            var suppressorThread = new Thread(() =>
             {
-                // Run background monitor for first 15 seconds of startup to instantly hide any console flashbangs from usbip
-                DateTime endTime = DateTime.Now.AddSeconds(15);
-                while (DateTime.Now < endTime)
+                var titleSb = new System.Text.StringBuilder(256);
+                var classSb = new System.Text.StringBuilder(256);
+
+                while (true)
                 {
                     try
                     {
-                        Process[] usbipProcs = Process.GetProcessesByName("usbip");
-                        foreach (var proc in usbipProcs)
+                        EnumWindows((hWnd, lParam) =>
                         {
-                            if (proc.MainWindowHandle != IntPtr.Zero)
+                            classSb.Clear();
+                            GetClassName(hWnd, classSb, classSb.Capacity);
+                            string cls = classSb.ToString();
+                            if (cls == "ConsoleWindowClass")
                             {
-                                ShowWindow(proc.MainWindowHandle, SW_HIDE);
+                                titleSb.Clear();
+                                GetWindowText(hWnd, titleSb, titleSb.Capacity);
+                                string title = titleSb.ToString();
+                                if (title.Contains("usbip", StringComparison.OrdinalIgnoreCase) ||
+                                    title.Contains("viiper", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    ShowWindow(hWnd, SW_HIDE);
+                                }
                             }
-                        }
-
-                        Process[] cmdProcs = Process.GetProcessesByName("cmd");
-                        foreach (var proc in cmdProcs)
-                        {
-                            if (proc.MainWindowHandle != IntPtr.Zero && (proc.MainWindowTitle.Contains("usbip", StringComparison.OrdinalIgnoreCase) || string.IsNullOrWhiteSpace(proc.MainWindowTitle)))
-                            {
-                                ShowWindow(proc.MainWindowHandle, SW_HIDE);
-                            }
-                        }
+                            return true;
+                        }, IntPtr.Zero);
                     }
                     catch { }
 
-                    Thread.Sleep(5); // Ultra low polling latency to suppress the flash before it draws
+                    Thread.Sleep(20);
                 }
-            });
+            })
+            {
+                IsBackground = true,
+                Priority = ThreadPriority.Lowest
+            };
+            suppressorThread.Start();
+        }
+
+        private static void KillPreviousInstances()
+        {
+            try
+            {
+                int currentPid = Process.GetCurrentProcess().Id;
+                string currentName = Process.GetCurrentProcess().ProcessName;
+                var targetNames = new System.Collections.Generic.HashSet<string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    currentName,
+                    "HandheldCompanion",
+                    "LegionGoCompanion"
+                };
+
+                foreach (var name in targetNames)
+                {
+                    Process[] processes = Process.GetProcessesByName(name);
+                    foreach (var p in processes)
+                    {
+                        if (p.Id != currentPid)
+                        {
+                            try
+                            {
+                                p.Kill();
+                                p.WaitForExit(3000);
+                            }
+                            catch { }
+                        }
+                    }
+                }
+            }
+            catch { }
+        }
+
+        private static void CleanOldFiles()
+        {
+            try
+            {
+                string dir = AppDomain.CurrentDomain.BaseDirectory;
+                var oldFiles = Directory.GetFiles(dir, "*.old", SearchOption.AllDirectories);
+                foreach (var file in oldFiles)
+                {
+                    try { File.Delete(file); } catch { }
+                }
+            }
+            catch { }
+        }
+
+        private static bool IsAdministrator()
+        {
+            try
+            {
+                using var identity = System.Security.Principal.WindowsIdentity.GetCurrent();
+                var principal = new System.Security.Principal.WindowsPrincipal(identity);
+                return principal.IsInRole(System.Security.Principal.WindowsBuiltInRole.Administrator);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static bool TryElevateViaScheduledTaskOrUac()
+        {
+            if (IsAdministrator())
+                return false; // Already elevated
+
+            // Elevate interactively via UAC so the GUI window appears on the user's active desktop
+            try
+            {
+                string exe = Process.GetCurrentProcess().MainModule?.FileName ?? "HandheldCompanion.exe";
+                var psi = new ProcessStartInfo(exe)
+                {
+                    UseShellExecute = true,
+                    Verb = "runas"
+                };
+                Process.Start(psi);
+                return true;
+            }
+            catch { }
+
+            return false;
         }
 
         [STAThread]
-        static void Main()
+        static void Main(string[] args)
         {
+            // If another instance is already running, signal it to restore its window and exit immediately!
+            if (CheckExistingInstanceAndSignal())
+                return;
+
+            if (!args.Contains("--no-elevate") && TryElevateViaScheduledTaskOrUac())
+                return;
+
             Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
+
+            // Register message so lower-integrity processes can signal us to show window
+            WM_SHOWME = (uint)RegisterWindowMessage("HANDHELD_COMPANION_SHOW_WINDOW");
+            try { ChangeWindowMessageFilter(WM_SHOWME, MSGFLT_ADD); } catch { }
+
+            // Terminate any previous dead instances
+            KillPreviousInstances();
+
+            // Clean up any temporary .old files from updates/deploys
+            CleanOldFiles();
 
             // Suppress any console window flashbangs immediately
             StartWindowSuppressor();
@@ -122,6 +270,7 @@ namespace HandheldCompanion
                 Task.Run(() => ControllerManager.Start());
                 string exePath = Process.GetCurrentProcess().MainModule?.FileName ?? "LegionGoCompanion.exe";
                 Task.Run(() => TaskManager.Start(exePath));
+                Task.Run(() => HidHide.RegisterApplication(exePath));
                 Task.Run(() => PerformanceManager.Start());
                 Task.Run(() => UpdateManager.Start());
 

@@ -412,6 +412,7 @@ public class LegionGo : IDevice
     public override void set_long_limit(int limit)
     {
         SetCPUPowerLimit(CapabilityID.CPULongTermPowerLimit, limit);
+        SetCPUPowerLimit(CapabilityID.APUsPPTPowerLimit, limit);
         SetCPUPowerLimit(CapabilityID.CPUCrossLoadingPowerLimit, limit);
     }
 

@@ -1,4 +1,4 @@
-﻿// #define USE_SAPIENTIAUSB
+// #define USE_SAPIENTIAUSB
 using HandheldCompanion.Actions;
 using HandheldCompanion.Inputs;
 using HidLibrary;
@@ -169,6 +169,18 @@ namespace HandheldCompanion.Devices.Lenovo
         private byte[] SetSteamOSMode(bool enabled)
         {
             return new byte[] { 0x05, 0x06, 0x69, 0x09, 0x01, (byte)(enabled ? 0x02 : 0x01), 0x01 };
+        }
+
+        public bool ApplyGamepadMode(int mode)
+        {
+            // 1 = XInput, 2 = DInput  (0 = "unknown" — never send)
+            if (mode != 1 && mode != 2)
+                return false;
+
+            if (!hidDevices.TryGetValue(INPUT_HID_ID, out HidDevice? device))
+                return false;
+
+            return device.Write([0x05, 0x00, 0x04, 0x0E, 0x03, (byte)mode]);
         }
 
         public override void SetPassthrough(bool enabled)

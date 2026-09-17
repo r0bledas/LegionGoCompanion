@@ -27,46 +27,53 @@ namespace HandheldCompanion.Views
 
             this.SuspendLayout();
 
-            this.BackColor = Color.White;
-            this.ForeColor = Color.Black;
             this.Dock = DockStyle.Fill;
             this.AutoScroll = true;
 
             // Title
-            this.lblTitle.Text = "Fan Control Presets";
-            this.lblTitle.Font = new Font("Segoe UI", 18F, FontStyle.Bold);
-            this.lblTitle.Location = new Point(25, 20);
-            this.lblTitle.Size = new Size(400, 35);
+            this.lblTitle.Text = "Fan Speed & Thermal Control";
+            this.lblTitle.Font = new Font(this.Font.FontFamily, 11F, FontStyle.Bold);
+            this.lblTitle.Location = new Point(15, 15);
+            this.lblTitle.AutoSize = true;
 
             // Status Label
-            this.lblStatus.Text = "Active Mode: Select a fan preset below";
-            this.lblStatus.Font = new Font("Segoe UI", 12F, FontStyle.Regular);
-            this.lblStatus.ForeColor = Color.FromArgb(0, 102, 204);
-            this.lblStatus.Location = new Point(28, 65);
-            this.lblStatus.Size = new Size(600, 25);
+            this.lblStatus.Text = "Active Mode: Auto / Balanced";
+            this.lblStatus.Location = new Point(16, 42);
+            this.lblStatus.AutoSize = true;
 
-            // FlowPanel for big touch buttons
-            this.flowPanel.Location = new Point(25, 105);
-            this.flowPanel.Size = new Size(720, 450);
+            // GroupBox for Fan Modes
+            GroupBox grpFan = new GroupBox
+            {
+                Text = "Fan Modes & Presets",
+                Location = new Point(15, 75),
+                Size = new Size(780, 220),
+                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+            };
+
+            // FlowPanel for buttons
+            this.flowPanel.Location = new Point(15, 25);
+            this.flowPanel.Size = new Size(750, 180);
             this.flowPanel.AutoScroll = true;
 
             // Mode 1: Auto (Balanced)
-            AddFanButton("AUTO / BALANCED", () => ApplyFanMode("Auto / Balanced", 0, false, true));
+            AddFanButton("Auto / Balanced", () => ApplyFanMode("Auto / Balanced", 0, false, true));
 
             // Mode 2: Full Speed (100%)
-            AddFanButton("FULL SPEED (100%)", () => ApplyFanMode("Full Speed (100%)", 100, true, false));
+            AddFanButton("Full Speed (100%)", () => ApplyFanMode("Full Speed (100%)", 100, true, false));
 
             // Speed Presets
             int[] fanSpeeds = new int[] { 30, 50, 70, 85 };
             foreach (int speed in fanSpeeds)
             {
                 int s = speed;
-                AddFanButton(s.ToString() + "% SPEED", () => ApplyFanMode(s.ToString() + "% Custom", s, false, false));
+                AddFanButton(s.ToString() + "% Speed", () => ApplyFanMode(s.ToString() + "% Custom", s, false, false));
             }
+
+            grpFan.Controls.Add(this.flowPanel);
 
             this.Controls.Add(this.lblTitle);
             this.Controls.Add(this.lblStatus);
-            this.Controls.Add(this.flowPanel);
+            this.Controls.Add(grpFan);
 
             this.ResumeLayout(false);
         }
@@ -76,40 +83,18 @@ namespace HandheldCompanion.Views
             Button btn = new Button
             {
                 Text = text,
-                Size = new Size(210, 90),
-                Font = new Font("Segoe UI", 14F, FontStyle.Bold),
-                FlatStyle = FlatStyle.Flat,
-                BackColor = Color.FromArgb(245, 245, 245),
-                ForeColor = Color.Black,
-                Margin = new Padding(10),
+                Size = new Size(130, 48),
+                Font = new Font(this.Font.FontFamily, 10F, FontStyle.Regular),
+                Margin = new Padding(8),
                 Cursor = Cursors.Hand
             };
-            btn.FlatAppearance.BorderSize = 2;
-            btn.FlatAppearance.BorderColor = Color.FromArgb(210, 210, 210);
 
             btn.Click += (s, e) =>
             {
                 onClick();
-                HighlightButton(btn);
             };
 
             this.flowPanel.Controls.Add(btn);
-        }
-
-        private void HighlightButton(Button activeBtn)
-        {
-            foreach (Control ctrl in flowPanel.Controls)
-            {
-                if (ctrl is Button b)
-                {
-                    b.BackColor = Color.FromArgb(245, 245, 245);
-                    b.ForeColor = Color.Black;
-                    b.FlatAppearance.BorderColor = Color.FromArgb(210, 210, 210);
-                }
-            }
-            activeBtn.BackColor = Color.FromArgb(0, 102, 204);
-            activeBtn.ForeColor = Color.White;
-            activeBtn.FlatAppearance.BorderColor = Color.FromArgb(0, 80, 180);
         }
 
         private void ApplyFanMode(string name, int percentage, bool isFullSpeed, bool isAuto)

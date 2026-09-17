@@ -50,14 +50,26 @@ public static class TaskManager
             taskDefinition.Settings.DisallowStartIfOnBatteries = false;
             taskDefinition.Settings.StopIfGoingOnBatteries = false;
             taskDefinition.Settings.ExecutionTimeLimit = TimeSpan.Zero;
-            taskDefinition.Settings.Enabled = false;
-            taskDefinition.Triggers.Add(new LogonTrigger() { UserId = WindowsIdentity.GetCurrent().Name });
-            taskDefinition.Actions.Add(new ExecAction(TaskExecutable));
+            taskDefinition.Settings.MultipleInstances = TaskInstancesPolicy.Parallel;
+            taskDefinition.Settings.Enabled = true;
+            bool runAtStartup = ManagerFactory.settingsManager.GetBoolean("RunAtStartup");
+            taskDefinition.Triggers.Add(new LogonTrigger() 
+            { 
+                UserId = WindowsIdentity.GetCurrent().Name, 
+                Delay = TimeSpan.FromSeconds(3),
+                Enabled = runAtStartup 
+            });
+            string workingDir = System.IO.Path.GetDirectoryName(TaskExecutable) ?? string.Empty;
+            taskDefinition.Actions.Add(new ExecAction(TaskExecutable, null, workingDir));
 
             task = TaskService.Instance.RootFolder.RegisterTaskDefinition("HandheldCompanion", taskDefinition);
-            task.Enabled = ManagerFactory.settingsManager.GetBoolean("RunAtStartup");
+            task.Enabled = true;
+            LogManager.LogInformation("TaskManager registered scheduled task 'HandheldCompanion' (Enabled=true, RunAtStartup={0})", runAtStartup);
         }
-        catch { }
+        catch (Exception ex)
+        {
+            LogManager.LogWarning("TaskManager failed to register scheduled task: {0}", ex.Message);
+        }
 
         // raise events
         switch (ManagerFactory.settingsManager.Status)
@@ -122,10 +134,16 @@ public static class TaskManager
 
         try
         {
-            task.Enabled = value;
+            if (task.Definition.Triggers.Count > 0)
+            {
+                task.Definition.Triggers[0].Enabled = value;
+                task.RegisterChanges();
+                LogManager.LogInformation("TaskManager updated LogonTrigger.Enabled to {0}", value);
+            }
         }
-        catch
+        catch (Exception ex)
         {
+            LogManager.LogWarning("TaskManager failed to update task trigger: {0}", ex.Message);
         }
     }
 }

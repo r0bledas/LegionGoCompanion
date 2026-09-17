@@ -1,107 +1,252 @@
 using System;
 using System.Drawing;
 using System.Windows.Forms;
+using HandheldCompanion.Managers;
 
 namespace HandheldCompanion.Views
 {
     public class MainForm : Form
     {
-        private Panel sidebarPanel;
-        private Panel contentPanel;
-        private Button btnPower;
-        private Button btnFans;
-        private Button btnController;
-        private Button btnSettings;
-        private Label lblTitle;
+        private TabControl mainTabControl;
+        private TabPage tabGeneral;
+        private TabPage tabSettings;
+
+        private NotifyIcon trayIcon;
+        private ContextMenuStrip trayMenu;
+        private bool isExiting = false;
 
         public MainForm()
         {
             InitializeComponent();
+            InitializeTrayIcon();
         }
 
         private void InitializeComponent()
         {
-            this.sidebarPanel = new Panel();
-            this.contentPanel = new Panel();
-            this.btnPower = new Button();
-            this.btnFans = new Button();
-            this.btnController = new Button();
-            this.btnSettings = new Button();
-            this.lblTitle = new Label();
+            this.mainTabControl = new TabControl();
+            this.tabGeneral = new TabPage();
+            this.tabSettings = new TabPage();
 
             this.SuspendLayout();
 
-            // Form
+            // Form properties & High-DPI Scaling for Legion Go 2K display
+            this.AutoScaleMode = AutoScaleMode.Dpi;
+            this.AutoScaleDimensions = new SizeF(96F, 96F);
             this.Text = "Legion Go Companion";
-            this.Size = new Size(1000, 650);
-            this.BackColor = Color.White;
-            this.ForeColor = Color.Black;
-            this.Font = new Font("Segoe UI", 11F, FontStyle.Regular, GraphicsUnit.Point);
+            this.Size = new Size(700, 520);
+            this.MinimumSize = new Size(580, 420);
             this.StartPosition = FormStartPosition.CenterScreen;
+            this.Font = new Font("Segoe UI", 9.5F, FontStyle.Regular);
 
-            // Sidebar
-            this.sidebarPanel.Dock = DockStyle.Left;
-            this.sidebarPanel.Width = 220;
-            this.sidebarPanel.BackColor = Color.FromArgb(240, 240, 240);
-            
-            this.lblTitle.Text = "LEGION GO";
-            this.lblTitle.Font = new Font("Segoe UI", 16F, FontStyle.Bold);
-            this.lblTitle.Dock = DockStyle.Top;
-            this.lblTitle.Height = 70;
-            this.lblTitle.TextAlign = ContentAlignment.MiddleCenter;
-            this.lblTitle.ForeColor = Color.FromArgb(0, 102, 204);
+            // TabControl
+            this.mainTabControl.Dock = DockStyle.Fill;
+            this.mainTabControl.Font = new Font("Segoe UI", 9.5F, FontStyle.Regular);
+            this.mainTabControl.Padding = new Point(14, 4);
 
-            this.sidebarPanel.Controls.Add(this.btnSettings);
-            this.sidebarPanel.Controls.Add(this.btnController);
-            this.sidebarPanel.Controls.Add(this.btnFans);
-            this.sidebarPanel.Controls.Add(this.btnPower);
-            this.sidebarPanel.Controls.Add(this.lblTitle);
+            // Tab 1: General (Controller, TDP, Fans consolidated)
+            this.tabGeneral.Text = "General";
+            this.tabGeneral.Padding = new Padding(4);
+            this.tabGeneral.UseVisualStyleBackColor = true;
+            GeneralView generalView = new GeneralView { Dock = DockStyle.Fill };
+            this.tabGeneral.Controls.Add(generalView);
 
-            // Buttons Helper
-            void StyleButton(Button btn, string text)
-            {
-                btn.Text = text;
-                btn.Dock = DockStyle.Top;
-                btn.Height = 65;
-                btn.FlatStyle = FlatStyle.Flat;
-                btn.FlatAppearance.BorderSize = 0;
-                btn.TextAlign = ContentAlignment.MiddleLeft;
-                btn.Padding = new Padding(20, 0, 0, 0);
-                btn.Font = new Font("Segoe UI", 12F, FontStyle.Bold);
-                btn.ForeColor = Color.FromArgb(40, 40, 40);
-                btn.BackColor = Color.FromArgb(240, 240, 240);
-                btn.Cursor = Cursors.Hand;
-            }
+            // Tab 2: Settings (Battery cap, Logs, Restart)
+            this.tabSettings.Text = "Settings";
+            this.tabSettings.Padding = new Padding(4);
+            this.tabSettings.UseVisualStyleBackColor = true;
+            SettingsView settingsView = new SettingsView { Dock = DockStyle.Fill };
+            this.tabSettings.Controls.Add(settingsView);
 
-            StyleButton(this.btnPower, "TDP & Power");
-            StyleButton(this.btnFans, "Fan Control");
-            StyleButton(this.btnController, "Controller");
-            StyleButton(this.btnSettings, "Settings");
+            // Add tabs
+            this.mainTabControl.Controls.Add(this.tabGeneral);
+            this.mainTabControl.Controls.Add(this.tabSettings);
 
-            // Content Panel
-            this.contentPanel.Dock = DockStyle.Fill;
-            this.contentPanel.BackColor = Color.White;
-            this.contentPanel.Padding = new Padding(20);
-
-            // Navigation actions
-            this.btnPower.Click += (s, e) => ShowView(new TdpPowerView());
-            this.btnFans.Click += (s, e) => ShowView(new FanControlView());
-            this.btnController.Click += (s, e) => ShowView(new ControllerView());
-            this.btnSettings.Click += (s, e) => ShowView(new SettingsView());
-
-            this.Controls.Add(this.contentPanel);
-            this.Controls.Add(this.sidebarPanel);
-
-            ShowView(new TdpPowerView());
+            this.Controls.Add(this.mainTabControl);
 
             this.ResumeLayout(false);
         }
 
-        private void ShowView(UserControl view)
+        private void InitializeTrayIcon()
         {
-            this.contentPanel.Controls.Clear();
-            view.Dock = DockStyle.Fill;
-            this.contentPanel.Controls.Add(view);
+            this.trayMenu = new ContextMenuStrip();
+
+            ToolStripMenuItem itemOpen = new ToolStripMenuItem("Open Legion Go Companion");
+            itemOpen.Font = new Font(itemOpen.Font, FontStyle.Bold);
+            itemOpen.Click += (s, e) => RestoreFromTray();
+
+            ToolStripMenuItem itemRestart = new ToolStripMenuItem("Restart");
+            itemRestart.Click += (s, e) =>
+            {
+                Application.Restart();
+                Environment.Exit(0);
+            };
+
+            ToolStripMenuItem itemExit = new ToolStripMenuItem("Exit");
+            itemExit.Click += (s, e) => ExitApplication();
+
+            this.trayMenu.Items.Add(itemOpen);
+            this.trayMenu.Items.Add(new ToolStripSeparator());
+            this.trayMenu.Items.Add(itemRestart);
+            this.trayMenu.Items.Add(itemExit);
+
+            this.trayIcon = new NotifyIcon
+            {
+                Text = "Legion Go Companion",
+                ContextMenuStrip = this.trayMenu
+            };
+
+            try
+            {
+                Icon appIcon = Icon.ExtractAssociatedIcon(Application.ExecutablePath) ?? SystemIcons.Application;
+                this.Icon = appIcon;
+                this.trayIcon.Icon = appIcon;
+            }
+            catch
+            {
+                this.Icon = SystemIcons.Application;
+                this.trayIcon.Icon = SystemIcons.Application;
+            }
+
+            this.trayIcon.MouseClick += (s, e) =>
+            {
+                if (e.Button == MouseButtons.Left)
+                {
+                    RestoreFromTray();
+                }
+            };
+            this.trayIcon.DoubleClick += (s, e) => RestoreFromTray();
+
+            // Set initial visibility based on CloseMinimises setting
+            UpdateTrayIconVisibility();
+
+            // Listen for setting changes
+            ManagerFactory.settingsManager.SettingValueChanged += (name, value, temp, init) =>
+            {
+                if (name == "CloseMinimises")
+                {
+                    if (this.IsHandleCreated && !this.IsDisposed)
+                    {
+                        this.BeginInvoke((MethodInvoker)(() => UpdateTrayIconVisibility()));
+                    }
+                }
+            };
+        }
+
+        private void UpdateTrayIconVisibility()
+        {
+            bool keepRunning = ManagerFactory.settingsManager.GetBoolean("CloseMinimises");
+            this.trayIcon.Visible = keepRunning;
+        }
+
+        private bool allowVisible = false;
+
+        protected override void SetVisibleCore(bool value)
+        {
+            if (!allowVisible)
+            {
+                bool startMinimized = ManagerFactory.settingsManager.GetBoolean("StartMinimized");
+                if (startMinimized)
+                {
+                    value = false;
+                    if (!this.IsHandleCreated) CreateHandle();
+                }
+                else
+                {
+                    allowVisible = true;
+                }
+            }
+            base.SetVisibleCore(value);
+        }
+
+        protected override void WndProc(ref Message m)
+        {
+            if (Program.WM_SHOWME != 0 && (uint)m.Msg == Program.WM_SHOWME)
+            {
+                if (this.InvokeRequired)
+                {
+                    this.BeginInvoke(new Action(() => RestoreFromTray()));
+                }
+                else
+                {
+                    RestoreFromTray();
+                }
+            }
+            base.WndProc(ref m);
+        }
+
+        protected override void OnShown(EventArgs e)
+        {
+            base.OnShown(e);
+            bool startMinimized = ManagerFactory.settingsManager.GetBoolean("StartMinimized");
+            if (startMinimized)
+            {
+                this.trayIcon.Visible = true;
+            }
+            else
+            {
+                RestoreFromTray();
+            }
+        }
+
+        public void RestoreFromTray()
+        {
+            allowVisible = true;
+            this.Show();
+            if (this.WindowState == FormWindowState.Minimized)
+            {
+                this.WindowState = FormWindowState.Normal;
+            }
+            this.Visible = true;
+            this.Activate();
+            this.BringToFront();
+        }
+
+        public void ExitApplication()
+        {
+            isExiting = true;
+            if (this.trayIcon != null)
+            {
+                this.trayIcon.Visible = false;
+                this.trayIcon.Dispose();
+            }
+            Application.Exit();
+        }
+
+        protected override void OnFormClosing(FormClosingEventArgs e)
+        {
+            if (!isExiting && e.CloseReason == CloseReason.UserClosing)
+            {
+                bool keepRunning = ManagerFactory.settingsManager.GetBoolean("CloseMinimises");
+                if (keepRunning)
+                {
+                    e.Cancel = true;
+                    this.Hide();
+                    if (this.trayIcon != null)
+                    {
+                        this.trayIcon.Visible = true;
+                        this.trayIcon.ShowBalloonTip(1200, "Legion Go Companion", "Running in background (system tray)", ToolTipIcon.Info);
+                    }
+                    return;
+                }
+            }
+
+            if (this.trayIcon != null)
+            {
+                this.trayIcon.Visible = false;
+                this.trayIcon.Dispose();
+            }
+
+            base.OnFormClosing(e);
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                this.trayIcon?.Dispose();
+                this.trayMenu?.Dispose();
+            }
+            base.Dispose(disposing);
         }
     }
 }

@@ -27,27 +27,32 @@ namespace HandheldCompanion.Views
 
             this.SuspendLayout();
 
-            this.BackColor = Color.White;
-            this.ForeColor = Color.Black;
             this.Dock = DockStyle.Fill;
             this.AutoScroll = true;
 
             // Title
-            this.lblTitle.Text = "TDP & Power Presets";
-            this.lblTitle.Font = new Font("Segoe UI", 18F, FontStyle.Bold);
-            this.lblTitle.Location = new Point(25, 20);
-            this.lblTitle.Size = new Size(400, 35);
+            this.lblTitle.Text = "TDP & Power Limit Presets";
+            this.lblTitle.Font = new Font(this.Font.FontFamily, 11F, FontStyle.Bold);
+            this.lblTitle.Location = new Point(15, 15);
+            this.lblTitle.AutoSize = true;
 
             // Status Label
             this.lblStatus.Text = "Active TDP: Select a preset below";
-            this.lblStatus.Font = new Font("Segoe UI", 12F, FontStyle.Regular);
-            this.lblStatus.ForeColor = Color.FromArgb(0, 102, 204);
-            this.lblStatus.Location = new Point(28, 65);
-            this.lblStatus.Size = new Size(600, 25);
+            this.lblStatus.Location = new Point(16, 42);
+            this.lblStatus.AutoSize = true;
 
-            // FlowPanel for big touch buttons
-            this.flowPanel.Location = new Point(25, 105);
-            this.flowPanel.Size = new Size(720, 450);
+            // GroupBox for Presets
+            GroupBox grpPresets = new GroupBox
+            {
+                Text = "Power Presets (Watts)",
+                Location = new Point(15, 75),
+                Size = new Size(780, 220),
+                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+            };
+
+            // FlowPanel for buttons
+            this.flowPanel.Location = new Point(15, 25);
+            this.flowPanel.Size = new Size(750, 180);
             this.flowPanel.AutoScroll = true;
 
             int[] presets = new int[] { 5, 10, 15, 20, 25, 30, 35, 40 };
@@ -57,25 +62,22 @@ namespace HandheldCompanion.Views
                 Button btn = new Button
                 {
                     Text = tdp.ToString() + " W",
-                    Size = new Size(150, 90),
-                    Font = new Font("Segoe UI", 18F, FontStyle.Bold),
-                    FlatStyle = FlatStyle.Flat,
-                    BackColor = Color.FromArgb(245, 245, 245),
-                    ForeColor = Color.Black,
-                    Margin = new Padding(10),
+                    Size = new Size(110, 48),
+                    Font = new Font(this.Font.FontFamily, 11F, FontStyle.Bold),
+                    Margin = new Padding(8),
                     Cursor = Cursors.Hand
                 };
-                btn.FlatAppearance.BorderSize = 2;
-                btn.FlatAppearance.BorderColor = Color.FromArgb(210, 210, 210);
 
                 int currentTdp = tdp;
                 btn.Click += (s, e) => ApplyTdp(currentTdp, btn);
                 this.flowPanel.Controls.Add(btn);
             }
 
+            grpPresets.Controls.Add(this.flowPanel);
+
             this.Controls.Add(this.lblTitle);
             this.Controls.Add(this.lblStatus);
-            this.Controls.Add(this.flowPanel);
+            this.Controls.Add(grpPresets);
 
             this.ResumeLayout(false);
         }
