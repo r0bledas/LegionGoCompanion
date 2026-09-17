@@ -122,6 +122,17 @@ begin
     result:= true; 
   end;
 end;
+
+
+function isViGemInstalled():boolean;
+begin
+  result:= false;
+  if(FileExists(ExpandConstant('{commonpf}') + '\Nefarius Software Solutions\ViGEm Bus Driver\vigembus.cat')) then
+  begin
+    log('ViGem is already installed.');
+    result:= true;                       
+  end;
+end;
      
 
 function getInstalledHidHideVersion():string;

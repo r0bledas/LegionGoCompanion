@@ -2,6 +2,7 @@ using System;
 using System.Diagnostics;
 using System.Drawing;
 using System.IO;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 using HandheldCompanion.Devices;
 using HandheldCompanion.Devices.Lenovo;
@@ -50,10 +51,11 @@ namespace HandheldCompanion.Views
             {
                 Dock = DockStyle.Fill,
                 ColumnCount = 1,
-                RowCount = 2,
+                RowCount = 3,
                 Padding = new Padding(10, 0, 10, 10),
                 AutoScroll = true
             };
+            tableLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             tableLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             tableLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 
@@ -230,8 +232,174 @@ namespace HandheldCompanion.Views
             flowUtils.Controls.Add(btnRestart);
             grpUtilities.Controls.Add(flowUtils);
 
+            // GroupBox 3: Software Updates
+            GroupBox grpUpdates = new GroupBox
+            {
+                Text = "Software Updates",
+                Dock = DockStyle.Top,
+                AutoSize = true,
+                Padding = new Padding(8),
+                Margin = new Padding(0, 4, 0, 8)
+            };
+
+            FlowLayoutPanel flowUpdates = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Top,
+                AutoSize = true,
+                FlowDirection = FlowDirection.TopDown,
+                WrapContents = false,
+                Padding = new Padding(8)
+            };
+
+            Label lblCurrentVersion = new Label
+            {
+                Text = $"Current Version: v{UpdateService.CurrentVersion.ToString(3)}",
+                AutoSize = true,
+                Font = new Font(this.Font.FontFamily, 9.5F, FontStyle.Bold),
+                Margin = new Padding(4, 2, 4, 4)
+            };
+
+            Label lblUpdateStatus = new Label
+            {
+                Text = "Click 'Check for Updates' to search GitHub for newer releases.",
+                AutoSize = true,
+                Font = new Font(this.Font.FontFamily, 9F, FontStyle.Regular),
+                ForeColor = Color.DimGray,
+                Margin = new Padding(4, 2, 4, 6)
+            };
+
+            ProgressBar progressUpdate = new ProgressBar
+            {
+                Size = LogicalToDeviceUnits(new Size(320, 18)),
+                Visible = false,
+                Margin = new Padding(4, 2, 4, 6)
+            };
+
+            FlowLayoutPanel flowUpdateButtons = new FlowLayoutPanel
+            {
+                AutoSize = true,
+                WrapContents = true,
+                Margin = new Padding(0)
+            };
+
+            Button btnCheckUpdates = new Button
+            {
+                Text = "Check for Updates",
+                Size = LogicalToDeviceUnits(new Size(140, 32)),
+                Font = new Font("Segoe UI", 9F, FontStyle.Regular),
+                Margin = new Padding(LogicalToDeviceUnits(3)),
+                Cursor = Cursors.Hand,
+                FlatStyle = FlatStyle.System
+            };
+
+            Button btnDownloadInstall = new Button
+            {
+                Text = "Download & Install",
+                Size = LogicalToDeviceUnits(new Size(150, 32)),
+                Font = new Font("Segoe UI", 9F, FontStyle.Regular),
+                Margin = new Padding(LogicalToDeviceUnits(3)),
+                Cursor = Cursors.Hand,
+                FlatStyle = FlatStyle.System,
+                Enabled = false,
+                Visible = false
+            };
+
+            ReleaseInfo? foundRelease = null;
+
+            btnCheckUpdates.Click += async (s, e) =>
+            {
+                btnCheckUpdates.Enabled = false;
+                lblUpdateStatus.ForeColor = Color.Black;
+                lblUpdateStatus.Text = "Checking GitHub repository for latest release...";
+                progressUpdate.Visible = false;
+                btnDownloadInstall.Visible = false;
+
+                try
+                {
+                    var release = await UpdateService.CheckForUpdateAsync();
+                    if (release == null)
+                    {
+                        lblUpdateStatus.ForeColor = Color.DarkRed;
+                        lblUpdateStatus.Text = "Could not check for updates (network or GitHub API error).";
+                    }
+                    else if (release.IsNewer)
+                    {
+                        foundRelease = release;
+                        lblUpdateStatus.ForeColor = Color.DarkGreen;
+                        string assetStr = !string.IsNullOrEmpty(release.AssetName) ? $" ({release.AssetName})" : "";
+                        lblUpdateStatus.Text = $"Update available: {release.TagName}{assetStr}! Click 'Download & Install' to proceed.";
+                        btnDownloadInstall.Visible = true;
+                        btnDownloadInstall.Enabled = true;
+                    }
+                    else
+                    {
+                        lblUpdateStatus.ForeColor = Color.DarkSlateGray;
+                        lblUpdateStatus.Text = $"You are up to date! Latest release on GitHub is {release.TagName}.";
+                    }
+                }
+                catch (Exception ex)
+                {
+                    lblUpdateStatus.ForeColor = Color.DarkRed;
+                    lblUpdateStatus.Text = $"Update check failed: {ex.Message}";
+                }
+                finally
+                {
+                    btnCheckUpdates.Enabled = true;
+                }
+            };
+
+            btnDownloadInstall.Click += async (s, e) =>
+            {
+                if (foundRelease == null || string.IsNullOrEmpty(foundRelease.DownloadUrl))
+                    return;
+
+                btnCheckUpdates.Enabled = false;
+                btnDownloadInstall.Enabled = false;
+                progressUpdate.Value = 0;
+                progressUpdate.Visible = true;
+                lblUpdateStatus.ForeColor = Color.Black;
+                lblUpdateStatus.Text = "Starting download...";
+
+                var progress = new Progress<(long downloaded, long total, int percent)>(report =>
+                {
+                    progressUpdate.Value = Math.Clamp(report.percent, 0, 100);
+                    double mbDownloaded = report.downloaded / (1024.0 * 1024.0);
+                    double mbTotal = report.total / (1024.0 * 1024.0);
+                    lblUpdateStatus.Text = report.total > 0
+                        ? $"Downloading: {report.percent}% ({mbDownloaded:F1} MB / {mbTotal:F1} MB)..."
+                        : $"Downloading: {mbDownloaded:F1} MB...";
+                });
+
+                try
+                {
+                    string downloadedPath = await UpdateService.DownloadUpdateAsync(foundRelease, progress);
+                    lblUpdateStatus.ForeColor = Color.DarkGreen;
+                    lblUpdateStatus.Text = "Download complete! Launching installer...";
+
+                    await Task.Delay(1000);
+                    UpdateService.LaunchInstallerAndExit(downloadedPath, silent: false);
+                }
+                catch (Exception ex)
+                {
+                    lblUpdateStatus.ForeColor = Color.DarkRed;
+                    lblUpdateStatus.Text = $"Download failed: {ex.Message}";
+                    btnCheckUpdates.Enabled = true;
+                    btnDownloadInstall.Enabled = true;
+                }
+            };
+
+            flowUpdateButtons.Controls.Add(btnCheckUpdates);
+            flowUpdateButtons.Controls.Add(btnDownloadInstall);
+
+            flowUpdates.Controls.Add(lblCurrentVersion);
+            flowUpdates.Controls.Add(lblUpdateStatus);
+            flowUpdates.Controls.Add(progressUpdate);
+            flowUpdates.Controls.Add(flowUpdateButtons);
+            grpUpdates.Controls.Add(flowUpdates);
+
             tableLayout.Controls.Add(grpSettings, 0, 0);
-            tableLayout.Controls.Add(grpUtilities, 0, 1);
+            tableLayout.Controls.Add(grpUpdates, 0, 1);
+            tableLayout.Controls.Add(grpUtilities, 0, 2);
 
             this.Controls.Add(tableLayout);
             this.Controls.Add(statusPanel);

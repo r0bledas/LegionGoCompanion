@@ -9,19 +9,20 @@
   #define UseDotNet10
 #endif
 
+#define UseViGem
 #define UseDirectX
 #define UseHideHide
 #define UseRTSS
 #define UsePawnIO
 #define UseUSBip
 
-#define InstallerVersion        "0.2"
-#define MyAppSetupName         "Handheld Companion"
-#define MyBuildId              "HandheldCompanion"
-#define MyAppVersion           "0.32.4.0"
-#define MyAppPublisher         "BenjaminLSR"
-#define MyAppCopyright         "Copyright © BenjaminLSR"
-#define MyAppURL               "https://github.com/Valkirie/HandheldCompanion"
+#define InstallerVersion        "1.1.0"
+#define MyAppSetupName         "Legion Go Companion"
+#define MyBuildId              "LegionGoCompanion"
+#define MyAppVersion           "1.1.0"
+#define MyAppPublisher         "r0bledas"
+#define MyAppCopyright         "Copyright © r0bledas"
+#define MyAppURL               "https://github.com/r0bledas/LegionGoCompanion"
 #define MyAppExeName           "HandheldCompanion.exe"
 #define MyConfiguration        "Release"
 
@@ -31,6 +32,7 @@
 #define EncoderServerExe       "EncoderServer.exe"
 #define RTSSHooksLoaderExe     "RTSSHooksLoader.exe"
 
+#define ViGemName              "ViGEmBus Setup"
 #define DotNetName             ".NET Desktop Runtime"
 #define DirectXName            "DirectX Runtime"
 #define HidHideName            "HidHide Drivers"
@@ -38,6 +40,7 @@
 #define PawnIOName             "PawnIO"
 #define USBipName              "USBip"
 
+#define NewViGemVersion        "1.22.0.0"
 #define NewDotNetVersion       "10.0.9"
 #define NewDirectXVersion      "9.29.1974"
 #define NewHidHideVersion      "1.5.230"
@@ -45,6 +48,7 @@
 #define NewPawnIOVersion       "2.1.0.0"
 #define NewUSBipVersion        "0.9.7.7"
 
+#define ViGemDownloadLink      "https://github.com/nefarius/ViGEmBus/releases/download/v1.22.0/ViGEmBus_1.22.0_x64_x86_arm64.exe"
 #define DirectXDownloadLink    "https://download.microsoft.com/download/1/7/1/1718CCC4-6315-4D8E-9543-8E28A4E18C4C/dxwebsetup.exe"
 #define HidHideDownloadLink    "https://github.com/nefarius/HidHide/releases/download/v1.5.230.0/HidHide_1.5.230_x64.exe"
 #define RtssDownloadLink       "https://github.com/Valkirie/HandheldCompanion/raw/main/redist/RTSSSetup737.exe"
@@ -65,6 +69,7 @@
 ; Windows 10 (2004+)
 #define WindowsVersion         "10.0.19041"
 
+AppId={{LegionGoCompanion-LenovoGo}}
 AllowNoIcons=yes
 AppName={#MyAppSetupName}
 AppVersion={#MyAppVersion}
@@ -78,10 +83,11 @@ AppPublisherURL={#MyAppURL}
 AppSupportURL={#MyAppURL}
 AppUpdatesURL={#MyAppURL} 
 CloseApplications=yes
+CloseApplicationsFilter=*HandheldCompanion*
 Compression=lzma
 DefaultGroupName={#MyAppSetupName}
 DefaultDirName={autopf}\{#MyAppSetupName}
-OutputBaseFilename={#MyBuildId}-{#MyAppVersion}
+OutputBaseFilename={#MyBuildId}-Setup
 SetupIconFile="{#SourcePath}\HandheldCompanion\Resources\icon.ico"
 SetupLogging=yes 
 MinVersion={#WindowsVersion}
@@ -108,7 +114,10 @@ Source: "{#SourcePath}\redist\netcorecheck.exe"; Flags: dontcopy noencryption
 Source: "{#SourcePath}\redist\netcorecheck_x64.exe"; Flags: dontcopy noencryption
 Source: "{#SourcePath}\redist\PawnIO_setup.exe"; Flags: dontcopy noencryption
 #endif
-Source: "{#SourcePath}\bin\{#MyConfiguration}\{#MyConfigurationExt}-windows{#WindowsVersion}.0\win-x64\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+#ifdef UseViGem
+Source: "{#SourcePath}\redist\ViGEmBus_1.22.0_x64_x86_arm64.exe"; Flags: dontcopy noencryption
+#endif
+Source: "{#SourcePath}\HandheldCompanion\bin\{#MyConfiguration}\{#MyConfigurationExt}-windows{#WindowsVersion}.0\win-x64\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "{#SourcePath}\Certificate.pfx"; DestDir: "{tmp}"; Flags: deleteafterinstall
 Source: "{#SourcePath}\Certificate.ps1"; DestDir: "{tmp}"; Flags: deleteafterinstall
 Source: "{#SourcePath}\redist\PromptFont.otf"; DestDir: "{autofonts}"; FontInstall: "PromptFont"; Flags: uninsneveruninstall
@@ -123,7 +132,7 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"
 
 [Run]
 Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -WindowStyle Hidden -File ""{tmp}\Certificate.ps1"""; Description: "Deploying signature"; Flags: runhidden
-Filename: "{app}\HandheldCompanion.exe"; Flags: postinstall nowait shellexec skipifsilent; Description: "Starting Handheld Companion"
+Filename: "{app}\{#MyAppExeName}"; Flags: postinstall nowait shellexec skipifsilent; Description: "Starting Legion Go Companion"
   
 [InstallDelete]
 ; Clean up old DLL files from previous framework-dependent installations
@@ -187,6 +196,7 @@ function Dependency_PrepareToInstall(var NeedsRestart: Boolean): String; forward
 function Dependency_UpdateReadyMemo(const Space, NewLine, MemoUserInfoInfo, MemoDirInfo, MemoTypeInfo, MemoComponentsInfo, MemoGroupInfo, MemoTasksInfo: String): String; forward;
 function Dependency_IsNetCoreInstalled(const Version: String): Boolean; forward;
 function Dependency_IsDirectXInstalled: Boolean; forward;
+procedure Dependency_AddViGem; forward;
 procedure Dependency_AddDotNet10Desktop; forward;
 procedure Dependency_AddDirectX; forward;
 procedure Dependency_AddHideHide; forward;
@@ -397,6 +407,16 @@ var
 begin
   Log('***Enter PrepareToInstall()***');
 
+  // Kill running Legion Go Companion process before update
+  if IsProcessRunning('{#MyAppExeName}') then
+  begin
+    Dependency_DownloadPage.Show;
+    Dependency_DownloadPage.SetText('Closing Legion Go Companion...', '');
+    StopProcess('{#MyAppExeName}');
+    Sleep(1000);
+    Dependency_DownloadPage.Hide;
+  end;
+
   // Kill any running RTSS-related processes before installing dependencies
   if IsProcessRunning('{#EncoderServerExe}') or
      IsProcessRunning('{#EncoderServer64Exe}') or
@@ -445,6 +465,9 @@ var
 begin
   if CurUninstallStep = usUninstall then
   begin
+    if IsProcessRunning('{#MyAppExeName}') then
+      StopProcess('{#MyAppExeName}');
+
     if Exec(ExpandConstant('{app}\{#MyAppExeName}'), '--uninstall-restore', '', SW_SHOW, ewWaitUntilTerminated, resultCode) then
     begin
       Log('Uninstall restore mode finished with exit code ' + IntToStr(resultCode));
@@ -454,26 +477,23 @@ begin
     else
       Log('Failed to launch uninstall restore mode');
 
+    // Cleanly delete scheduled startup tasks
+    Exec('schtasks.exe', '/Delete /TN "LegionGoCompanion" /F', '', SW_HIDE, ewWaitUntilTerminated, resultCode);
+    Exec('schtasks.exe', '/Delete /TN "HandheldCompanion" /F', '', SW_HIDE, ewWaitUntilTerminated, resultCode);
+
     if not(keepHidhideCheckbox.Checked) then
       uninstallHidHide();
 
     if not(keepVigemCheckbox.Checked) then
-    begin
-      if ShellExec('', 'msiexec.exe', '/X{966606F3-2745-49E9-BF15-5C3EAA4E9077}', '', SW_SHOW, ewWaitUntilTerminated, resultCode) then
-      begin
-        Log('Successfully executed Vigem uninstaller');
-        if resultCode = 0 then
-          Log('Vigem uninstaller finished successfully')
-        else
-          Log('Vigem uninstaller failed with exit code ' + IntToStr(resultCode));
-      end
-      else
-        Log('Failed to execute Vigem uninstaller');
-    end;
+      uninstallViGem();
 
     if deleteSettingsCheckbox.Checked then
+    begin
       if DirExists(ExpandConstant('{localappdata}\{#MyBuildId}')) then
         DelTree(ExpandConstant('{localappdata}\{#MyBuildId}'), True, True, True);
+      if DirExists(ExpandConstant('{localappdata}\HandheldCompanion')) then
+        DelTree(ExpandConstant('{localappdata}\HandheldCompanion'), True, True, True);
+    end;
   end;
 end;
 
@@ -482,6 +502,22 @@ var
   installedVersion: String;
   resultCode: Integer;
 begin
+#ifdef UseViGem
+  if not isViGemInstalled() then
+  begin
+    Dependency_AddViGem;
+  end
+  else
+  begin
+    installedVersion := RegGetInstalledVersion('{#ViGemName}');
+    if compareVersions('{#NewViGemVersion}', installedVersion, '.', '-') > 0 then
+    begin
+      Log('{#ViGemName} {#NewViGemVersion} needs update.');
+      Dependency_AddViGem;
+    end;
+  end;
+#endif
+
 #ifdef UseDotNet10
   if not Dependency_IsNetCoreInstalled('Microsoft.WindowsDesktop.App {#NewDotNetVersion}') then
   begin
@@ -864,6 +900,15 @@ begin
     '{#USBipName}',
     '{#USBipDownloadLink}',
     '', True, True, False, '');
+end;
+
+procedure Dependency_AddViGem;
+begin
+  Dependency_Add_With_Version('ViGEmBus_1.22.0_x64_x86_arm64.exe', '{#NewViGemVersion}', RegGetInstalledVersion('{#ViGemName}'),
+    '/quiet /norestart',
+    '{#ViGemName}',
+    '{#ViGemDownloadLink}',
+    '', True, False, False, '');
 end;
 
 function BoolToStr(Value: Boolean): String;
