@@ -93,6 +93,7 @@ SetupLogging=yes
 MinVersion={#WindowsVersion}
 OutputDir={#SourcePath}\install 
 PrivilegesRequired=admin
+PrivilegesRequiredOverridesAllowed=commandline
 SolidCompression=yes
 LZMAUseSeparateProcess=yes
 LZMANumBlockThreads=6
