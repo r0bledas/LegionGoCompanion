@@ -1,4 +1,4 @@
-﻿using HandheldCompanion.Controllers;
+using HandheldCompanion.Controllers;
 using HandheldCompanion.Helpers;
 using HandheldCompanion.Inputs;
 using HandheldCompanion.Shared;
@@ -89,6 +89,16 @@ namespace HandheldCompanion.Targets
             {
                 gamepadMotion.GetRawGyro(out float gx, out float gy, out float gz);
                 gamepadMotion.GetRawAcceleration(out float ax, out float ay, out float az);
+
+                // Fall back to inputs.GyroState if gamepadMotion produces all zeros
+                if (gx == 0f && gy == 0f && gz == 0f && ax == 0f && ay == 0f && az == 0f)
+                {
+                    var gyro = inputs.GyroState.GetGyroscope(GyroState.SensorState.DSU);
+                    var accel = inputs.GyroState.GetAccelerometer(GyroState.SensorState.DSU);
+                    gx = gyro.X; gy = gyro.Y; gz = gyro.Z;
+                    ax = accel.X; ay = accel.Y; az = accel.Z;
+                }
+
                 short gxs = InputUtils.RoundClampToShort(InputUtils.Clamp(gx, -2048.0f, 2048.0f) * 16.0f);
                 short gys = InputUtils.RoundClampToShort(InputUtils.Clamp(gy, -2048.0f, 2048.0f) * 16.0f);
                 short gzs = InputUtils.RoundClampToShort(InputUtils.Clamp(gz, -2048.0f, 2048.0f) * 16.0f);

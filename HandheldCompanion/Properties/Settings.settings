@@ -265,7 +265,7 @@
       <Value Profile="(Default)">Time,GPU,CPU,VRAM,RAM,BATT,FPS</Value>
     </Setting>
     <Setting Name="LegionControllerGyroIndex" Type="System.Int32" Scope="User">
-      <Value Profile="(Default)">0</Value>
+      <Value Profile="(Default)">1</Value>
     </Setting>
     <Setting Name="BatteryChargeLimit" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">False</Value>

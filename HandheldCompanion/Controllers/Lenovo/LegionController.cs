@@ -99,10 +99,13 @@ namespace HandheldCompanion.Controllers.Lenovo
         public override bool IsReady => IsWireless() || IsWired();
 
         public LegionController() : base()
-        { }
+        {
+            gamepadIndex = 1;
+        }
 
         public LegionController(PnPDetails details) : base(details)
         {
+            gamepadIndex = 1;
             // Capabilities
             Capabilities |= ControllerCapabilities.MotionSensor;
 
@@ -159,7 +162,13 @@ namespace HandheldCompanion.Controllers.Lenovo
 
         protected override void QuerySettings()
         {
-            SettingsManager_SettingValueChanged("LegionControllerGyroIndex", ManagerFactory.settingsManager.GetInt("LegionControllerGyroIndex"), false, false);
+            int gyroIdx = ManagerFactory.settingsManager.GetInt("LegionControllerGyroIndex");
+            if (gyroIdx == 0)
+            {
+                gyroIdx = 1;
+                ManagerFactory.settingsManager.SetProperty("LegionControllerGyroIndex", 1);
+            }
+            SettingsManager_SettingValueChanged("LegionControllerGyroIndex", gyroIdx, false, false);
             base.QuerySettings();
         }
 
@@ -207,7 +216,8 @@ namespace HandheldCompanion.Controllers.Lenovo
                 EXTRA_IDX -= 2;
             }
 
-            // manage gamepad motion from right controller
+            // manage gamepad motion from both controllers (Left Joy-Con and Right Joy-Con IMU)
+            gamepadMotions[0] = new($"{details.baseContainerDeviceInstanceId}\\{LegionGoTablet.LeftJoyconIndex}");
             gamepadMotions[1] = new($"{details.baseContainerDeviceInstanceId}\\{LegionGoTablet.RightJoyconIndex}");
         }
 

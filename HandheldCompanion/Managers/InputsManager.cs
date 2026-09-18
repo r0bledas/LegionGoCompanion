@@ -753,6 +753,16 @@ public static class InputsManager
 
         // prepare button state
         ButtonState.Overwrite(controllerState.ButtonState, buttonState);
+
+        // Suppress custom-remapped buttons from triggering hotkey chords
+        lock (CustomMappingService.RemappedButtons)
+        {
+            foreach (var btn in CustomMappingService.RemappedButtons)
+            {
+                buttonState[btn] = false;
+            }
+        }
+
         // update previous state
         if (prevState.Equals(buttonState))
             return;

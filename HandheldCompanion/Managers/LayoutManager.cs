@@ -48,10 +48,24 @@ public class LayoutManager : IManager
     public FileSystemWatcher layoutWatcher { get; set; }
     private readonly Timer layoutTimer;
 
-    //  Mapping plans & caches (rebuilt when currentLayout changes) 
+    // Mapping plans & caches (rebuilt when currentLayout changes) 
+    public static readonly Dictionary<ButtonFlags, IActions[]> CustomButtonPlans = new();
     private Dictionary<ButtonFlags, IActions[]> _buttonPlan = new();
     private Dictionary<AxisLayoutFlags, IActions[]> _axisPlan = new();
     private Dictionary<AxisLayoutFlags, IActions> _gyroPlan = new();  // one action per axis flag
+
+    public void ApplyCustomMappings(Dictionary<ButtonFlags, IActions[]> mappings)
+    {
+        lock (updateLock)
+        {
+            CustomButtonPlans.Clear();
+            foreach (var kv in mappings)
+            {
+                CustomButtonPlans[kv.Key] = kv.Value;
+            }
+            BuildPlans();
+        }
+    }
 
     // X/Y AxisFlags for each AxisLayoutFlags — cached to avoid per-tick lookups
     private readonly Dictionary<AxisLayoutFlags, (AxisFlags X, AxisFlags Y)> _axisXY = new();
@@ -158,6 +172,7 @@ public class LayoutManager : IManager
         }
 
         base.Start();
+        CustomMappingService.Instance.ApplyMappings();
     }
 
     public override void Stop()
@@ -530,6 +545,19 @@ public class LayoutManager : IManager
             else
             {
                 _buttonPlan[kv.Key] = actions.ToArray();
+            }
+        }
+
+        // Overlay user-configured custom button mappings (e.g. Legion L/R, Back buttons)
+        foreach (var kv in CustomButtonPlans)
+        {
+            if (kv.Value != null && kv.Value.Length > 0)
+            {
+                _buttonPlan[kv.Key] = kv.Value;
+            }
+            else
+            {
+                _buttonPlan.Remove(kv.Key);
             }
         }
 

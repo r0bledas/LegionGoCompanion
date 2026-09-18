@@ -23,6 +23,7 @@ namespace HandheldCompanion.Views
 
         private TabControl mainTabControl;
         private TabPage tabGeneral;
+        private TabPage tabController;
         private TabPage tabSettings;
 
         private NotifyIcon trayIcon;
@@ -50,6 +51,7 @@ namespace HandheldCompanion.Views
 
             this.mainTabControl = new TabControl();
             this.tabGeneral = new TabPage();
+            this.tabController = new TabPage();
             this.tabSettings = new TabPage();
 
             this.SuspendLayout();
@@ -147,7 +149,14 @@ namespace HandheldCompanion.Views
             GeneralView generalView = new GeneralView { Dock = DockStyle.Fill };
             this.tabGeneral.Controls.Add(generalView);
 
-            // Tab 2: Settings (Battery cap, Logs, Restart)
+            // Tab 2: Controller (Emulation & Button Remapping)
+            this.tabController.Text = "Controller";
+            this.tabController.Padding = new Padding(2);
+            this.tabController.UseVisualStyleBackColor = true;
+            ControllerView controllerView = new ControllerView { Dock = DockStyle.Fill };
+            this.tabController.Controls.Add(controllerView);
+
+            // Tab 3: Settings (Battery cap, Logs, Restart)
             this.tabSettings.Text = "Settings";
             this.tabSettings.Padding = new Padding(2);
             this.tabSettings.UseVisualStyleBackColor = true;
@@ -156,6 +165,7 @@ namespace HandheldCompanion.Views
 
             // Add tabs
             this.mainTabControl.Controls.Add(this.tabGeneral);
+            this.mainTabControl.Controls.Add(this.tabController);
             this.mainTabControl.Controls.Add(this.tabSettings);
 
             this.Controls.Add(this.bottomStatusPanel);

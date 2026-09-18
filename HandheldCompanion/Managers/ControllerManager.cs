@@ -318,31 +318,39 @@ public static class ControllerManager
         // raise event, before layout mapping
         InputsUpdated?.Invoke(controllerState, false);
 
-        // get main motion safely
+        // get main motion safely with fallback to index 1 (Right Joy-Con)
         byte gamepadIndex = tc.gamepadIndex;
         if (!motions.TryGetValue(gamepadIndex, out GamepadMotion? gamepadMotion) || gamepadMotion is null)
-            return;
-
-        // sensor override
-        switch (sensorSelection)
         {
-            case SensorFamily.Windows:
-            case SensorFamily.SerialUSBIMU:
-                {
-                    IDevice dev = IDevice.GetCurrent();
-                    GamepadMotion? devMotion = dev?.GamepadMotion;
-                    if (devMotion is null)
-                        break; // keep existing gamepadMotion if device motion not ready
-
-                    gamepadMotion = devMotion;
-                    SensorsManager.UpdateReport(controllerState, gamepadMotion, ref delta);
-                    break;
-                }
+            if (motions.TryGetValue(1, out GamepadMotion? motion1) && motion1 is not null)
+                gamepadMotion = motion1;
+            else
+                gamepadMotion = motions.Values.FirstOrDefault(m => m is not null);
         }
 
-        // Update motion consumers (null-safe)
-        MotionManager.UpdateReport(controllerState, gamepadMotion, delta);
-        // App.overlayModel?.UpdateReport(controllerState, gamepadMotion, delta);
+        if (gamepadMotion is not null)
+        {
+            // sensor override
+            switch (sensorSelection)
+            {
+                case SensorFamily.Windows:
+                case SensorFamily.SerialUSBIMU:
+                    {
+                        IDevice dev = IDevice.GetCurrent();
+                        GamepadMotion? devMotion = dev?.GamepadMotion;
+                        if (devMotion is null)
+                            break; // keep existing gamepadMotion if device motion not ready
+
+                        gamepadMotion = devMotion;
+                        SensorsManager.UpdateReport(controllerState, gamepadMotion, ref delta);
+                        break;
+                    }
+            }
+
+            // Update motion consumers (null-safe)
+            MotionManager.UpdateReport(controllerState, gamepadMotion, delta);
+            // App.overlayModel?.UpdateReport(controllerState, gamepadMotion, delta);
+        }
 
         // compute layout (null-safe mapping)
         ControllerState mapped = ManagerFactory.layoutManager?.MapController(controllerState, delta) ?? controllerState;
