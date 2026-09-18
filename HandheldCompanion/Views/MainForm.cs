@@ -58,47 +58,47 @@ namespace HandheldCompanion.Views
             this.AutoScaleMode = AutoScaleMode.Dpi;
             this.AutoScaleDimensions = new SizeF(96F, 96F);
             this.Text = "Legion Go Companion";
-            this.Size = new Size(680, 520);
-            this.MinimumSize = new Size(460, 380);
+            this.Size = new Size(540, 390);
+            this.MinimumSize = new Size(420, 280);
             this.StartPosition = FormStartPosition.CenterScreen;
-            this.Font = new Font("Segoe UI", 9.5F, FontStyle.Regular);
+            this.Font = new Font("Segoe UI", 9F, FontStyle.Regular);
 
             // ==========================================
-            // Bottom Status Panel: Admin Indicator & System Status
+            // Bottom Status Panel: Minimal, Clean, No Emojis
             // ==========================================
             this.bottomStatusPanel.Dock = DockStyle.Bottom;
-            this.bottomStatusPanel.Height = LogicalToDeviceUnits(36);
-            this.bottomStatusPanel.BackColor = Color.FromArgb(242, 244, 247);
-            this.bottomStatusPanel.Padding = new Padding(LogicalToDeviceUnits(10), LogicalToDeviceUnits(4), LogicalToDeviceUnits(10), LogicalToDeviceUnits(4));
+            this.bottomStatusPanel.Height = 24;
+            this.bottomStatusPanel.BackColor = Color.FromArgb(245, 246, 248);
+            this.bottomStatusPanel.Padding = new Padding(8, 0, 8, 0);
             this.bottomStatusPanel.Paint += (s, e) =>
             {
-                using var pen = new Pen(Color.FromArgb(218, 222, 228), 1);
+                using var pen = new Pen(Color.FromArgb(225, 228, 232), 1);
                 e.Graphics.DrawLine(pen, 0, 0, bottomStatusPanel.Width, 0);
             };
 
             bool isAdmin = Program.IsAdministrator();
 
-            // 1. Admin status label
+            // 1. Admin status label (No emojis)
             this.lblAdminStatus.AutoSize = true;
-            this.lblAdminStatus.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
-            this.lblAdminStatus.Location = new Point(LogicalToDeviceUnits(10), LogicalToDeviceUnits(8));
+            this.lblAdminStatus.Font = new Font("Segoe UI", 8F, FontStyle.Bold);
+            this.lblAdminStatus.Location = new Point(8, 4);
             if (isAdmin)
             {
-                this.lblAdminStatus.Text = "🛡️ Admin: YES (Elevated)";
+                this.lblAdminStatus.Text = "Admin: Elevated";
                 this.lblAdminStatus.ForeColor = Color.FromArgb(34, 139, 34);
             }
             else
             {
-                this.lblAdminStatus.Text = "⚠️ Admin: NO";
-                this.lblAdminStatus.ForeColor = Color.FromArgb(211, 47, 47);
+                this.lblAdminStatus.Text = "Admin: No";
+                this.lblAdminStatus.ForeColor = Color.FromArgb(200, 30, 30);
             }
             this.bottomStatusPanel.Controls.Add(this.lblAdminStatus);
 
             // 2. Restart as Admin button (only if not running elevated)
             this.btnRestartAdmin.Text = "Restart as Admin";
-            this.btnRestartAdmin.Font = new Font("Segoe UI", 8.5F, FontStyle.Bold);
-            this.btnRestartAdmin.Size = new Size(LogicalToDeviceUnits(120), LogicalToDeviceUnits(24));
-            this.btnRestartAdmin.Location = new Point(LogicalToDeviceUnits(120), LogicalToDeviceUnits(6));
+            this.btnRestartAdmin.Font = new Font("Segoe UI", 8F, FontStyle.Regular);
+            this.btnRestartAdmin.Size = new Size(100, 20);
+            this.btnRestartAdmin.Location = new Point(85, 2);
             this.btnRestartAdmin.FlatStyle = FlatStyle.Flat;
             this.btnRestartAdmin.FlatAppearance.BorderSize = 0;
             this.btnRestartAdmin.BackColor = Color.FromArgb(0, 120, 215);
@@ -125,30 +125,31 @@ namespace HandheldCompanion.Views
             };
             this.bottomStatusPanel.Controls.Add(this.btnRestartAdmin);
 
-            // 3. System Diagnostics Health label
+            // 3. System Diagnostics Health label (Clean text, no emojis)
             this.lblSystemHealth.AutoSize = true;
-            this.lblSystemHealth.Font = new Font("Segoe UI", 8.5F, FontStyle.Regular);
-            this.lblSystemHealth.ForeColor = Color.FromArgb(70, 75, 85);
+            this.lblSystemHealth.Font = new Font("Segoe UI", 8F, FontStyle.Regular);
+            this.lblSystemHealth.ForeColor = Color.FromArgb(80, 85, 95);
             this.lblSystemHealth.Dock = DockStyle.Right;
             this.lblSystemHealth.TextAlign = ContentAlignment.MiddleRight;
-            this.lblSystemHealth.Text = "Checking system health...";
+            this.lblSystemHealth.Padding = new Padding(0, 4, 4, 0);
+            this.lblSystemHealth.Text = "Checking health...";
             this.bottomStatusPanel.Controls.Add(this.lblSystemHealth);
 
             // TabControl
             this.mainTabControl.Dock = DockStyle.Fill;
-            this.mainTabControl.Font = new Font("Segoe UI", 9.5F, FontStyle.Regular);
-            this.mainTabControl.Padding = new Point(14, 4);
+            this.mainTabControl.Font = new Font("Segoe UI", 9F, FontStyle.Regular);
+            this.mainTabControl.Padding = new Point(12, 3);
 
             // Tab 1: General (Controller, TDP, Fans consolidated)
             this.tabGeneral.Text = "General";
-            this.tabGeneral.Padding = new Padding(4);
+            this.tabGeneral.Padding = new Padding(2);
             this.tabGeneral.UseVisualStyleBackColor = true;
             GeneralView generalView = new GeneralView { Dock = DockStyle.Fill };
             this.tabGeneral.Controls.Add(generalView);
 
             // Tab 2: Settings (Battery cap, Logs, Restart)
             this.tabSettings.Text = "Settings";
-            this.tabSettings.Padding = new Padding(4);
+            this.tabSettings.Padding = new Padding(2);
             this.tabSettings.UseVisualStyleBackColor = true;
             SettingsView settingsView = new SettingsView { Dock = DockStyle.Fill };
             this.tabSettings.Controls.Add(settingsView);
@@ -182,14 +183,11 @@ namespace HandheldCompanion.Views
                 bool hidHideOk = File.Exists(Path.Combine(Environment.SystemDirectory, "drivers", "HidHide.sys"));
                 bool controllerOk = ControllerManager.HasTargetController;
 
-                bool compact = this.ClientSize.Width < 540;
-                string vigemStr = vigemOk ? (compact ? "ViGEm: OK" : "● ViGEm: OK") : (compact ? "ViGEm: ❌" : "❌ ViGEm: N/A");
-                string hidHideStr = hidHideOk ? (compact ? "HidHide: OK" : "● HidHide: OK") : (compact ? "HidHide: ⚠️" : "⚠️ HidHide: N/A");
-                string controllerStr = controllerOk ? (compact ? "Ctrl: OK" : "● Controller: Connected") : (compact ? "Ctrl: ⚠️" : "⚠️ Controller: Disconnected");
+                string vigemStr = vigemOk ? "ViGEm: OK" : "ViGEm: Missing";
+                string hidHideStr = hidHideOk ? "HidHide: OK" : "HidHide: Missing";
+                string controllerStr = controllerOk ? "Controller: OK" : "Controller: Disconnected";
 
-                this.lblSystemHealth.Text = compact
-                    ? $"{vigemStr} | {hidHideStr} | {controllerStr}"
-                    : $"{vigemStr}  |  {hidHideStr}  |  {controllerStr}";
+                this.lblSystemHealth.Text = $"{vigemStr}  |  {hidHideStr}  |  {controllerStr}";
             }
             catch { }
         }

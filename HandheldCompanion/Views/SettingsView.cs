@@ -13,8 +13,6 @@ namespace HandheldCompanion.Views
 {
     public class SettingsView : UserControl
     {
-        private Label lblStatus;
-
         public SettingsView()
         {
             InitializeComponent();
@@ -24,42 +22,17 @@ namespace HandheldCompanion.Views
         {
             this.SuspendLayout();
 
-            this.AutoScaleMode = AutoScaleMode.Dpi;
-            this.AutoScaleDimensions = new SizeF(96F, 96F);
+            this.AutoScaleMode = AutoScaleMode.Inherit;
             this.Dock = DockStyle.Fill;
             this.AutoScroll = true;
-            this.Font = new Font("Segoe UI", 9.5F, FontStyle.Regular);
-
-            // Status Bar at the bottom
-            Panel statusPanel = new Panel
-            {
-                Dock = DockStyle.Bottom,
-                Height = LogicalToDeviceUnits(30),
-                Padding = new Padding(LogicalToDeviceUnits(10), LogicalToDeviceUnits(4), LogicalToDeviceUnits(10), LogicalToDeviceUnits(2)),
-                BackColor = Color.FromArgb(246, 248, 250)
-            };
-            statusPanel.Paint += (s, e) =>
-            {
-                using var pen = new Pen(Color.FromArgb(220, 224, 230), 1);
-                e.Graphics.DrawLine(pen, 0, 0, statusPanel.Width, 0);
-            };
-
-            this.lblStatus = new Label
-            {
-                Text = "Hardware & Companion Settings",
-                Font = new Font("Segoe UI", 8.5F, FontStyle.Regular),
-                ForeColor = Color.FromArgb(70, 75, 85),
-                AutoSize = true,
-                Dock = DockStyle.Left
-            };
-            statusPanel.Controls.Add(this.lblStatus);
+            this.Font = new Font("Segoe UI", 9F, FontStyle.Regular);
 
             // Main scrollable content panel
             Panel contentPanel = new Panel
             {
                 Dock = DockStyle.Fill,
                 AutoScroll = true,
-                Padding = new Padding(LogicalToDeviceUnits(8), LogicalToDeviceUnits(4), LogicalToDeviceUnits(8), LogicalToDeviceUnits(8))
+                Padding = new Padding(6, 4, 6, 6)
             };
 
             // GroupBox 1: Hardware & Power Options
@@ -68,8 +41,8 @@ namespace HandheldCompanion.Views
                 Text = "Hardware & Battery Options",
                 Dock = DockStyle.Top,
                 AutoSize = true,
-                Padding = new Padding(8),
-                Margin = new Padding(0, 4, 0, 8)
+                Padding = new Padding(6, 4, 6, 6),
+                Margin = new Padding(0, 0, 0, 6)
             };
 
             FlowLayoutPanel flowSettings = new FlowLayoutPanel
@@ -78,15 +51,15 @@ namespace HandheldCompanion.Views
                 AutoSize = true,
                 FlowDirection = FlowDirection.TopDown,
                 WrapContents = false,
-                Padding = new Padding(8)
+                Padding = new Padding(4)
             };
 
             CheckBox chkBattery = new CheckBox
             {
                 Text = "80% Battery Limit",
                 AutoSize = true,
-                Font = new Font(this.Font.FontFamily, 9F, FontStyle.Regular),
-                Margin = new Padding(4, 4, 4, 8),
+                Font = new Font(this.Font.FontFamily, 8.5F, FontStyle.Regular),
+                Margin = new Padding(2, 2, 2, 4),
                 Cursor = Cursors.Hand,
                 Checked = ManagerFactory.settingsManager.GetBoolean("BatteryChargeLimit")
             };
@@ -98,15 +71,14 @@ namespace HandheldCompanion.Views
                 {
                     lego.SetBatteryChargeLimit(chkBattery.Checked);
                 }
-                lblStatus.Text = chkBattery.Checked ? "80% Battery Limit: Enabled" : "80% Battery Limit: Disabled (100% Full Charge)";
             };
 
             CheckBox chkKeepRunning = new CheckBox
             {
                 Text = "Keep running after closing the window (show menu bar / tray icon)",
                 AutoSize = true,
-                Font = new Font(this.Font.FontFamily, 9F, FontStyle.Regular),
-                Margin = new Padding(4, 4, 4, 8),
+                Font = new Font(this.Font.FontFamily, 8.5F, FontStyle.Regular),
+                Margin = new Padding(2, 2, 2, 4),
                 Cursor = Cursors.Hand,
                 Checked = ManagerFactory.settingsManager.GetBoolean("CloseMinimises")
             };
@@ -114,17 +86,14 @@ namespace HandheldCompanion.Views
             chkKeepRunning.CheckedChanged += (s, e) =>
             {
                 ManagerFactory.settingsManager.SetProperty("CloseMinimises", chkKeepRunning.Checked);
-                lblStatus.Text = chkKeepRunning.Checked
-                    ? "Background mode active: Window will minimize to menu bar / tray icon on close."
-                    : "Background mode disabled: Application will fully exit when window is closed.";
             };
 
             CheckBox chkRunAtStartup = new CheckBox
             {
                 Text = "Run at Startup (elevated, no UAC prompt)",
                 AutoSize = true,
-                Font = new Font(this.Font.FontFamily, 9F, FontStyle.Regular),
-                Margin = new Padding(4, 4, 4, 8),
+                Font = new Font(this.Font.FontFamily, 8.5F, FontStyle.Regular),
+                Margin = new Padding(2, 2, 2, 4),
                 Cursor = Cursors.Hand,
                 Checked = ManagerFactory.settingsManager.GetBoolean("RunAtStartup")
             };
@@ -132,17 +101,14 @@ namespace HandheldCompanion.Views
             chkRunAtStartup.CheckedChanged += (s, e) =>
             {
                 ManagerFactory.settingsManager.SetProperty("RunAtStartup", chkRunAtStartup.Checked);
-                lblStatus.Text = chkRunAtStartup.Checked
-                    ? "Startup enabled: App will launch automatically at login with highest privileges."
-                    : "Startup disabled: App will not launch at login.";
             };
 
             CheckBox chkStartMinimized = new CheckBox
             {
                 Text = "Silent Launch on Startup (start minimized without window popping up)",
                 AutoSize = true,
-                Font = new Font(this.Font.FontFamily, 9F, FontStyle.Regular),
-                Margin = new Padding(4, 4, 4, 8),
+                Font = new Font(this.Font.FontFamily, 8.5F, FontStyle.Regular),
+                Margin = new Padding(2, 2, 2, 4),
                 Cursor = Cursors.Hand,
                 Checked = ManagerFactory.settingsManager.GetBoolean("StartMinimized")
             };
@@ -150,17 +116,14 @@ namespace HandheldCompanion.Views
             chkStartMinimized.CheckedChanged += (s, e) =>
             {
                 ManagerFactory.settingsManager.SetProperty("StartMinimized", chkStartMinimized.Checked);
-                lblStatus.Text = chkStartMinimized.Checked
-                    ? "Silent launch enabled: Window will not pop up on startup (runs silently in tray/background)."
-                    : "Silent launch disabled: Window will pop up on screen on startup.";
             };
 
             CheckBox chkDesktopOnStart = new CheckBox
             {
                 Text = "Desktop Layout on Startup (if unchecked, defaults to x360)",
                 AutoSize = true,
-                Font = new Font(this.Font.FontFamily, 9F, FontStyle.Regular),
-                Margin = new Padding(4, 4, 4, 8),
+                Font = new Font(this.Font.FontFamily, 8.5F, FontStyle.Regular),
+                Margin = new Padding(2, 2, 2, 4),
                 Cursor = Cursors.Hand,
                 Checked = ManagerFactory.settingsManager.GetBoolean("DesktopLayoutOnStart")
             };
@@ -168,9 +131,6 @@ namespace HandheldCompanion.Views
             chkDesktopOnStart.CheckedChanged += (s, e) =>
             {
                 ManagerFactory.settingsManager.SetProperty("DesktopLayoutOnStart", chkDesktopOnStart.Checked);
-                lblStatus.Text = chkDesktopOnStart.Checked
-                    ? "Startup mode: Desktop (sticks → mouse, no gamepad exposed)"
-                    : "Startup mode: x360 (Xbox 360 virtual controller)";
             };
 
             flowSettings.Controls.Add(chkBattery);
@@ -186,8 +146,8 @@ namespace HandheldCompanion.Views
                 Text = "Utilities & Diagnostics",
                 Dock = DockStyle.Top,
                 AutoSize = true,
-                Padding = new Padding(8),
-                Margin = new Padding(0, 4, 0, 8)
+                Padding = new Padding(6, 4, 6, 6),
+                Margin = new Padding(0, 0, 0, 6)
             };
 
             FlowLayoutPanel flowUtils = new FlowLayoutPanel
@@ -195,15 +155,15 @@ namespace HandheldCompanion.Views
                 Dock = DockStyle.Top,
                 AutoSize = true,
                 WrapContents = true,
-                Padding = new Padding(4)
+                Padding = new Padding(2)
             };
 
             Button btnLogs = new Button
             {
                 Text = "Open Logs",
-                Size = LogicalToDeviceUnits(new Size(115, 32)),
-                Font = new Font("Segoe UI", 9F, FontStyle.Regular),
-                Margin = new Padding(LogicalToDeviceUnits(3)),
+                Size = new Size(95, 26),
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Regular),
+                Margin = new Padding(2),
                 Cursor = Cursors.Hand,
                 FlatStyle = FlatStyle.Flat,
                 BackColor = Color.FromArgb(245, 247, 250),
@@ -223,9 +183,9 @@ namespace HandheldCompanion.Views
             Button btnRestart = new Button
             {
                 Text = "Restart App",
-                Size = LogicalToDeviceUnits(new Size(115, 32)),
-                Font = new Font("Segoe UI", 9F, FontStyle.Regular),
-                Margin = new Padding(LogicalToDeviceUnits(3)),
+                Size = new Size(95, 26),
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Regular),
+                Margin = new Padding(2),
                 Cursor = Cursors.Hand,
                 FlatStyle = FlatStyle.Flat,
                 BackColor = Color.FromArgb(245, 247, 250),
@@ -249,8 +209,8 @@ namespace HandheldCompanion.Views
                 Text = "Software Updates",
                 Dock = DockStyle.Top,
                 AutoSize = true,
-                Padding = new Padding(8),
-                Margin = new Padding(0, 4, 0, 8)
+                Padding = new Padding(6, 4, 6, 6),
+                Margin = new Padding(0, 0, 0, 6)
             };
 
             FlowLayoutPanel flowUpdates = new FlowLayoutPanel
@@ -259,31 +219,31 @@ namespace HandheldCompanion.Views
                 AutoSize = true,
                 FlowDirection = FlowDirection.TopDown,
                 WrapContents = false,
-                Padding = new Padding(8)
+                Padding = new Padding(4)
             };
 
             Label lblCurrentVersion = new Label
             {
                 Text = $"Current Version: v{UpdateService.CurrentVersion.ToString(3)}",
                 AutoSize = true,
-                Font = new Font(this.Font.FontFamily, 9.5F, FontStyle.Bold),
-                Margin = new Padding(4, 2, 4, 4)
+                Font = new Font(this.Font.FontFamily, 8.5F, FontStyle.Bold),
+                Margin = new Padding(2, 2, 2, 3)
             };
 
             Label lblUpdateStatus = new Label
             {
                 Text = "Click 'Check for Updates' to search GitHub for newer releases.",
                 AutoSize = true,
-                Font = new Font(this.Font.FontFamily, 9F, FontStyle.Regular),
+                Font = new Font(this.Font.FontFamily, 8F, FontStyle.Regular),
                 ForeColor = Color.DimGray,
-                Margin = new Padding(4, 2, 4, 6)
+                Margin = new Padding(2, 1, 2, 4)
             };
 
             ProgressBar progressUpdate = new ProgressBar
             {
-                Size = LogicalToDeviceUnits(new Size(320, 18)),
+                Size = new Size(260, 14),
                 Visible = false,
-                Margin = new Padding(4, 2, 4, 6)
+                Margin = new Padding(2, 1, 2, 4)
             };
 
             FlowLayoutPanel flowUpdateButtons = new FlowLayoutPanel
@@ -296,9 +256,9 @@ namespace HandheldCompanion.Views
             Button btnCheckUpdates = new Button
             {
                 Text = "Check for Updates",
-                Size = LogicalToDeviceUnits(new Size(140, 32)),
-                Font = new Font("Segoe UI", 9F, FontStyle.Regular),
-                Margin = new Padding(LogicalToDeviceUnits(3)),
+                Size = new Size(125, 26),
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Regular),
+                Margin = new Padding(2),
                 Cursor = Cursors.Hand,
                 FlatStyle = FlatStyle.System
             };
@@ -306,9 +266,9 @@ namespace HandheldCompanion.Views
             Button btnDownloadInstall = new Button
             {
                 Text = "Download & Install",
-                Size = LogicalToDeviceUnits(new Size(150, 32)),
-                Font = new Font("Segoe UI", 9F, FontStyle.Regular),
-                Margin = new Padding(LogicalToDeviceUnits(3)),
+                Size = new Size(135, 26),
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Regular),
+                Margin = new Padding(2),
                 Cursor = Cursors.Hand,
                 FlatStyle = FlatStyle.System,
                 Enabled = false,
@@ -412,9 +372,7 @@ namespace HandheldCompanion.Views
             contentPanel.Controls.Add(grpUpdates);
             contentPanel.Controls.Add(grpSettings);
 
-            this.Controls.Add(statusPanel);
             this.Controls.Add(contentPanel);
-            contentPanel.BringToFront();
 
             this.ResumeLayout(false);
         }
