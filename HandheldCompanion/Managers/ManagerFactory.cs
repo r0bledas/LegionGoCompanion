@@ -1,4 +1,4 @@
-﻿using HandheldCompanion.Shared;
+using HandheldCompanion.Shared;
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows.Input;
@@ -33,9 +33,7 @@ namespace HandheldCompanion.Managers
             processManager,
             gpuManager,
             notificationManager,
-            libraryManager,
-            platformManager,
-            collectionManager
+            platformManager
         };
 
         static ManagerFactory()

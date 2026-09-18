@@ -278,11 +278,9 @@ namespace HandheldCompanion
                     Task.Run(() => manager.Start());
                 }
 
-                // Start static managers
+                // Start static managers (essential Legion Go & controller services only)
                 LogManager.LogInformation("Loading static managers...");
-                Task.Run(() => OSDManager.Start());
                 Task.Run(() => SystemManager.Start());
-                Task.Run(() => DynamicLightingManager.Start());
                 Task.Run(() => VirtualManager.Start());
                 Task.Run(() => SensorsManager.Start());
                 Task.Run(() => ControllerManager.Start());
@@ -290,7 +288,6 @@ namespace HandheldCompanion
                 Task.Run(() => TaskManager.Start(exePath));
                 Task.Run(() => HidHide.RegisterApplication(exePath));
                 Task.Run(() => PerformanceManager.Start());
-                Task.Run(() => UpdateManager.Start());
 
                 LogManager.LogInformation("Starting UI...");
                 Application.Run(new MainForm());

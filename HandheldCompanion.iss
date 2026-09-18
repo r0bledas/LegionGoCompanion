@@ -12,31 +12,23 @@
 #define UseViGem
 ;#define UseDirectX
 #define UseHideHide
-;#define UseRTSS
 #define UsePawnIO
 #define UseUSBip
 
-#define InstallerVersion        "1.2.0"
+#define InstallerVersion        "1.2.1"
 #define MyAppSetupName         "Legion Go Companion"
 #define MyBuildId              "LegionGoCompanion"
-#define MyAppVersion           "1.2.0"
+#define MyAppVersion           "1.2.1"
 #define MyAppPublisher         "r0bledas"
 #define MyAppCopyright         "Copyright © r0bledas"
 #define MyAppURL               "https://github.com/r0bledas/LegionGoCompanion"
 #define MyAppExeName           "HandheldCompanion.exe"
 #define MyConfiguration        "Release"
 
-#define RtssExe                "RTSS.exe"
-#define EncoderServer64Exe     "EncoderServer64.exe"
-#define RTSSHooksLoader64Exe   "RTSSHooksLoader64.exe"
-#define EncoderServerExe       "EncoderServer.exe"
-#define RTSSHooksLoaderExe     "RTSSHooksLoader.exe"
-
 #define ViGemName              "ViGEmBus Setup"
 #define DotNetName             ".NET Desktop Runtime"
 #define DirectXName            "DirectX Runtime"
 #define HidHideName            "HidHide Drivers"
-#define RtssName               "RTSS Setup"
 #define PawnIOName             "PawnIO"
 #define USBipName              "USBip"
 
@@ -44,14 +36,12 @@
 #define NewDotNetVersion       "10.0.9"
 #define NewDirectXVersion      "9.29.1974"
 #define NewHidHideVersion      "1.5.230"
-#define NewRtssVersion         "7.3.5.28314"
 #define NewPawnIOVersion       "2.1.0.0"
 #define NewUSBipVersion        "0.9.7.7"
 
 #define ViGemDownloadLink      "https://github.com/nefarius/ViGEmBus/releases/download/v1.22.0/ViGEmBus_1.22.0_x64_x86_arm64.exe"
 #define DirectXDownloadLink    "https://download.microsoft.com/download/1/7/1/1718CCC4-6315-4D8E-9543-8E28A4E18C4C/dxwebsetup.exe"
 #define HidHideDownloadLink    "https://github.com/nefarius/HidHide/releases/download/v1.5.230.0/HidHide_1.5.230_x64.exe"
-#define RtssDownloadLink       "https://github.com/Valkirie/HandheldCompanion/raw/main/redist/RTSSSetup737.exe"
 #define PawnIODownloadLink     "https://github.com/namazso/PawnIO.Setup/releases/latest/download/PawnIO_setup.exe"
 #define USBipDownloadLink      "https://github.com/vadimgrn/usbip-win2/releases/download/v.0.9.7.7/USBip-0.9.7.7-x64.exe"
 #define GameControllerDBDownloadLink "https://raw.githubusercontent.com/mdqinc/SDL_GameControllerDB/refs/heads/master/gamecontrollerdb.txt"
@@ -202,7 +192,6 @@ procedure Dependency_AddViGem; forward;
 procedure Dependency_AddDotNet10Desktop; forward;
 procedure Dependency_AddDirectX; forward;
 procedure Dependency_AddHideHide; forward;
-procedure Dependency_AddRTSS; forward;
 procedure Dependency_AddPawnIO; forward;
 procedure Dependency_AddUSBip; forward;
 function BoolToStr(Value: Boolean): String; forward;
@@ -854,14 +843,7 @@ begin
     '', True, False, True, 'HidHide');
 end;
 
-procedure Dependency_AddRTSS;
-begin
-  Dependency_Add_With_Version('RTSSSetup737.exe', '{#NewRtssVersion}', RegGetInstalledVersion('{#RtssName}'),
-    '/S',
-    '{#RtssName}',
-    '{#RtssDownloadLink}',
-    '', True, True, False, '');
-end;
+
 
 procedure Dependency_AddPawnIO;
 begin

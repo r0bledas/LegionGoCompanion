@@ -158,9 +158,7 @@
     <Setting Name="OnScreenDisplayRefreshRate" Type="System.Double" Scope="User">
       <Value Profile="(Default)">1000</Value>
     </Setting>
-    <Setting Name="PlatformRTSSEnabled" Type="System.Boolean" Scope="User">
-      <Value Profile="(Default)">True</Value>
-    </Setting>
+
     <Setting Name="QuickToolsLocation" Type="System.Int32" Scope="User">
       <Value Profile="(Default)">5</Value>
     </Setting>

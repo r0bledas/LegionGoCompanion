@@ -1,4 +1,4 @@
-﻿using HandheldCompanion.Shared;
+using HandheldCompanion.Shared;
 
 using RTSSSharedMemoryNET;
 
@@ -89,13 +89,6 @@ public static class OSDManager
 
     private static void QueryPlatforms()
     {
-        // manage events
-        PlatformManager.RTSS.Hooked += RTSS_Hooked;
-        PlatformManager.RTSS.Unhooked += RTSS_Unhooked;
-
-        AppEntry? appEntry = PlatformManager.RTSS.GetAppEntry();
-        if (appEntry is not null)
-            RTSS_Hooked(appEntry);
     }
 
     private static void PlatformManager_Initialized()
@@ -140,8 +133,6 @@ public static class OSDManager
         // manage events
         ManagerFactory.settingsManager.SettingValueChanged -= SettingsManager_SettingValueChanged;
         ManagerFactory.settingsManager.Initialized -= SettingsManager_Initialized;
-        PlatformManager.RTSS.Hooked -= RTSS_Hooked;
-        PlatformManager.RTSS.Unhooked -= RTSS_Unhooked;
 
         IsInitialized = false;
 

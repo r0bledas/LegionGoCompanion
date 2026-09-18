@@ -11,9 +11,9 @@
 		<StartupObject>HandheldCompanion.Program</StartupObject>
 		<OutputPath>$(SolutionDir)bin\$(Configuration)</OutputPath>
 		<ApplicationIcon>Resources\icon.ico</ApplicationIcon>
-		<Version>1.2.0</Version>
-		<AssemblyVersion>1.2.0.0</AssemblyVersion>
-		<FileVersion>1.2.0.0</FileVersion>
+		<Version>1.2.1</Version>
+		<AssemblyVersion>1.2.1.0</AssemblyVersion>
+		<FileVersion>1.2.1.0</FileVersion>
 		<Platforms>x64</Platforms>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 		<RunPostBuildEvent>OnBuildSuccess</RunPostBuildEvent>
@@ -361,15 +361,7 @@
 		<None Update="Resources\Segoe Fluent Icons.ttf">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</None>
-		<None Update="RTSSHooks.dll">
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-		</None>
-		<None Update="RTSSHooks64.dll">
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-		</None>
-		<None Update="Resources\RTSSSharedMemoryNET.dll">
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-		</None>
+
 		<None Update="SapientiaUsb.dll">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</None>
@@ -474,9 +466,7 @@
 		<Reference Include="Nefarius.ViGEm.Client">
 			<HintPath>..\Resources\Nefarius.ViGEm.Client.dll</HintPath>
 		</Reference>
-		<Reference Include="RTSSSharedMemoryNET">
-			<HintPath>Resources\RTSSSharedMemoryNET.dll</HintPath>
-		</Reference>
+
 	</ItemGroup>
 	<Target Name="PreBuild" BeforeTargets="PreBuildEvent">
 		<Exec Command="if exist &quot;%25LocalAppData%25\HandheldCompanion\SecretKeys.cs&quot; (&#xA;    copy &quot;.\SecretKeys.cs&quot; &quot;.\SecretKeys.cs.bak&quot;&#xA;    copy &quot;%25LocalAppData%25\HandheldCompanion\SecretKeys.cs&quot; &quot;.\SecretKeys.cs&quot;&#xA;)" />

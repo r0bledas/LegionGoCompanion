@@ -1,5 +1,6 @@
 using System;
 using System.Drawing;
+using System.Linq;
 using System.Media;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -41,38 +42,39 @@ namespace HandheldCompanion.Views
             this.AutoScaleMode = AutoScaleMode.Dpi;
             this.AutoScaleDimensions = new SizeF(96F, 96F);
             this.Dock = DockStyle.Fill;
-            this.AutoScroll = true;
             this.Font = new Font("Segoe UI", 9.5F, FontStyle.Regular);
 
-            // Status Bar at the top
+            // Status Bar at the bottom of the General tab
             Panel statusPanel = new Panel
             {
-                Dock = DockStyle.Top,
-                Height = LogicalToDeviceUnits(34),
-                Padding = new Padding(LogicalToDeviceUnits(12), LogicalToDeviceUnits(6), LogicalToDeviceUnits(12), 0)
+                Dock = DockStyle.Bottom,
+                Height = LogicalToDeviceUnits(30),
+                Padding = new Padding(LogicalToDeviceUnits(10), LogicalToDeviceUnits(4), LogicalToDeviceUnits(10), LogicalToDeviceUnits(2)),
+                BackColor = Color.FromArgb(246, 248, 250)
+            };
+            statusPanel.Paint += (s, e) =>
+            {
+                using var pen = new Pen(Color.FromArgb(220, 224, 230), 1);
+                e.Graphics.DrawLine(pen, 0, 0, statusPanel.Width, 0);
             };
 
             this.lblStatus = new Label
             {
                 Text = "Ready | Legion Go Companion",
-                Font = new Font("Segoe UI", 9.5F, FontStyle.Regular),
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Regular),
+                ForeColor = Color.FromArgb(70, 75, 85),
                 AutoSize = true,
                 Dock = DockStyle.Left
             };
             statusPanel.Controls.Add(this.lblStatus);
 
-            // Main Content Layout: Table with 3 compact GroupBoxes
-            TableLayoutPanel tableLayout = new TableLayoutPanel
+            // Main scrollable content panel
+            Panel contentPanel = new Panel
             {
                 Dock = DockStyle.Fill,
-                ColumnCount = 1,
-                RowCount = 3,
-                Padding = new Padding(10, 0, 10, 10),
-                AutoScroll = true
+                AutoScroll = true,
+                Padding = new Padding(LogicalToDeviceUnits(8), LogicalToDeviceUnits(4), LogicalToDeviceUnits(8), LogicalToDeviceUnits(8))
             };
-            tableLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-            tableLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-            tableLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 
             // ==========================================
             // 1. Controller GroupBox
@@ -82,29 +84,28 @@ namespace HandheldCompanion.Views
                 Text = "Controller Emulation & Layout",
                 Dock = DockStyle.Top,
                 AutoSize = true,
-                Padding = new Padding(8),
-                Margin = new Padding(0, 4, 0, 8)
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                Padding = new Padding(LogicalToDeviceUnits(8), LogicalToDeviceUnits(10), LogicalToDeviceUnits(8), LogicalToDeviceUnits(8)),
+                Margin = new Padding(0, 0, 0, LogicalToDeviceUnits(8))
             };
 
             FlowLayoutPanel flowController = new FlowLayoutPanel
             {
                 Dock = DockStyle.Top,
                 AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
                 WrapContents = true,
-                Padding = new Padding(4)
+                Padding = new Padding(LogicalToDeviceUnits(2))
             };
 
-            btnDS4 = CreateCompactButton("DS4", 78, 30, async () =>
+            btnDS4 = CreateCompactButton("DS4", 72, 30, async () =>
             {
                 lblStatus.Text = "Switching controller to DS4...";
                 PlayDisconnectSound();
-                // 1. Cloak native physical controller via HidHide so games ONLY see the virtual DS4
                 ManagerFactory.settingsManager.SetProperty("HIDcloakonconnect", true);
                 ControllerManager.TargetController?.Hide(false);
                 SetLegionPassthrough(false);
-                // 2. Switch layout to Gamepad
                 ManagerFactory.layoutManager.SetLayoutMode(LayoutModes.Gamepad);
-                // 3. Connect virtual DualShock 4
                 bool modeChanged = await VirtualManager.SetControllerMode(HIDmode.DualShock4Controller);
                 await VirtualManager.SetControllerStatus(HIDstatus.Connected);
                 PlayConnectSound();
@@ -112,17 +113,14 @@ namespace HandheldCompanion.Views
                 lblStatus.Text = "Active Controller: DS4 (DualShock 4 / Gyro active; native hidden)";
             });
 
-            btnX360 = CreateCompactButton("x360", 78, 30, async () =>
+            btnX360 = CreateCompactButton("x360", 72, 30, async () =>
             {
                 lblStatus.Text = "Switching controller to x360...";
                 PlayDisconnectSound();
-                // 1. Cloak native physical controller via HidHide so games ONLY see the virtual x360
                 ManagerFactory.settingsManager.SetProperty("HIDcloakonconnect", true);
                 ControllerManager.TargetController?.Hide(false);
                 SetLegionPassthrough(false);
-                // 2. Switch layout to Gamepad
                 ManagerFactory.layoutManager.SetLayoutMode(LayoutModes.Gamepad);
-                // 3. Connect virtual Xbox 360
                 bool modeChanged = await VirtualManager.SetControllerMode(HIDmode.Xbox360Controller);
                 await VirtualManager.SetControllerStatus(HIDstatus.Connected);
                 PlayConnectSound();
@@ -130,14 +128,12 @@ namespace HandheldCompanion.Views
                 lblStatus.Text = "Active Controller: x360 (Standard XInput; native hidden)";
             });
 
-            btnNative = CreateCompactButton("Native", 78, 30, async () =>
+            btnNative = CreateCompactButton("Native", 72, 30, async () =>
             {
                 lblStatus.Text = "Switching controller to Native Passthrough...";
                 PlayDisconnectSound();
-                // 1. Disconnect any virtual controller
                 await VirtualManager.SetControllerMode(HIDmode.NoController);
                 await VirtualManager.SetControllerStatus(HIDstatus.Disconnected);
-                // 2. Uncloak native controller so games can directly access it
                 ManagerFactory.settingsManager.SetProperty("HIDcloakonconnect", false);
                 ControllerManager.TargetController?.Unhide(false);
                 SetLegionPassthrough(true);
@@ -147,18 +143,15 @@ namespace HandheldCompanion.Views
                 lblStatus.Text = "Active Controller: Native Passthrough (Direct Legion Go hardware exposed)";
             });
 
-            btnDesktop = CreateCompactButton("Desktop", 78, 30, async () =>
+            btnDesktop = CreateCompactButton("Desktop", 72, 30, async () =>
             {
                 lblStatus.Text = "Enabling Desktop Mode (Stick to Mouse)...";
                 PlayConnectSound();
-                // 1. Cloak native controller from games so games do NOT see an active controller
                 ManagerFactory.settingsManager.SetProperty("HIDcloakonconnect", true);
                 ControllerManager.TargetController?.Hide(false);
                 SetLegionPassthrough(false);
-                // 2. Disconnect virtual controller completely so Windows/games detect NO gamepads
                 await VirtualManager.SetControllerMode(HIDmode.NoController);
                 await VirtualManager.SetControllerStatus(HIDstatus.Disconnected);
-                // 3. Switch layout to Desktop (sticks & buttons feed exclusively into mouse cursor & keyboard clicks)
                 ManagerFactory.layoutManager.SetLayoutMode(LayoutModes.Desktop);
                 HighlightControllerButton(btnDesktop);
                 lblStatus.Text = "Active Mode: Desktop (No gamepad exposed; Stick: Mouse, Triggers: Click, Left Stick: Scroll)";
@@ -178,16 +171,18 @@ namespace HandheldCompanion.Views
                 Text = "TDP Power Limit (Watts)",
                 Dock = DockStyle.Top,
                 AutoSize = true,
-                Padding = new Padding(8),
-                Margin = new Padding(0, 4, 0, 8)
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                Padding = new Padding(LogicalToDeviceUnits(8), LogicalToDeviceUnits(10), LogicalToDeviceUnits(8), LogicalToDeviceUnits(8)),
+                Margin = new Padding(0, 0, 0, LogicalToDeviceUnits(8))
             };
 
             FlowLayoutPanel flowTdp = new FlowLayoutPanel
             {
                 Dock = DockStyle.Top,
                 AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
                 WrapContents = true,
-                Padding = new Padding(4)
+                Padding = new Padding(LogicalToDeviceUnits(2))
             };
 
             int[] tdpValues = new int[] { 5, 8, 10, 15, 20, 25, 30, 35, 40 };
@@ -196,7 +191,7 @@ namespace HandheldCompanion.Views
             for (int i = 0; i < tdpValues.Length; i++)
             {
                 int wattage = tdpValues[i];
-                Button b = CreateCompactButton(wattage + "W", 56, 30, () => ApplyTdp(wattage));
+                Button b = CreateCompactButton(wattage + "W", 48, 28, () => ApplyTdp(wattage));
                 tdpButtons[i] = b;
                 flowTdp.Controls.Add(b);
             }
@@ -210,20 +205,22 @@ namespace HandheldCompanion.Views
                 Text = "Fan & Thermal Control",
                 Dock = DockStyle.Top,
                 AutoSize = true,
-                Padding = new Padding(8),
-                Margin = new Padding(0, 4, 0, 8)
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                Padding = new Padding(LogicalToDeviceUnits(8), LogicalToDeviceUnits(10), LogicalToDeviceUnits(8), LogicalToDeviceUnits(8)),
+                Margin = new Padding(0, 0, 0, LogicalToDeviceUnits(8))
             };
 
             FlowLayoutPanel flowFan = new FlowLayoutPanel
             {
                 Dock = DockStyle.Top,
                 AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
                 WrapContents = true,
-                Padding = new Padding(4)
+                Padding = new Padding(LogicalToDeviceUnits(2))
             };
 
-            btnFanAuto = CreateCompactButton("Auto", 65, 30, () => ApplyFanMode("Auto (Balanced)", 0, false, true, btnFanAuto));
-            btnFanFull = CreateCompactButton("100% Full", 75, 30, () => ApplyFanMode("Full Speed (100%)", 100, true, false, btnFanFull));
+            btnFanAuto = CreateCompactButton("Auto", 62, 28, () => ApplyFanMode("Auto (Balanced)", 0, false, true, btnFanAuto));
+            btnFanFull = CreateCompactButton("100% Full", 74, 28, () => ApplyFanMode("Full Speed (100%)", 100, true, false, btnFanFull));
 
             flowFan.Controls.Add(btnFanAuto);
             flowFan.Controls.Add(btnFanFull);
@@ -234,19 +231,20 @@ namespace HandheldCompanion.Views
             {
                 int spd = fanSpeeds[i];
                 Button b = null;
-                b = CreateCompactButton(spd + "%", 56, 30, () => ApplyFanMode(spd + "% Fixed", spd, false, false, b));
+                b = CreateCompactButton(spd + "%", 48, 28, () => ApplyFanMode(spd + "% Fixed", spd, false, false, b));
                 fanSpeedButtons[i] = b;
                 flowFan.Controls.Add(b);
             }
             grpFan.Controls.Add(flowFan);
 
-            // Add groups to table
-            tableLayout.Controls.Add(grpController, 0, 0);
-            tableLayout.Controls.Add(grpTdp, 0, 1);
-            tableLayout.Controls.Add(grpFan, 0, 2);
+            // Add groups to content panel (Dock.Top docks in reverse order of addition)
+            contentPanel.Controls.Add(grpFan);
+            contentPanel.Controls.Add(grpTdp);
+            contentPanel.Controls.Add(grpController);
 
-            this.Controls.Add(tableLayout);
             this.Controls.Add(statusPanel);
+            this.Controls.Add(contentPanel);
+            contentPanel.BringToFront();
 
             // Initialize active state highlights
             UpdateActiveControllerHighlight();
@@ -295,8 +293,12 @@ namespace HandheldCompanion.Views
                 Font = new Font("Segoe UI", 9F, FontStyle.Regular),
                 Margin = new Padding(LogicalToDeviceUnits(3)),
                 Cursor = Cursors.Hand,
-                FlatStyle = FlatStyle.System
+                FlatStyle = FlatStyle.Flat,
+                BackColor = Color.FromArgb(245, 247, 250),
+                ForeColor = Color.FromArgb(30, 35, 45)
             };
+            btn.FlatAppearance.BorderColor = Color.FromArgb(210, 215, 222);
+            btn.FlatAppearance.BorderSize = 1;
             btn.Click += (s, e) => onClick();
             return btn;
         }
@@ -310,8 +312,12 @@ namespace HandheldCompanion.Views
                 Font = new Font("Segoe UI", 9F, FontStyle.Regular),
                 Margin = new Padding(LogicalToDeviceUnits(3)),
                 Cursor = Cursors.Hand,
-                FlatStyle = FlatStyle.System
+                FlatStyle = FlatStyle.Flat,
+                BackColor = Color.FromArgb(245, 247, 250),
+                ForeColor = Color.FromArgb(30, 35, 45)
             };
+            btn.FlatAppearance.BorderColor = Color.FromArgb(210, 215, 222);
+            btn.FlatAppearance.BorderSize = 1;
             btn.Click += async (s, e) =>
             {
                 try
@@ -326,6 +332,15 @@ namespace HandheldCompanion.Views
                 }
             };
             return btn;
+        }
+
+        private void SetButtonSelected(Button? b, bool isSel)
+        {
+            if (b == null) return;
+            b.Font = new Font("Segoe UI", 9F, isSel ? FontStyle.Bold : FontStyle.Regular);
+            b.BackColor = isSel ? Color.FromArgb(0, 120, 215) : Color.FromArgb(245, 247, 250);
+            b.ForeColor = isSel ? Color.White : Color.FromArgb(30, 35, 45);
+            b.FlatAppearance.BorderColor = isSel ? Color.FromArgb(0, 95, 175) : Color.FromArgb(210, 215, 222);
         }
 
         private void UpdateActiveControllerHighlight()
@@ -350,35 +365,29 @@ namespace HandheldCompanion.Views
             Button[] all = new Button[] { btnDS4, btnX360, btnNative, btnDesktop };
             foreach (var b in all)
             {
-                if (b == null) continue;
-                bool isSel = (b == selected);
-                b.Font = new Font("Segoe UI", 9F, isSel ? FontStyle.Bold : FontStyle.Regular);
+                SetButtonSelected(b, b == selected);
             }
         }
 
         private void HighlightTdpButton(int wattage)
         {
+            if (tdpButtons == null) return;
             foreach (var b in tdpButtons)
             {
-                if (b == null) continue;
-                bool isSel = b.Text == wattage + "W";
-                b.Font = new Font("Segoe UI", 9F, isSel ? FontStyle.Bold : FontStyle.Regular);
+                SetButtonSelected(b, b != null && b.Text == wattage + "W");
             }
         }
 
         private void HighlightFanButton(Button selected)
         {
-            if (btnFanAuto != null)
-                btnFanAuto.Font = new Font("Segoe UI", 9F, btnFanAuto == selected ? FontStyle.Bold : FontStyle.Regular);
-            if (btnFanFull != null)
-                btnFanFull.Font = new Font("Segoe UI", 9F, btnFanFull == selected ? FontStyle.Bold : FontStyle.Regular);
+            SetButtonSelected(btnFanAuto, btnFanAuto == selected);
+            SetButtonSelected(btnFanFull, btnFanFull == selected);
 
             if (fanSpeedButtons != null)
             {
                 foreach (var b in fanSpeedButtons)
                 {
-                    if (b == null) continue;
-                    b.Font = new Font("Segoe UI", 9F, b == selected ? FontStyle.Bold : FontStyle.Regular);
+                    SetButtonSelected(b, b == selected);
                 }
             }
         }

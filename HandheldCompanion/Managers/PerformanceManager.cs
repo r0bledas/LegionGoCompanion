@@ -564,7 +564,7 @@ public static class PerformanceManager
         if (!ManagerFactory.platformManager.IsReady)
             return;
 
-        bool hasHook = PlatformManager.RTSS?.HasHook() ?? false;
+        bool hasHook = false;
         if (!hasHook)
         {
             autotdpWatchdog.Interval = INTERVAL_DEGRADED;
@@ -583,7 +583,7 @@ public static class PerformanceManager
                 double unclampedProcessValueFPS = 0.0;
 
                 // todo: Store fps for data gathering from multiple points (OSD, Performance)
-                double framerate = PlatformManager.RTSS?.GetFramerate(true) ?? 0.0d;
+                double framerate = 0.0d;
                 double processValueFPS = unclampedProcessValueFPS = framerate;
 
                 // Ensure realistic process values, prevent divide by 0

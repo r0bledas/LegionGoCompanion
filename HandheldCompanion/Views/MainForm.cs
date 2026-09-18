@@ -15,7 +15,7 @@ namespace HandheldCompanion.Views
         [DllImport("user32.dll")]
         private static extern bool SetForegroundWindow(IntPtr hWnd);
 
-        private Panel topHeaderPanel;
+        private Panel bottomStatusPanel;
         private Label lblAdminStatus;
         private Button btnRestartAdmin;
         private Label lblSystemHealth;
@@ -43,7 +43,7 @@ namespace HandheldCompanion.Views
 
         private void InitializeComponent()
         {
-            this.topHeaderPanel = new Panel();
+            this.bottomStatusPanel = new Panel();
             this.lblAdminStatus = new Label();
             this.btnRestartAdmin = new Button();
             this.lblSystemHealth = new Label();
@@ -58,30 +58,30 @@ namespace HandheldCompanion.Views
             this.AutoScaleMode = AutoScaleMode.Dpi;
             this.AutoScaleDimensions = new SizeF(96F, 96F);
             this.Text = "Legion Go Companion";
-            this.Size = new Size(720, 560);
-            this.MinimumSize = new Size(600, 460);
+            this.Size = new Size(680, 520);
+            this.MinimumSize = new Size(460, 380);
             this.StartPosition = FormStartPosition.CenterScreen;
             this.Font = new Font("Segoe UI", 9.5F, FontStyle.Regular);
 
             // ==========================================
-            // Top Header Panel: Admin Indicator & System Status
+            // Bottom Status Panel: Admin Indicator & System Status
             // ==========================================
-            this.topHeaderPanel.Dock = DockStyle.Top;
-            this.topHeaderPanel.Height = LogicalToDeviceUnits(44);
-            this.topHeaderPanel.BackColor = Color.FromArgb(245, 247, 250);
-            this.topHeaderPanel.Padding = new Padding(LogicalToDeviceUnits(12), LogicalToDeviceUnits(8), LogicalToDeviceUnits(12), LogicalToDeviceUnits(8));
-            this.topHeaderPanel.Paint += (s, e) =>
+            this.bottomStatusPanel.Dock = DockStyle.Bottom;
+            this.bottomStatusPanel.Height = LogicalToDeviceUnits(36);
+            this.bottomStatusPanel.BackColor = Color.FromArgb(242, 244, 247);
+            this.bottomStatusPanel.Padding = new Padding(LogicalToDeviceUnits(10), LogicalToDeviceUnits(4), LogicalToDeviceUnits(10), LogicalToDeviceUnits(4));
+            this.bottomStatusPanel.Paint += (s, e) =>
             {
-                using var pen = new Pen(Color.FromArgb(220, 224, 230), 1);
-                e.Graphics.DrawLine(pen, 0, topHeaderPanel.Height - 1, topHeaderPanel.Width, topHeaderPanel.Height - 1);
+                using var pen = new Pen(Color.FromArgb(218, 222, 228), 1);
+                e.Graphics.DrawLine(pen, 0, 0, bottomStatusPanel.Width, 0);
             };
 
             bool isAdmin = Program.IsAdministrator();
 
             // 1. Admin status label
             this.lblAdminStatus.AutoSize = true;
-            this.lblAdminStatus.Font = new Font("Segoe UI", 9.5F, FontStyle.Bold);
-            this.lblAdminStatus.Location = new Point(LogicalToDeviceUnits(10), LogicalToDeviceUnits(11));
+            this.lblAdminStatus.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
+            this.lblAdminStatus.Location = new Point(LogicalToDeviceUnits(10), LogicalToDeviceUnits(8));
             if (isAdmin)
             {
                 this.lblAdminStatus.Text = "🛡️ Admin: YES (Elevated)";
@@ -89,16 +89,16 @@ namespace HandheldCompanion.Views
             }
             else
             {
-                this.lblAdminStatus.Text = "⚠️ Admin: NO (Features Limited)";
+                this.lblAdminStatus.Text = "⚠️ Admin: NO";
                 this.lblAdminStatus.ForeColor = Color.FromArgb(211, 47, 47);
             }
-            this.topHeaderPanel.Controls.Add(this.lblAdminStatus);
+            this.bottomStatusPanel.Controls.Add(this.lblAdminStatus);
 
             // 2. Restart as Admin button (only if not running elevated)
-            this.btnRestartAdmin.Text = "🛡️ Restart as Admin";
-            this.btnRestartAdmin.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
-            this.btnRestartAdmin.Size = new Size(LogicalToDeviceUnits(150), LogicalToDeviceUnits(28));
-            this.btnRestartAdmin.Location = new Point(LogicalToDeviceUnits(250), LogicalToDeviceUnits(8));
+            this.btnRestartAdmin.Text = "Restart as Admin";
+            this.btnRestartAdmin.Font = new Font("Segoe UI", 8.5F, FontStyle.Bold);
+            this.btnRestartAdmin.Size = new Size(LogicalToDeviceUnits(120), LogicalToDeviceUnits(24));
+            this.btnRestartAdmin.Location = new Point(LogicalToDeviceUnits(120), LogicalToDeviceUnits(6));
             this.btnRestartAdmin.FlatStyle = FlatStyle.Flat;
             this.btnRestartAdmin.FlatAppearance.BorderSize = 0;
             this.btnRestartAdmin.BackColor = Color.FromArgb(0, 120, 215);
@@ -123,16 +123,16 @@ namespace HandheldCompanion.Views
                     MessageBox.Show("Could not start elevated process: " + ex.Message, "Restart as Admin", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 }
             };
-            this.topHeaderPanel.Controls.Add(this.btnRestartAdmin);
+            this.bottomStatusPanel.Controls.Add(this.btnRestartAdmin);
 
             // 3. System Diagnostics Health label
             this.lblSystemHealth.AutoSize = true;
-            this.lblSystemHealth.Font = new Font("Segoe UI", 9F, FontStyle.Regular);
+            this.lblSystemHealth.Font = new Font("Segoe UI", 8.5F, FontStyle.Regular);
             this.lblSystemHealth.ForeColor = Color.FromArgb(70, 75, 85);
             this.lblSystemHealth.Dock = DockStyle.Right;
             this.lblSystemHealth.TextAlign = ContentAlignment.MiddleRight;
             this.lblSystemHealth.Text = "Checking system health...";
-            this.topHeaderPanel.Controls.Add(this.lblSystemHealth);
+            this.bottomStatusPanel.Controls.Add(this.lblSystemHealth);
 
             // TabControl
             this.mainTabControl.Dock = DockStyle.Fill;
@@ -157,8 +157,11 @@ namespace HandheldCompanion.Views
             this.mainTabControl.Controls.Add(this.tabGeneral);
             this.mainTabControl.Controls.Add(this.tabSettings);
 
+            this.Controls.Add(this.bottomStatusPanel);
             this.Controls.Add(this.mainTabControl);
-            this.Controls.Add(this.topHeaderPanel);
+            this.mainTabControl.BringToFront();
+
+            this.Resize += (s, e) => UpdateDiagnostics();
 
             this.ResumeLayout(false);
         }
@@ -179,11 +182,14 @@ namespace HandheldCompanion.Views
                 bool hidHideOk = File.Exists(Path.Combine(Environment.SystemDirectory, "drivers", "HidHide.sys"));
                 bool controllerOk = ControllerManager.HasTargetController;
 
-                string vigemStr = vigemOk ? "● ViGEm: OK" : "❌ ViGEm: N/A";
-                string hidHideStr = hidHideOk ? "● HidHide: OK" : "⚠️ HidHide: N/A";
-                string controllerStr = controllerOk ? "● Controller: Connected" : "⚠️ Controller: Disconnected";
+                bool compact = this.ClientSize.Width < 540;
+                string vigemStr = vigemOk ? (compact ? "ViGEm: OK" : "● ViGEm: OK") : (compact ? "ViGEm: ❌" : "❌ ViGEm: N/A");
+                string hidHideStr = hidHideOk ? (compact ? "HidHide: OK" : "● HidHide: OK") : (compact ? "HidHide: ⚠️" : "⚠️ HidHide: N/A");
+                string controllerStr = controllerOk ? (compact ? "Ctrl: OK" : "● Controller: Connected") : (compact ? "Ctrl: ⚠️" : "⚠️ Controller: Disconnected");
 
-                this.lblSystemHealth.Text = $"{vigemStr}  |  {hidHideStr}  |  {controllerStr}";
+                this.lblSystemHealth.Text = compact
+                    ? $"{vigemStr} | {hidHideStr} | {controllerStr}"
+                    : $"{vigemStr}  |  {hidHideStr}  |  {controllerStr}";
             }
             catch { }
         }

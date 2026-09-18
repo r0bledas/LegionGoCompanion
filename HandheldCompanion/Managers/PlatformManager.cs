@@ -1,4 +1,4 @@
-﻿using GameLib.Core;
+using GameLib.Core;
 using HandheldCompanion.Misc;
 using HandheldCompanion.Platforms;
 using HandheldCompanion.Platforms.Games;
@@ -27,7 +27,6 @@ public class PlatformManager : IManager
     public static MicrosoftStore MicrosoftStore = null!;
 
     // misc platforms
-    public static RTSSPlatform RTSS = null!;
     public static LibreHardwarePlatform LibreHardware = null!;
     public static WindowsPlatform WindowsPlatform = null!;
 
@@ -41,27 +40,14 @@ public class PlatformManager : IManager
 
         base.PrepareStart();
 
-        // initialize gaming platforms
-        Steam = new Steam();
-        GOGGalaxy = new GOGGalaxy();
-        UbisoftConnect = new UbisoftConnect();
-        BattleNet = new BattleNet();
-        Origin = new Origin();
-        Epic = new Epic();
-        RiotGames = new RiotGames();
-        Rockstar = new Rockstar();
-        EADesktop = new EADesktop();
-        MicrosoftStore = new MicrosoftStore();
-
-        // initialize misc platforms
-        RTSS = new RTSSPlatform();
+        // initialize misc platforms (RTSS ditched, no gaming platforms started)
         LibreHardware = new LibreHardwarePlatform();
         WindowsPlatform = new WindowsPlatform();
 
         // populate lists
-        GamingPlatforms = new() { Steam, GOGGalaxy, UbisoftConnect, BattleNet, Origin, Epic, RiotGames, Rockstar, EADesktop, MicrosoftStore };
-        MiscPlatforms = new() { RTSS, LibreHardware, WindowsPlatform };
-        AllPlatforms = new(GamingPlatforms.Concat(MiscPlatforms));
+        GamingPlatforms = new();
+        MiscPlatforms = new() { LibreHardware, WindowsPlatform };
+        AllPlatforms = new(MiscPlatforms);
 
         // start platforms
         foreach (IPlatform platform in AllPlatforms)
@@ -88,14 +74,7 @@ public class PlatformManager : IManager
         {
             if (platform.IsInstalled)
             {
-                bool kill = true;
-
-                if (platform is RTSSPlatform)
-                    kill = ManagerFactory.settingsManager.GetBoolean("PlatformRTSSEnabled");
-                else if (platform is LibreHardwarePlatform)
-                    kill = false;
-
-                platform.Stop(kill);
+                platform.Stop(false);
             }
         }
 

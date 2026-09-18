@@ -30,34 +30,37 @@ namespace HandheldCompanion.Views
             this.AutoScroll = true;
             this.Font = new Font("Segoe UI", 9.5F, FontStyle.Regular);
 
-            // Status Bar at the top
+            // Status Bar at the bottom
             Panel statusPanel = new Panel
             {
-                Dock = DockStyle.Top,
-                Height = LogicalToDeviceUnits(34),
-                Padding = new Padding(LogicalToDeviceUnits(12), LogicalToDeviceUnits(6), LogicalToDeviceUnits(12), 0)
+                Dock = DockStyle.Bottom,
+                Height = LogicalToDeviceUnits(30),
+                Padding = new Padding(LogicalToDeviceUnits(10), LogicalToDeviceUnits(4), LogicalToDeviceUnits(10), LogicalToDeviceUnits(2)),
+                BackColor = Color.FromArgb(246, 248, 250)
+            };
+            statusPanel.Paint += (s, e) =>
+            {
+                using var pen = new Pen(Color.FromArgb(220, 224, 230), 1);
+                e.Graphics.DrawLine(pen, 0, 0, statusPanel.Width, 0);
             };
 
             this.lblStatus = new Label
             {
                 Text = "Hardware & Companion Settings",
-                Font = new Font("Segoe UI", 9.5F, FontStyle.Regular),
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Regular),
+                ForeColor = Color.FromArgb(70, 75, 85),
                 AutoSize = true,
                 Dock = DockStyle.Left
             };
             statusPanel.Controls.Add(this.lblStatus);
 
-            TableLayoutPanel tableLayout = new TableLayoutPanel
+            // Main scrollable content panel
+            Panel contentPanel = new Panel
             {
                 Dock = DockStyle.Fill,
-                ColumnCount = 1,
-                RowCount = 3,
-                Padding = new Padding(10, 0, 10, 10),
-                AutoScroll = true
+                AutoScroll = true,
+                Padding = new Padding(LogicalToDeviceUnits(8), LogicalToDeviceUnits(4), LogicalToDeviceUnits(8), LogicalToDeviceUnits(8))
             };
-            tableLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-            tableLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-            tableLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 
             // GroupBox 1: Hardware & Power Options
             GroupBox grpSettings = new GroupBox
@@ -202,8 +205,12 @@ namespace HandheldCompanion.Views
                 Font = new Font("Segoe UI", 9F, FontStyle.Regular),
                 Margin = new Padding(LogicalToDeviceUnits(3)),
                 Cursor = Cursors.Hand,
-                FlatStyle = FlatStyle.System
+                FlatStyle = FlatStyle.Flat,
+                BackColor = Color.FromArgb(245, 247, 250),
+                ForeColor = Color.FromArgb(30, 35, 45)
             };
+            btnLogs.FlatAppearance.BorderColor = Color.FromArgb(210, 215, 222);
+            btnLogs.FlatAppearance.BorderSize = 1;
             btnLogs.Click += (s, e) =>
             {
                 string logPath = Environment.GetEnvironmentVariable("LOG_PATH") ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "HandheldCompanion", "logs");
@@ -220,8 +227,12 @@ namespace HandheldCompanion.Views
                 Font = new Font("Segoe UI", 9F, FontStyle.Regular),
                 Margin = new Padding(LogicalToDeviceUnits(3)),
                 Cursor = Cursors.Hand,
-                FlatStyle = FlatStyle.System
+                FlatStyle = FlatStyle.Flat,
+                BackColor = Color.FromArgb(245, 247, 250),
+                ForeColor = Color.FromArgb(30, 35, 45)
             };
+            btnRestart.FlatAppearance.BorderColor = Color.FromArgb(210, 215, 222);
+            btnRestart.FlatAppearance.BorderSize = 1;
             btnRestart.Click += (s, e) =>
             {
                 Application.Restart();
@@ -397,12 +408,13 @@ namespace HandheldCompanion.Views
             flowUpdates.Controls.Add(flowUpdateButtons);
             grpUpdates.Controls.Add(flowUpdates);
 
-            tableLayout.Controls.Add(grpSettings, 0, 0);
-            tableLayout.Controls.Add(grpUpdates, 0, 1);
-            tableLayout.Controls.Add(grpUtilities, 0, 2);
+            contentPanel.Controls.Add(grpUtilities);
+            contentPanel.Controls.Add(grpUpdates);
+            contentPanel.Controls.Add(grpSettings);
 
-            this.Controls.Add(tableLayout);
             this.Controls.Add(statusPanel);
+            this.Controls.Add(contentPanel);
+            contentPanel.BringToFront();
 
             this.ResumeLayout(false);
         }
