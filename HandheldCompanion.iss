@@ -10,16 +10,16 @@
 #endif
 
 #define UseViGem
-#define UseDirectX
+;#define UseDirectX
 #define UseHideHide
-#define UseRTSS
+;#define UseRTSS
 #define UsePawnIO
 #define UseUSBip
 
-#define InstallerVersion        "1.1.0"
+#define InstallerVersion        "1.2.0"
 #define MyAppSetupName         "Legion Go Companion"
 #define MyBuildId              "LegionGoCompanion"
-#define MyAppVersion           "1.1.0"
+#define MyAppVersion           "1.2.0"
 #define MyAppPublisher         "r0bledas"
 #define MyAppCopyright         "Copyright © r0bledas"
 #define MyAppURL               "https://github.com/r0bledas/LegionGoCompanion"
@@ -119,6 +119,7 @@ Source: "{#SourcePath}\redist\PawnIO_setup.exe"; Flags: dontcopy noencryption
 Source: "{#SourcePath}\redist\ViGEmBus_1.22.0_x64_x86_arm64.exe"; Flags: dontcopy noencryption
 #endif
 Source: "{#SourcePath}\HandheldCompanion\bin\{#MyConfiguration}\{#MyConfigurationExt}-windows{#WindowsVersion}.0\win-x64\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#SourcePath}\hidapi.net\hidapi.dll"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#SourcePath}\Certificate.pfx"; DestDir: "{tmp}"; Flags: deleteafterinstall
 Source: "{#SourcePath}\Certificate.ps1"; DestDir: "{tmp}"; Flags: deleteafterinstall
 Source: "{#SourcePath}\redist\PromptFont.otf"; DestDir: "{autofonts}"; FontInstall: "PromptFont"; Flags: uninsneveruninstall
@@ -415,29 +416,6 @@ begin
     Dependency_DownloadPage.SetText('Closing Legion Go Companion...', '');
     StopProcess('{#MyAppExeName}');
     Sleep(1000);
-    Dependency_DownloadPage.Hide;
-  end;
-
-  // Kill any running RTSS-related processes before installing dependencies
-  if IsProcessRunning('{#EncoderServerExe}') or
-     IsProcessRunning('{#EncoderServer64Exe}') or
-     IsProcessRunning('{#RTSSHooksLoaderExe}') or
-     IsProcessRunning('{#RTSSHooksLoader64Exe}') or
-     IsProcessRunning('{#RtssExe}') then
-  begin
-    Dependency_DownloadPage.Show;
-    Dependency_DownloadPage.SetText('Stopping RivaTuner Statistics Server processes...', '');
-    Dependency_DownloadPage.SetProgress(0, 5);
-    StopProcess('{#EncoderServerExe}');
-    Dependency_DownloadPage.SetProgress(1, 5);
-    StopProcess('{#EncoderServer64Exe}');
-    Dependency_DownloadPage.SetProgress(2, 5);
-    StopProcess('{#RTSSHooksLoaderExe}');
-    Dependency_DownloadPage.SetProgress(3, 5);
-    StopProcess('{#RTSSHooksLoader64Exe}');
-    Dependency_DownloadPage.SetProgress(4, 5);
-    StopProcess('{#RtssExe}');
-    Dependency_DownloadPage.SetProgress(5, 5);
     Dependency_DownloadPage.Hide;
   end;
 

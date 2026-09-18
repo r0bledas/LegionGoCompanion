@@ -628,6 +628,10 @@ namespace HandheldCompanion.Managers
 
         public static void UpdateInputs(ControllerState controllerState, GamepadMotion gamepadMotion)
         {
+            // Never send inputs to virtual controller in Desktop mode or when virtual controller is disabled
+            if (ManagerFactory.layoutManager?.GetCurrentMode() == LayoutModes.Desktop || HIDmode == HIDmode.NoController)
+                return;
+
             // Skip sending inputs to virtual controller when listening for hotkey inputs
             if (InputsManager.IsListening)
                 return;

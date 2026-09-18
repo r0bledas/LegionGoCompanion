@@ -44,6 +44,7 @@ namespace HandheldCompanion
         private const uint MSGFLT_ADD = 1;
         private static readonly IntPtr HWND_BROADCAST = new IntPtr(0xffff);
         public static uint WM_SHOWME = 0;
+        public const string ShowWindowEventName = @"Global\LegionGoCompanion_ShowWindow_Event";
 
         private static bool CheckExistingInstanceAndSignal()
         {
@@ -54,8 +55,25 @@ namespace HandheldCompanion
                 var processes = Process.GetProcessesByName(currentName);
                 if (processes.Length > 1)
                 {
-                    uint wm = (uint)RegisterWindowMessage("HANDHELD_COMPANION_SHOW_WINDOW");
-                    PostMessage(HWND_BROADCAST, wm, IntPtr.Zero, IntPtr.Zero);
+                    // 1. Signal cross-integrity Global EventWaitHandle (works reliably across user/admin boundary)
+                    try
+                    {
+                        if (EventWaitHandle.TryOpenExisting(ShowWindowEventName, out var handle))
+                        {
+                            handle.Set();
+                            handle.Dispose();
+                        }
+                    }
+                    catch { }
+
+                    // 2. Broadcast window message as fallback
+                    try
+                    {
+                        uint wm = (uint)RegisterWindowMessage("HANDHELD_COMPANION_SHOW_WINDOW");
+                        PostMessage(HWND_BROADCAST, wm, IntPtr.Zero, IntPtr.Zero);
+                    }
+                    catch { }
+
                     return true;
                 }
             }
@@ -158,7 +176,7 @@ namespace HandheldCompanion
             catch { }
         }
 
-        private static bool IsAdministrator()
+        public static bool IsAdministrator()
         {
             try
             {

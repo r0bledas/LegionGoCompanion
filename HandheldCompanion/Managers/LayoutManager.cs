@@ -14,6 +14,7 @@ using System.IO;
 using System.Linq;
 using System.Numerics;
 using System.Runtime.CompilerServices;
+using System.Threading.Tasks;
 using System.Timers;
 
 namespace HandheldCompanion.Managers;
@@ -262,7 +263,70 @@ public class LayoutManager : IManager
         };
 
         if (target is not null)
+        {
             SetActiveLayout(target);
+            ApplyControllerIsolationForLayout(target == desktopLayout);
+        }
+    }
+
+    private void ApplyControllerIsolationForLayout(bool isDesktop)
+    {
+        try
+        {
+            if (isDesktop)
+            {
+                // In Desktop mode:
+                // 1. Cloak physical Legion Go controllers with HidHide so games detect 0 gamepads
+                ManagerFactory.settingsManager.SetProperty("HIDcloakonconnect", true);
+                ControllerManager.TargetController?.Hide(false);
+
+                // 2. Disconnect any virtual controller completely
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        await VirtualManager.SetControllerMode(HIDmode.NoController).ConfigureAwait(false);
+                        await VirtualManager.SetControllerStatus(HIDstatus.Disconnected).ConfigureAwait(false);
+                    }
+                    catch (Exception ex)
+                    {
+                        LogManager.LogError("Failed to disconnect virtual controller for Desktop mode: {0}", ex.Message);
+                    }
+                });
+            }
+            else
+            {
+                // In Gamepad mode:
+                // 1. Ensure physical controller remains cloaked so only virtual controller is visible to games
+                ManagerFactory.settingsManager.SetProperty("HIDcloakonconnect", true);
+                ControllerManager.TargetController?.Hide(false);
+
+                // 2. If virtual controller was disconnected (or set to NoController), reconnect preferred mode
+                if (VirtualManager.HIDmode == HIDmode.NoController || VirtualManager.HIDstatus == HIDstatus.Disconnected)
+                {
+                    HIDmode preferredMode = (HIDmode)ManagerFactory.settingsManager.GetInt("HIDmode");
+                    if (preferredMode == HIDmode.NoController || preferredMode == HIDmode.NotSelected)
+                        preferredMode = HIDmode.Xbox360Controller;
+
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            await VirtualManager.SetControllerMode(preferredMode).ConfigureAwait(false);
+                            await VirtualManager.SetControllerStatus(HIDstatus.Connected).ConfigureAwait(false);
+                        }
+                        catch (Exception ex)
+                        {
+                            LogManager.LogError("Failed to reconnect virtual controller for Gamepad mode: {0}", ex.Message);
+                        }
+                    });
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            LogManager.LogError("Error in ApplyControllerIsolationForLayout: {0}", ex.Message);
+        }
     }
 
     /// <summary>Selects the appropriate layout for Auto mode.</summary>

@@ -370,8 +370,11 @@ public static class ControllerManager
         mapped.ButtonState[ButtonFlags.RightPadTouch] |= Math.Abs((int)mapped.AxisState[AxisFlags.RightPadX]) > PAD_TOUCH_DEADZONE || Math.Abs((int)mapped.AxisState[AxisFlags.RightPadY]) > PAD_TOUCH_DEADZONE;
 
         DS4Touch.UpdateInputs(mapped);
-        VirtualManager.UpdateInputs(mapped, gamepadMotion);
-        DSUServer.UpdateInputs(mapped, motions);
+        if (ManagerFactory.layoutManager?.GetCurrentMode() != LayoutModes.Desktop)
+        {
+            VirtualManager.UpdateInputs(mapped, gamepadMotion);
+            DSUServer.UpdateInputs(mapped, motions);
+        }
         DSUServer.Tick(ticks, delta);
     }
 

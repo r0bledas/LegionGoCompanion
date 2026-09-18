@@ -1,12 +1,26 @@
 using System;
+using System.Diagnostics;
 using System.Drawing;
+using System.IO;
+using System.Runtime.InteropServices;
+using System.Threading;
 using System.Windows.Forms;
 using HandheldCompanion.Managers;
+using HandheldCompanion.Shared;
 
 namespace HandheldCompanion.Views
 {
     public class MainForm : Form
     {
+        [DllImport("user32.dll")]
+        private static extern bool SetForegroundWindow(IntPtr hWnd);
+
+        private Panel topHeaderPanel;
+        private Label lblAdminStatus;
+        private Button btnRestartAdmin;
+        private Label lblSystemHealth;
+        private System.Windows.Forms.Timer diagnosticsTimer;
+
         private TabControl mainTabControl;
         private TabPage tabGeneral;
         private TabPage tabSettings;
@@ -15,14 +29,25 @@ namespace HandheldCompanion.Views
         private ContextMenuStrip trayMenu;
         private bool isExiting = false;
 
+        private EventWaitHandle? showWindowEvent;
+        private Thread? showWindowThread;
+        private volatile bool isListeningForShow = true;
+
         public MainForm()
         {
             InitializeComponent();
             InitializeTrayIcon();
+            StartShowWindowListener();
+            StartDiagnosticsTimer();
         }
 
         private void InitializeComponent()
         {
+            this.topHeaderPanel = new Panel();
+            this.lblAdminStatus = new Label();
+            this.btnRestartAdmin = new Button();
+            this.lblSystemHealth = new Label();
+
             this.mainTabControl = new TabControl();
             this.tabGeneral = new TabPage();
             this.tabSettings = new TabPage();
@@ -33,10 +58,81 @@ namespace HandheldCompanion.Views
             this.AutoScaleMode = AutoScaleMode.Dpi;
             this.AutoScaleDimensions = new SizeF(96F, 96F);
             this.Text = "Legion Go Companion";
-            this.Size = new Size(700, 520);
-            this.MinimumSize = new Size(580, 420);
+            this.Size = new Size(720, 560);
+            this.MinimumSize = new Size(600, 460);
             this.StartPosition = FormStartPosition.CenterScreen;
             this.Font = new Font("Segoe UI", 9.5F, FontStyle.Regular);
+
+            // ==========================================
+            // Top Header Panel: Admin Indicator & System Status
+            // ==========================================
+            this.topHeaderPanel.Dock = DockStyle.Top;
+            this.topHeaderPanel.Height = LogicalToDeviceUnits(44);
+            this.topHeaderPanel.BackColor = Color.FromArgb(245, 247, 250);
+            this.topHeaderPanel.Padding = new Padding(LogicalToDeviceUnits(12), LogicalToDeviceUnits(8), LogicalToDeviceUnits(12), LogicalToDeviceUnits(8));
+            this.topHeaderPanel.Paint += (s, e) =>
+            {
+                using var pen = new Pen(Color.FromArgb(220, 224, 230), 1);
+                e.Graphics.DrawLine(pen, 0, topHeaderPanel.Height - 1, topHeaderPanel.Width, topHeaderPanel.Height - 1);
+            };
+
+            bool isAdmin = Program.IsAdministrator();
+
+            // 1. Admin status label
+            this.lblAdminStatus.AutoSize = true;
+            this.lblAdminStatus.Font = new Font("Segoe UI", 9.5F, FontStyle.Bold);
+            this.lblAdminStatus.Location = new Point(LogicalToDeviceUnits(10), LogicalToDeviceUnits(11));
+            if (isAdmin)
+            {
+                this.lblAdminStatus.Text = "🛡️ Admin: YES (Elevated)";
+                this.lblAdminStatus.ForeColor = Color.FromArgb(34, 139, 34);
+            }
+            else
+            {
+                this.lblAdminStatus.Text = "⚠️ Admin: NO (Features Limited)";
+                this.lblAdminStatus.ForeColor = Color.FromArgb(211, 47, 47);
+            }
+            this.topHeaderPanel.Controls.Add(this.lblAdminStatus);
+
+            // 2. Restart as Admin button (only if not running elevated)
+            this.btnRestartAdmin.Text = "🛡️ Restart as Admin";
+            this.btnRestartAdmin.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
+            this.btnRestartAdmin.Size = new Size(LogicalToDeviceUnits(150), LogicalToDeviceUnits(28));
+            this.btnRestartAdmin.Location = new Point(LogicalToDeviceUnits(250), LogicalToDeviceUnits(8));
+            this.btnRestartAdmin.FlatStyle = FlatStyle.Flat;
+            this.btnRestartAdmin.FlatAppearance.BorderSize = 0;
+            this.btnRestartAdmin.BackColor = Color.FromArgb(0, 120, 215);
+            this.btnRestartAdmin.ForeColor = Color.White;
+            this.btnRestartAdmin.Cursor = Cursors.Hand;
+            this.btnRestartAdmin.Visible = !isAdmin;
+            this.btnRestartAdmin.Click += (s, e) =>
+            {
+                try
+                {
+                    ProcessStartInfo psi = new ProcessStartInfo
+                    {
+                        FileName = Application.ExecutablePath,
+                        UseShellExecute = true,
+                        Verb = "runas"
+                    };
+                    Process.Start(psi);
+                    this.ExitApplication();
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show("Could not start elevated process: " + ex.Message, "Restart as Admin", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                }
+            };
+            this.topHeaderPanel.Controls.Add(this.btnRestartAdmin);
+
+            // 3. System Diagnostics Health label
+            this.lblSystemHealth.AutoSize = true;
+            this.lblSystemHealth.Font = new Font("Segoe UI", 9F, FontStyle.Regular);
+            this.lblSystemHealth.ForeColor = Color.FromArgb(70, 75, 85);
+            this.lblSystemHealth.Dock = DockStyle.Right;
+            this.lblSystemHealth.TextAlign = ContentAlignment.MiddleRight;
+            this.lblSystemHealth.Text = "Checking system health...";
+            this.topHeaderPanel.Controls.Add(this.lblSystemHealth);
 
             // TabControl
             this.mainTabControl.Dock = DockStyle.Fill;
@@ -62,8 +158,68 @@ namespace HandheldCompanion.Views
             this.mainTabControl.Controls.Add(this.tabSettings);
 
             this.Controls.Add(this.mainTabControl);
+            this.Controls.Add(this.topHeaderPanel);
 
             this.ResumeLayout(false);
+        }
+
+        private void StartDiagnosticsTimer()
+        {
+            diagnosticsTimer = new System.Windows.Forms.Timer { Interval = 2000 };
+            diagnosticsTimer.Tick += (s, e) => UpdateDiagnostics();
+            diagnosticsTimer.Start();
+            UpdateDiagnostics();
+        }
+
+        private void UpdateDiagnostics()
+        {
+            try
+            {
+                bool vigemOk = File.Exists(Path.Combine(Environment.SystemDirectory, "drivers", "ViGEmBus.sys")) || VirtualManager.IsInitialized;
+                bool hidHideOk = File.Exists(Path.Combine(Environment.SystemDirectory, "drivers", "HidHide.sys"));
+                bool controllerOk = ControllerManager.HasTargetController;
+
+                string vigemStr = vigemOk ? "● ViGEm: OK" : "❌ ViGEm: N/A";
+                string hidHideStr = hidHideOk ? "● HidHide: OK" : "⚠️ HidHide: N/A";
+                string controllerStr = controllerOk ? "● Controller: Connected" : "⚠️ Controller: Disconnected";
+
+                this.lblSystemHealth.Text = $"{vigemStr}  |  {hidHideStr}  |  {controllerStr}";
+            }
+            catch { }
+        }
+
+        private void StartShowWindowListener()
+        {
+            try
+            {
+                showWindowEvent = new EventWaitHandle(false, EventResetMode.AutoReset, Program.ShowWindowEventName);
+                showWindowThread = new Thread(() =>
+                {
+                    while (isListeningForShow)
+                    {
+                        try
+                        {
+                            if (showWindowEvent != null && showWindowEvent.WaitOne(1000))
+                            {
+                                if (isListeningForShow && this.IsHandleCreated && !this.IsDisposed)
+                                {
+                                    this.BeginInvoke(new Action(() => RestoreFromTray()));
+                                }
+                            }
+                        }
+                        catch { }
+                    }
+                })
+                {
+                    IsBackground = true,
+                    Priority = ThreadPriority.BelowNormal
+                };
+                showWindowThread.Start();
+            }
+            catch (Exception ex)
+            {
+                LogManager.LogError("Failed to start ShowWindowListener: {0}", ex.Message);
+            }
         }
 
         private void InitializeTrayIcon()
@@ -115,27 +271,7 @@ namespace HandheldCompanion.Views
                 }
             };
             this.trayIcon.DoubleClick += (s, e) => RestoreFromTray();
-
-            // Set initial visibility based on CloseMinimises setting
-            UpdateTrayIconVisibility();
-
-            // Listen for setting changes
-            ManagerFactory.settingsManager.SettingValueChanged += (name, value, temp, init) =>
-            {
-                if (name == "CloseMinimises")
-                {
-                    if (this.IsHandleCreated && !this.IsDisposed)
-                    {
-                        this.BeginInvoke((MethodInvoker)(() => UpdateTrayIconVisibility()));
-                    }
-                }
-            };
-        }
-
-        private void UpdateTrayIconVisibility()
-        {
-            bool keepRunning = ManagerFactory.settingsManager.GetBoolean("CloseMinimises");
-            this.trayIcon.Visible = keepRunning;
+            this.trayIcon.Visible = true;
         }
 
         private bool allowVisible = false;
@@ -191,19 +327,28 @@ namespace HandheldCompanion.Views
         public void RestoreFromTray()
         {
             allowVisible = true;
-            this.Show();
             if (this.WindowState == FormWindowState.Minimized)
             {
                 this.WindowState = FormWindowState.Normal;
             }
+            this.Show();
             this.Visible = true;
-            this.Activate();
             this.BringToFront();
+            this.Activate();
+            try
+            {
+                SetForegroundWindow(this.Handle);
+            }
+            catch { }
         }
 
         public void ExitApplication()
         {
             isExiting = true;
+            isListeningForShow = false;
+            diagnosticsTimer?.Stop();
+            try { showWindowEvent?.Set(); showWindowEvent?.Dispose(); } catch { }
+
             if (this.trayIcon != null)
             {
                 this.trayIcon.Visible = false;
@@ -230,12 +375,7 @@ namespace HandheldCompanion.Views
                 }
             }
 
-            if (this.trayIcon != null)
-            {
-                this.trayIcon.Visible = false;
-                this.trayIcon.Dispose();
-            }
-
+            ExitApplication();
             base.OnFormClosing(e);
         }
 
@@ -243,6 +383,9 @@ namespace HandheldCompanion.Views
         {
             if (disposing)
             {
+                isListeningForShow = false;
+                diagnosticsTimer?.Dispose();
+                try { showWindowEvent?.Set(); showWindowEvent?.Dispose(); } catch { }
                 this.trayIcon?.Dispose();
                 this.trayMenu?.Dispose();
             }
