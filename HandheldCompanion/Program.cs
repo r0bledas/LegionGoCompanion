@@ -23,6 +23,9 @@ namespace HandheldCompanion
         private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
 
         [DllImport("user32.dll")]
+        private static extern bool SetForegroundWindow(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
         private static extern IntPtr FindWindow(string? lpClassName, string? lpWindowName);
 
         [DllImport("user32.dll")]
@@ -52,30 +55,97 @@ namespace HandheldCompanion
             {
                 int currentPid = Process.GetCurrentProcess().Id;
                 string currentName = Process.GetCurrentProcess().ProcessName;
-                var processes = Process.GetProcessesByName(currentName);
-                if (processes.Length > 1)
+                var targetNames = new System.Collections.Generic.HashSet<string>(StringComparer.OrdinalIgnoreCase)
                 {
-                    // 1. Signal cross-integrity Global EventWaitHandle (works reliably across user/admin boundary)
-                    try
+                    currentName,
+                    "HandheldCompanion",
+                    "LegionGoCompanion"
+                };
+
+                bool hasOtherProcesses = false;
+                var otherProcesses = new System.Collections.Generic.List<Process>();
+
+                foreach (var name in targetNames)
+                {
+                    foreach (var p in Process.GetProcessesByName(name))
                     {
-                        if (EventWaitHandle.TryOpenExisting(ShowWindowEventName, out var handle))
+                        if (p.Id != currentPid)
                         {
-                            handle.Set();
-                            handle.Dispose();
+                            hasOtherProcesses = true;
+                            otherProcesses.Add(p);
                         }
                     }
-                    catch { }
+                }
 
-                    // 2. Broadcast window message as fallback
-                    try
+                if (!hasOtherProcesses)
+                    return false;
+
+                bool isCurrentAdmin = IsAdministrator();
+
+                // 1. Signal cross-integrity Global EventWaitHandle (works reliably across user/admin boundary)
+                try
+                {
+                    if (EventWaitHandle.TryOpenExisting(ShowWindowEventName, out var handle))
                     {
-                        uint wm = (uint)RegisterWindowMessage("HANDHELD_COMPANION_SHOW_WINDOW");
-                        PostMessage(HWND_BROADCAST, wm, IntPtr.Zero, IntPtr.Zero);
+                        handle.Set();
+                        handle.Dispose();
                     }
-                    catch { }
+                }
+                catch { }
 
+                // 2. Broadcast window message as fallback
+                try
+                {
+                    uint wm = (uint)RegisterWindowMessage("HANDHELD_COMPANION_SHOW_WINDOW");
+                    PostMessage(HWND_BROADCAST, wm, IntPtr.Zero, IntPtr.Zero);
+                }
+                catch { }
+
+                // 3. Check if an existing instance actually has an active window that responds
+                bool activeWindowFound = false;
+                for (int i = 0; i < 5; i++)
+                {
+                    Thread.Sleep(100);
+                    foreach (var p in otherProcesses)
+                    {
+                        try
+                        {
+                            p.Refresh();
+                            if (p.MainWindowHandle != IntPtr.Zero)
+                            {
+                                ShowWindow(p.MainWindowHandle, 9 /* SW_RESTORE */);
+                                SetForegroundWindow(p.MainWindowHandle);
+                                activeWindowFound = true;
+                                break;
+                            }
+                        }
+                        catch { }
+                    }
+                    if (activeWindowFound) break;
+                }
+
+                // If an existing instance is alive, has a window, and this instance is NOT elevating to admin,
+                // let the existing instance stay in the foreground and exit this duplicate
+                if (activeWindowFound && !isCurrentAdmin)
+                {
                     return true;
                 }
+
+                // If no active window was found (meaning the other instance is a zombie/ghost/dead process)
+                // OR if this process is running elevated as Administrator:
+                // Kill the old zombie instances, sweep ghost icons, and run THIS instance!
+                foreach (var p in otherProcesses)
+                {
+                    try
+                    {
+                        p.Kill();
+                        p.WaitForExit(1500);
+                    }
+                    catch { }
+                }
+
+                TrayCleaner.Clean();
+                return false;
             }
             catch { }
             return false;
@@ -244,6 +314,8 @@ namespace HandheldCompanion
             {
                 var ex = e.ExceptionObject as Exception;
                 MessageBox.Show("Fatal startup error: " + (ex?.Message ?? e.ExceptionObject.ToString()) + "\n\n" + ex?.StackTrace, "LegionGoCompanion Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                TrayCleaner.Clean();
+                Environment.Exit(1);
             };
 
             Application.ThreadException += (s, e) =>
@@ -291,10 +363,14 @@ namespace HandheldCompanion
 
                 LogManager.LogInformation("Starting UI...");
                 Application.Run(new MainForm());
+                TrayCleaner.Clean();
+                Environment.Exit(0);
             }
             catch (Exception ex)
             {
                 MessageBox.Show("Startup Exception: " + ex.Message + "\n\n" + ex.StackTrace, "Startup Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                TrayCleaner.Clean();
+                Environment.Exit(1);
             }
         }
     }

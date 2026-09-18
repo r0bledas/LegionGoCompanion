@@ -53,6 +53,7 @@ public static class TaskManager
             taskDefinition.Settings.MultipleInstances = TaskInstancesPolicy.Parallel;
             taskDefinition.Settings.Enabled = true;
             bool runAtStartup = ManagerFactory.settingsManager.GetBoolean("RunAtStartup");
+            bool startMinimized = ManagerFactory.settingsManager.GetBoolean("StartMinimized");
             taskDefinition.Triggers.Add(new LogonTrigger() 
             { 
                 UserId = WindowsIdentity.GetCurrent().Name, 
@@ -60,11 +61,12 @@ public static class TaskManager
                 Enabled = runAtStartup 
             });
             string workingDir = System.IO.Path.GetDirectoryName(TaskExecutable) ?? string.Empty;
-            taskDefinition.Actions.Add(new ExecAction(TaskExecutable, null, workingDir));
+            string? taskArgs = startMinimized ? "--minimized" : null;
+            taskDefinition.Actions.Add(new ExecAction(TaskExecutable, taskArgs, workingDir));
 
             task = TaskService.Instance.RootFolder.RegisterTaskDefinition("HandheldCompanion", taskDefinition);
             task.Enabled = true;
-            LogManager.LogInformation("TaskManager registered scheduled task 'HandheldCompanion' (Enabled=true, RunAtStartup={0})", runAtStartup);
+            LogManager.LogInformation("TaskManager registered scheduled task 'HandheldCompanion' (Enabled=true, RunAtStartup={0}, StartMinimized={1})", runAtStartup, startMinimized);
         }
         catch (Exception ex)
         {
@@ -124,6 +126,29 @@ public static class TaskManager
             case "RunAtStartup":
                 UpdateTask(Convert.ToBoolean(value));
                 break;
+            case "StartMinimized":
+                UpdateTaskArgs(Convert.ToBoolean(value));
+                break;
+        }
+    }
+
+    private static void UpdateTaskArgs(bool startMinimized)
+    {
+        if (task is null)
+            return;
+
+        try
+        {
+            if (task.Definition.Actions.Count > 0 && task.Definition.Actions[0] is ExecAction execAction)
+            {
+                execAction.Arguments = startMinimized ? "--minimized" : null;
+                task.RegisterChanges();
+                LogManager.LogInformation("TaskManager updated ExecAction.Arguments to {0}", execAction.Arguments);
+            }
+        }
+        catch (Exception ex)
+        {
+            LogManager.LogWarning("TaskManager failed to update task arguments: {0}", ex.Message);
         }
     }
 

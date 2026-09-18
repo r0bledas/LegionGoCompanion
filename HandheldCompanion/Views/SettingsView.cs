@@ -195,8 +195,16 @@ namespace HandheldCompanion.Views
             btnRestart.FlatAppearance.BorderSize = 1;
             btnRestart.Click += (s, e) =>
             {
-                Application.Restart();
-                Environment.Exit(0);
+                if (this.FindForm() is MainForm mainForm)
+                {
+                    mainForm.ExitApplication(restart: true);
+                }
+                else
+                {
+                    TrayCleaner.Clean();
+                    Application.Restart();
+                    Environment.Exit(0);
+                }
             };
 
             flowUtils.Controls.Add(btnLogs);

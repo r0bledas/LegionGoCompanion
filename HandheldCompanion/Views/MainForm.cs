@@ -196,7 +196,21 @@ namespace HandheldCompanion.Views
         {
             try
             {
-                showWindowEvent = new EventWaitHandle(false, EventResetMode.AutoReset, Program.ShowWindowEventName);
+                try
+                {
+                    var security = new System.Security.AccessControl.EventWaitHandleSecurity();
+                    security.AddAccessRule(new System.Security.AccessControl.EventWaitHandleAccessRule(
+                        new System.Security.Principal.SecurityIdentifier(System.Security.Principal.WellKnownSidType.WorldSid, null),
+                        System.Security.AccessControl.EventWaitHandleRights.FullControl,
+                        System.Security.AccessControl.AccessControlType.Allow));
+
+                    showWindowEvent = EventWaitHandleAcl.Create(false, EventResetMode.AutoReset, Program.ShowWindowEventName, out _, security);
+                }
+                catch
+                {
+                    showWindowEvent = new EventWaitHandle(false, EventResetMode.AutoReset, Program.ShowWindowEventName);
+                }
+
                 showWindowThread = new Thread(() =>
                 {
                     while (isListeningForShow)
@@ -205,7 +219,7 @@ namespace HandheldCompanion.Views
                         {
                             if (showWindowEvent != null && showWindowEvent.WaitOne(1000))
                             {
-                                if (isListeningForShow && this.IsHandleCreated && !this.IsDisposed)
+                                if (isListeningForShow && !this.IsDisposed)
                                 {
                                     this.BeginInvoke(new Action(() => RestoreFromTray()));
                                 }
@@ -235,14 +249,10 @@ namespace HandheldCompanion.Views
             itemOpen.Click += (s, e) => RestoreFromTray();
 
             ToolStripMenuItem itemRestart = new ToolStripMenuItem("Restart");
-            itemRestart.Click += (s, e) =>
-            {
-                Application.Restart();
-                Environment.Exit(0);
-            };
+            itemRestart.Click += (s, e) => ExitApplication(restart: true);
 
             ToolStripMenuItem itemExit = new ToolStripMenuItem("Exit");
-            itemExit.Click += (s, e) => ExitApplication();
+            itemExit.Click += (s, e) => ExitApplication(restart: false);
 
             this.trayMenu.Items.Add(itemOpen);
             this.trayMenu.Items.Add(new ToolStripSeparator());
@@ -255,17 +265,31 @@ namespace HandheldCompanion.Views
                 ContextMenuStrip = this.trayMenu
             };
 
+            Icon? appIcon = null;
             try
             {
-                Icon appIcon = Icon.ExtractAssociatedIcon(Application.ExecutablePath) ?? SystemIcons.Application;
-                this.Icon = appIcon;
-                this.trayIcon.Icon = appIcon;
+                string icoPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Resources", "icon.ico");
+                if (File.Exists(icoPath))
+                {
+                    appIcon = new Icon(icoPath);
+                }
             }
-            catch
+            catch { }
+
+            if (appIcon == null)
             {
-                this.Icon = SystemIcons.Application;
-                this.trayIcon.Icon = SystemIcons.Application;
+                try
+                {
+                    appIcon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
+                }
+                catch { }
             }
+
+            appIcon ??= SystemIcons.Application;
+
+            this.Icon = appIcon;
+            this.ShowInTaskbar = true;
+            this.trayIcon.Icon = appIcon;
 
             this.trayIcon.MouseClick += (s, e) =>
             {
@@ -278,14 +302,26 @@ namespace HandheldCompanion.Views
             this.trayIcon.Visible = true;
         }
 
+        private static bool IsSilentStartupArg()
+        {
+            var args = Environment.GetCommandLineArgs();
+            for (int i = 1; i < args.Length; i++)
+            {
+                string a = args[i].Trim().ToLowerInvariant();
+                if (a == "--minimized" || a == "--silent" || a == "-minimized" || a == "-silent" || a == "/minimized" || a == "/silent")
+                    return true;
+            }
+            return false;
+        }
+
         private bool allowVisible = false;
 
         protected override void SetVisibleCore(bool value)
         {
             if (!allowVisible)
             {
-                bool startMinimized = ManagerFactory.settingsManager.GetBoolean("StartMinimized");
-                if (startMinimized)
+                // Only suppress initial window visibility if launched with an explicit silent/minimized startup argument (e.g. from logon trigger)
+                if (IsSilentStartupArg())
                 {
                     value = false;
                     if (!this.IsHandleCreated) CreateHandle();
@@ -317,12 +353,11 @@ namespace HandheldCompanion.Views
         protected override void OnShown(EventArgs e)
         {
             base.OnShown(e);
-            bool startMinimized = ManagerFactory.settingsManager.GetBoolean("StartMinimized");
-            if (startMinimized)
+            if (this.trayIcon != null)
             {
                 this.trayIcon.Visible = true;
             }
-            else
+            if (!IsSilentStartupArg())
             {
                 RestoreFromTray();
             }
@@ -331,12 +366,20 @@ namespace HandheldCompanion.Views
         public void RestoreFromTray()
         {
             allowVisible = true;
+            if (!this.IsHandleCreated)
+            {
+                this.CreateHandle();
+            }
             if (this.WindowState == FormWindowState.Minimized)
             {
                 this.WindowState = FormWindowState.Normal;
             }
             this.Show();
             this.Visible = true;
+            if (this.trayIcon != null)
+            {
+                this.trayIcon.Visible = true;
+            }
             this.BringToFront();
             this.Activate();
             try
@@ -346,7 +389,7 @@ namespace HandheldCompanion.Views
             catch { }
         }
 
-        public void ExitApplication()
+        public void ExitApplication(bool restart = false)
         {
             isExiting = true;
             isListeningForShow = false;
@@ -358,7 +401,18 @@ namespace HandheldCompanion.Views
                 this.trayIcon.Visible = false;
                 this.trayIcon.Dispose();
             }
-            Application.Exit();
+
+            TrayCleaner.Clean();
+
+            if (restart)
+            {
+                Application.Restart();
+            }
+            else
+            {
+                Application.Exit();
+            }
+            Environment.Exit(0);
         }
 
         protected override void OnFormClosing(FormClosingEventArgs e)
@@ -379,7 +433,7 @@ namespace HandheldCompanion.Views
                 }
             }
 
-            ExitApplication();
+            ExitApplication(restart: false);
             base.OnFormClosing(e);
         }
 
