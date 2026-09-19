@@ -28,16 +28,12 @@ namespace HandheldCompanion.Views
         private Button btnFanFull;
         private Button[] fanSpeedButtons;
 
-        // Display Resolution presets
+        // Display Resolution presets (Strict 16:10 aspect ratio matching Legion Go native panel)
         private static readonly (string Label, int Width, int Height)[] ResolutionPresets = new[]
         {
-            ("720p", 1280, 720),
             ("800p", 1280, 800),
-            ("900p", 1600, 900),
             ("1000p", 1600, 1000),
-            ("1080p", 1920, 1080),
             ("1200p", 1920, 1200),
-            ("1440p", 2560, 1440),
             ("1600p", 2560, 1600)
         };
         private Button[]? resolutionButtons;
@@ -249,7 +245,7 @@ namespace HandheldCompanion.Views
                 var preset = ResolutionPresets[i];
                 int w = preset.Width;
                 int h = preset.Height;
-                int btnWidth = preset.Label.Length <= 4 ? 46 : 52;
+                int btnWidth = preset.Label.Length <= 4 ? 52 : 58;
                 Button b = CreateCompactButton(preset.Label, btnWidth, 24, () => ApplyResolution(w, h));
                 resolutionButtons[i] = b;
                 flowResolution.Controls.Add(b);
