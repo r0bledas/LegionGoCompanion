@@ -15,6 +15,11 @@ namespace HandheldCompanion.Views
         [DllImport("user32.dll")]
         private static extern bool SetForegroundWindow(IntPtr hWnd);
 
+        [DllImport("user32.dll")]
+        private static extern IntPtr GetForegroundWindow();
+
+        public static MainForm? Instance { get; private set; }
+
         private Panel bottomStatusPanel;
         private Label lblAdminStatus;
         private Button btnRestartAdmin;
@@ -36,6 +41,7 @@ namespace HandheldCompanion.Views
 
         public MainForm()
         {
+            Instance = this;
             InitializeComponent();
             InitializeTrayIcon();
             StartShowWindowListener();
@@ -397,6 +403,68 @@ namespace HandheldCompanion.Views
                 SetForegroundWindow(this.Handle);
             }
             catch { }
+        }
+
+        public static void ToggleOrShowWindow()
+        {
+            if (Instance == null || Instance.IsDisposed)
+                return;
+
+            if (Instance.InvokeRequired)
+            {
+                Instance.BeginInvoke(new Action(ToggleOrShowWindow));
+                return;
+            }
+
+            try
+            {
+                IntPtr fg = GetForegroundWindow();
+                bool isForeground = (fg == Instance.Handle);
+                bool isVisible = Instance.Visible && Instance.WindowState != FormWindowState.Minimized;
+
+                if (isVisible && isForeground)
+                {
+                    Instance.WindowState = FormWindowState.Minimized;
+                    Instance.Hide();
+                }
+                else
+                {
+                    Instance.RestoreFromTray();
+                }
+            }
+            catch (Exception ex)
+            {
+                LogManager.LogError("ToggleOrShowWindow failed: {0}", ex.Message);
+            }
+        }
+
+        public static void ShowWindowDirect()
+        {
+            if (Instance == null || Instance.IsDisposed)
+                return;
+
+            if (Instance.InvokeRequired)
+            {
+                Instance.BeginInvoke(new Action(ShowWindowDirect));
+                return;
+            }
+
+            Instance.RestoreFromTray();
+        }
+
+        public static void HideWindowDirect()
+        {
+            if (Instance == null || Instance.IsDisposed)
+                return;
+
+            if (Instance.InvokeRequired)
+            {
+                Instance.BeginInvoke(new Action(HideWindowDirect));
+                return;
+            }
+
+            Instance.WindowState = FormWindowState.Minimized;
+            Instance.Hide();
         }
 
         public void ExitApplication(bool restart = false)

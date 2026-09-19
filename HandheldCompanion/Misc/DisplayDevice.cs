@@ -1,4 +1,4 @@
-﻿using System.Runtime.InteropServices;
+using System.Runtime.InteropServices;
 using static HandheldCompanion.Managers.MultimediaManager;
 
 namespace HandheldCompanion.Misc
@@ -6,6 +6,7 @@ namespace HandheldCompanion.Misc
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
     public struct DisplayDevice
     {
+        public const int DM_DISPLAYORIENTATION = 0x80;
         public const int DM_DISPLAYFREQUENCY = 0x400000;
         public const int DM_PELSWIDTH = 0x80000;
         public const int DM_PELSHEIGHT = 0x100000;

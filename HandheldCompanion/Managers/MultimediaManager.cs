@@ -1,4 +1,4 @@
-﻿using HandheldCompanion.Managers.Desktop;
+using HandheldCompanion.Managers.Desktop;
 using HandheldCompanion.Shared;
 using Microsoft.Win32;
 using NAudio.CoreAudioApi;
@@ -618,9 +618,9 @@ public class MultimediaManager : IManager
 
         // Validate that the frequency is actually available for this resolution
         ScreenResolution? targetResolution = PrimaryDesktop?.screenResolutions
-            .FirstOrDefault(r => r.Width == width && r.Height == height);
+            .FirstOrDefault(r => (r.Width == width && r.Height == height) || (r.Width == height && r.Height == width));
 
-        if (targetResolution != null && !targetResolution.Frequencies.ContainsKey(displayFrequency))
+        if (targetResolution != null && displayFrequency > 0 && !targetResolution.Frequencies.ContainsKey(displayFrequency))
         {
             // Frequency not in enumerated list - try the closest available frequency
             if (targetResolution.Frequencies.Any())
@@ -630,22 +630,25 @@ public class MultimediaManager : IManager
                     .ThenByDescending(f => f) // Prefer higher if equal distance
                     .First();
             }
-            else
-            {
-                // No frequencies available for this resolution
-                return false;
-            }
         }
+        else if (displayFrequency <= 0)
+        {
+            displayFrequency = targetResolution?.Frequencies.Keys.FirstOrDefault() ?? PrimaryDesktop?.GetCurrentFrequency() ?? 60;
+        }
+
+        DisplayDevice currentDm = GetDisplay(deviceName);
 
         DisplayDevice dm = new DisplayDevice
         {
-            dmSize = (short)Marshal.SizeOf(typeof(DisplayDevice)),
-            dmDeviceName = deviceName,
-            dmPelsWidth = width,
-            dmPelsHeight = height,
-            dmDisplayFrequency = displayFrequency,
-            dmFields = DisplayDevice.DM_PELSWIDTH | DisplayDevice.DM_PELSHEIGHT | DisplayDevice.DM_DISPLAYFREQUENCY
+            dmSize = (short)Marshal.SizeOf(typeof(DisplayDevice))
         };
+        EnumDisplaySettings(deviceName, -1, ref dm);
+
+        dm.dmDeviceName = deviceName;
+        dm.dmPelsWidth = width;
+        dm.dmPelsHeight = height;
+        dm.dmDisplayFrequency = displayFrequency;
+        dm.dmFields = DisplayDevice.DM_PELSWIDTH | DisplayDevice.DM_PELSHEIGHT | DisplayDevice.DM_DISPLAYFREQUENCY;
 
         if (bitsPerPel > 0)
         {
@@ -653,12 +656,34 @@ public class MultimediaManager : IManager
             dm.dmFields |= DisplayDevice.DM_BITSPERPEL;
         }
 
-        long testResult = ChangeDisplaySettings(ref dm, CDS_TEST);
-        if (testResult != 0)
-            return false;
+        if (currentDm.dmDisplayOrientation != 0)
+        {
+            dm.dmDisplayOrientation = currentDm.dmDisplayOrientation;
+            dm.dmFields |= DisplayDevice.DM_DISPLAYORIENTATION;
+        }
 
-        long applyResult = ChangeDisplaySettings(ref dm, 0);
-        return applyResult == 0;
+        // Test with specified width x height
+        int testResult = ChangeDisplaySettingsEx(deviceName, ref dm, IntPtr.Zero, CDS_TEST, IntPtr.Zero);
+        if (testResult == DISP_CHANGE_SUCCESSFUL)
+        {
+            int applyResult = ChangeDisplaySettingsEx(deviceName, ref dm, IntPtr.Zero, CDS_UPDATEREGISTRY, IntPtr.Zero);
+            return applyResult == DISP_CHANGE_SUCCESSFUL;
+        }
+
+        // On portrait-native rotated displays, try swapped dimensions if unswapped failed
+        DisplayDevice swappedDm = dm;
+        swappedDm.dmPelsWidth = height;
+        swappedDm.dmPelsHeight = width;
+        int swappedTest = ChangeDisplaySettingsEx(deviceName, ref swappedDm, IntPtr.Zero, CDS_TEST, IntPtr.Zero);
+        if (swappedTest == DISP_CHANGE_SUCCESSFUL)
+        {
+            int applySwapped = ChangeDisplaySettingsEx(deviceName, ref swappedDm, IntPtr.Zero, CDS_UPDATEREGISTRY, IntPtr.Zero);
+            return applySwapped == DISP_CHANGE_SUCCESSFUL;
+        }
+
+        LogManager.LogError("SetResolution failed for {0}x{1}@{2}Hz on {3} (Test results: {4}, {5})",
+            width, height, displayFrequency, deviceName, testResult, swappedTest);
+        return false;
     }
 
     public static DisplayDevice GetDisplay(string deviceName)
@@ -906,6 +931,9 @@ public class MultimediaManager : IManager
 
     [DllImport("user32.dll", CharSet = CharSet.Auto)]
     private static extern int ChangeDisplaySettings([In] ref DisplayDevice lpDevMode, int dwFlags);
+
+    [DllImport("user32.dll", CharSet = CharSet.Auto)]
+    private static extern int ChangeDisplaySettingsEx(string? lpszDeviceName, [In] ref DisplayDevice lpDevMode, IntPtr hwnd, int dwFlags, IntPtr lParam);
 
     [DllImport("user32.dll", CharSet = CharSet.Auto)]
     private static extern bool EnumDisplaySettings(string lpszDeviceName, int iModeNum, ref DisplayDevice lpDevMode);

@@ -28,6 +28,12 @@ namespace HandheldCompanion.Views
         private Button btnFanFull;
         private Button[] fanSpeedButtons;
 
+        // Display Resolution buttons
+        private Button btnRes800;
+        private Button btnRes1200;
+        private Button btnRes1600;
+        private Label lblResStatus;
+
         public GeneralView()
         {
             InitializeComponent();
@@ -72,7 +78,7 @@ namespace HandheldCompanion.Views
                 Padding = new Padding(1)
             };
 
-            btnDS4 = CreateCompactButton("DS4", 62, 26, async () =>
+            btnDS4 = CreateCompactButton("DS4 (Gyro)", 72, 26, async () =>
             {
                 PlayDisconnectSound();
                 ManagerFactory.settingsManager.SetProperty("HIDcloakonconnect", true);
@@ -85,7 +91,7 @@ namespace HandheldCompanion.Views
                 HighlightControllerButton(btnDS4);
             });
 
-            btnX360 = CreateCompactButton("x360", 62, 26, async () =>
+            btnX360 = CreateCompactButton("x360 (No Gyro)", 86, 26, async () =>
             {
                 PlayDisconnectSound();
                 ManagerFactory.settingsManager.SetProperty("HIDcloakonconnect", true);
@@ -98,7 +104,7 @@ namespace HandheldCompanion.Views
                 HighlightControllerButton(btnX360);
             });
 
-            btnNative = CreateCompactButton("Native", 62, 26, async () =>
+            btnNative = CreateCompactButton("Native (No Gyro)", 96, 26, async () =>
             {
                 PlayDisconnectSound();
                 await VirtualManager.SetControllerMode(HIDmode.NoController);
@@ -111,7 +117,7 @@ namespace HandheldCompanion.Views
                 HighlightControllerButton(btnNative);
             });
 
-            btnDesktop = CreateCompactButton("Desktop", 66, 26, async () =>
+            btnDesktop = CreateCompactButton("Desktop", 62, 26, async () =>
             {
                 PlayConnectSound();
                 ManagerFactory.settingsManager.SetProperty("HIDcloakonconnect", true);
@@ -205,7 +211,49 @@ namespace HandheldCompanion.Views
             }
             grpFan.Controls.Add(flowFan);
 
+            // ==========================================
+            // 4. Display Resolution GroupBox (Internal Legion Go Display)
+            // ==========================================
+            GroupBox grpResolution = new GroupBox
+            {
+                Text = "Display Resolution",
+                Dock = DockStyle.Top,
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
+                Padding = new Padding(6, 4, 6, 6),
+                Margin = new Padding(0, 0, 0, 4)
+            };
+
+            FlowLayoutPanel flowResolution = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Top,
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                WrapContents = true,
+                Padding = new Padding(1)
+            };
+
+            btnRes800 = CreateCompactButton("800p (1280x800)", 110, 24, () => ApplyResolution(1280, 800));
+            btnRes1200 = CreateCompactButton("1200p (1920x1200)", 120, 24, () => ApplyResolution(1920, 1200));
+            btnRes1600 = CreateCompactButton("1600p Native (2560x1600)", 150, 24, () => ApplyResolution(2560, 1600));
+
+            lblResStatus = new Label
+            {
+                AutoSize = true,
+                Font = new Font("Segoe UI", 8F, FontStyle.Regular),
+                ForeColor = Color.FromArgb(90, 95, 105),
+                Padding = new Padding(4, 4, 2, 2)
+            };
+
+            flowResolution.Controls.Add(btnRes800);
+            flowResolution.Controls.Add(btnRes1200);
+            flowResolution.Controls.Add(btnRes1600);
+            flowResolution.Controls.Add(lblResStatus);
+            grpResolution.Controls.Add(flowResolution);
+
             // Add groups to content panel (Dock.Top docks in reverse order of addition)
+            contentPanel.Controls.Add(grpResolution);
             contentPanel.Controls.Add(grpFan);
             contentPanel.Controls.Add(grpTdp);
             contentPanel.Controls.Add(grpController);
@@ -215,6 +263,21 @@ namespace HandheldCompanion.Views
             // Initialize active state highlights
             UpdateActiveControllerHighlight();
             HighlightFanButton(btnFanAuto);
+            UpdateResolutionControls();
+
+            if (ManagerFactory.multimediaManager != null)
+            {
+                ManagerFactory.multimediaManager.DisplaySettingsChanged += (screen, res) =>
+                {
+                    if (this.IsHandleCreated && !this.IsDisposed)
+                        this.BeginInvoke(new Action(UpdateResolutionControls));
+                };
+                ManagerFactory.multimediaManager.PrimaryScreenChanged += (screen) =>
+                {
+                    if (this.IsHandleCreated && !this.IsDisposed)
+                        this.BeginInvoke(new Action(UpdateResolutionControls));
+                };
+            }
 
             this.ResumeLayout(false);
         }
@@ -426,6 +489,76 @@ namespace HandheldCompanion.Views
         {
             if (IDevice.GetCurrent() is LegionGo lego)
                 lego.SetPassthrough(enabled);
+        }
+
+        private void UpdateResolutionControls()
+        {
+            var primary = ManagerFactory.multimediaManager?.PrimaryDesktop;
+            bool isInternal = primary != null && primary.IsInternal;
+
+            btnRes800.Enabled = isInternal;
+            btnRes1200.Enabled = isInternal;
+            btnRes1600.Enabled = isInternal;
+
+            if (!isInternal)
+            {
+                lblResStatus.Text = "Disabled (External Display Active)";
+                lblResStatus.ForeColor = Color.FromArgb(180, 50, 50);
+                SetButtonSelected(btnRes800, false);
+                SetButtonSelected(btnRes1200, false);
+                SetButtonSelected(btnRes1600, false);
+                return;
+            }
+
+            var current = primary?.GetResolution();
+            if (current != null)
+            {
+                lblResStatus.Text = $"Current: {current.Width}x{current.Height}";
+                lblResStatus.ForeColor = Color.FromArgb(60, 65, 75);
+
+                HighlightResolutionButton(current.Width, current.Height);
+            }
+        }
+
+        private void HighlightResolutionButton(int width, int height)
+        {
+            int w = Math.Max(width, height);
+            int h = Math.Min(width, height);
+
+            SetButtonSelected(btnRes800, (w == 1280 && h == 800) || (w == 1200 && h == 800));
+            SetButtonSelected(btnRes1200, w == 1920 && h == 1200);
+            SetButtonSelected(btnRes1600, w == 2560 && h == 1600);
+        }
+
+        private void ApplyResolution(int width, int height)
+        {
+            try
+            {
+                var primary = ManagerFactory.multimediaManager?.PrimaryDesktop;
+                if (primary == null || !primary.IsInternal)
+                {
+                    MessageBox.Show("Resolution quick adjustment is only available on the internal Legion Go display.",
+                        "Display Resolution", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
+
+                int freq = primary.GetCurrentFrequency();
+                bool success = ManagerFactory.multimediaManager.SetResolution(width, height, freq);
+                if (success)
+                {
+                    HighlightResolutionButton(width, height);
+                    lblResStatus.Text = $"Current: {width}x{height}";
+                }
+                else
+                {
+                    MessageBox.Show($"Unable to switch resolution to {width}x{height}.",
+                        "Resolution Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                }
+            }
+            catch (Exception ex)
+            {
+                LogManager.LogError("ApplyResolution error: {0}", ex.Message);
+            }
         }
 
         private void PlayDisconnectSound()

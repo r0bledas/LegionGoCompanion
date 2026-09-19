@@ -2,10 +2,14 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Media;
 using GregsStack.InputSimulatorStandard.Native;
 using HandheldCompanion.Actions;
+using HandheldCompanion.Devices;
+using HandheldCompanion.Devices.Lenovo;
 using HandheldCompanion.Inputs;
 using HandheldCompanion.Shared;
+using HandheldCompanion.Views;
 using Newtonsoft.Json;
 
 namespace HandheldCompanion.Managers
@@ -14,7 +18,19 @@ namespace HandheldCompanion.Managers
     {
         None = 0,
         Controller = 1,
-        Keyboard = 2
+        Keyboard = 2,
+        Action = 3
+    }
+
+    public enum CustomActionType
+    {
+        None = 0,
+        ToggleWindow = 1,
+        ToggleFan = 2,
+        ShowWindow = 3,
+        HideWindow = 4,
+        Fan100 = 5,
+        FanAuto = 6
     }
 
     public class MappingItem
@@ -23,6 +39,9 @@ namespace HandheldCompanion.Managers
         public MappingType TargetType { get; set; } = MappingType.None;
         public ButtonFlags TargetButton { get; set; } = ButtonFlags.None;
         public VirtualKeyCode TargetKey { get; set; } = VirtualKeyCode.NONAME;
+        public CustomActionType TargetAction { get; set; } = CustomActionType.None;
+        public bool HasTurbo { get; set; } = false;
+        public int TurboDelayMs { get; set; } = 50;
     }
 
     public class CustomMappingService
@@ -45,9 +64,20 @@ namespace HandheldCompanion.Managers
             ButtonFlags.R4    // M3
         };
 
+        public static readonly List<(CustomActionType Action, string Name)> AvailableActions = new()
+        {
+            (CustomActionType.ToggleWindow, "Toggle Window (Show/Hide)"),
+            (CustomActionType.ToggleFan, "Toggle Fan (Auto <-> 100%)"),
+            (CustomActionType.ShowWindow, "Show Window"),
+            (CustomActionType.HideWindow, "Hide Window"),
+            (CustomActionType.Fan100, "Fan 100% (Full Speed)"),
+            (CustomActionType.FanAuto, "Fan Auto (Balanced)")
+        };
+
         public static readonly HashSet<ButtonFlags> RemappedButtons = new();
 
         private Dictionary<ButtonFlags, MappingItem> _mappings = new();
+        private static bool _isFanFullSpeed = false;
 
         public CustomMappingService()
         {
@@ -65,7 +95,19 @@ namespace HandheldCompanion.Managers
                 _mappings.Clear();
                 foreach (var btn in RemappableButtons)
                 {
-                    _mappings[btn] = new MappingItem { PhysicalButton = btn, TargetType = MappingType.None };
+                    if (btn == ButtonFlags.OEM1 || btn == ButtonFlags.OEM2)
+                    {
+                        _mappings[btn] = new MappingItem
+                        {
+                            PhysicalButton = btn,
+                            TargetType = MappingType.Action,
+                            TargetAction = CustomActionType.ToggleWindow
+                        };
+                    }
+                    else
+                    {
+                        _mappings[btn] = new MappingItem { PhysicalButton = btn, TargetType = MappingType.None };
+                    }
                 }
 
                 try
@@ -120,7 +162,7 @@ namespace HandheldCompanion.Managers
                 RemappedButtons.Clear();
                 foreach (var kv in _mappings)
                 {
-                    if (kv.Value.TargetType != MappingType.None)
+                    if (kv.Value.TargetType != MappingType.None || kv.Key == ButtonFlags.OEM1 || kv.Key == ButtonFlags.OEM2)
                     {
                         RemappedButtons.Add(kv.Key);
                     }
@@ -134,11 +176,23 @@ namespace HandheldCompanion.Managers
             {
                 if (_mappings.TryGetValue(button, out var item))
                     return item;
+
+                if (button == ButtonFlags.OEM1 || button == ButtonFlags.OEM2)
+                {
+                    return new MappingItem
+                    {
+                        PhysicalButton = button,
+                        TargetType = MappingType.Action,
+                        TargetAction = CustomActionType.ToggleWindow
+                    };
+                }
+
                 return new MappingItem { PhysicalButton = button, TargetType = MappingType.None };
             }
         }
 
-        public void SetMapping(ButtonFlags button, MappingType type, ButtonFlags targetBtn, VirtualKeyCode targetKey)
+        public void SetMapping(ButtonFlags button, MappingType type, ButtonFlags targetBtn, VirtualKeyCode targetKey,
+            CustomActionType targetAction = CustomActionType.None, bool hasTurbo = false, int turboDelayMs = 50)
         {
             lock (_lock)
             {
@@ -147,7 +201,10 @@ namespace HandheldCompanion.Managers
                     PhysicalButton = button,
                     TargetType = type,
                     TargetButton = targetBtn,
-                    TargetKey = targetKey
+                    TargetKey = targetKey,
+                    TargetAction = targetAction,
+                    HasTurbo = hasTurbo,
+                    TurboDelayMs = Math.Clamp(turboDelayMs, 10, 1000)
                 };
             }
             Save();
@@ -160,7 +217,19 @@ namespace HandheldCompanion.Managers
             {
                 foreach (var btn in RemappableButtons)
                 {
-                    _mappings[btn] = new MappingItem { PhysicalButton = btn, TargetType = MappingType.None };
+                    if (btn == ButtonFlags.OEM1 || btn == ButtonFlags.OEM2)
+                    {
+                        _mappings[btn] = new MappingItem
+                        {
+                            PhysicalButton = btn,
+                            TargetType = MappingType.Action,
+                            TargetAction = CustomActionType.ToggleWindow
+                        };
+                    }
+                    else
+                    {
+                        _mappings[btn] = new MappingItem { PhysicalButton = btn, TargetType = MappingType.None };
+                    }
                 }
             }
             Save();
@@ -178,16 +247,95 @@ namespace HandheldCompanion.Managers
                     var item = kv.Value;
                     if (item.TargetType == MappingType.Controller && item.TargetButton != ButtonFlags.None)
                     {
-                        plans[item.PhysicalButton] = new IActions[] { new ButtonActions(item.TargetButton) };
+                        var action = new ButtonActions(item.TargetButton);
+                        action.HasTurbo = item.HasTurbo;
+                        action.TurboDelay = Math.Clamp(item.TurboDelayMs, 10, 1000);
+                        plans[item.PhysicalButton] = new IActions[] { action };
                     }
                     else if (item.TargetType == MappingType.Keyboard && item.TargetKey != VirtualKeyCode.NONAME)
                     {
-                        plans[item.PhysicalButton] = new IActions[] { new KeyboardActions(item.TargetKey) };
+                        var action = new KeyboardActions(item.TargetKey);
+                        action.HasTurbo = item.HasTurbo;
+                        action.TurboDelay = Math.Clamp(item.TurboDelayMs, 10, 1000);
+                        plans[item.PhysicalButton] = new IActions[] { action };
                     }
                 }
             }
 
             ManagerFactory.layoutManager?.ApplyCustomMappings(plans);
+        }
+
+        public static void ExecuteAction(CustomActionType action)
+        {
+            try
+            {
+                switch (action)
+                {
+                    case CustomActionType.ToggleWindow:
+                        MainForm.ToggleOrShowWindow();
+                        break;
+                    case CustomActionType.ShowWindow:
+                        MainForm.ShowWindowDirect();
+                        break;
+                    case CustomActionType.HideWindow:
+                        MainForm.HideWindowDirect();
+                        break;
+                    case CustomActionType.ToggleFan:
+                        ToggleFanMode();
+                        break;
+                    case CustomActionType.Fan100:
+                        SetFan100Direct();
+                        break;
+                    case CustomActionType.FanAuto:
+                        SetFanAutoDirect();
+                        break;
+                }
+            }
+            catch (Exception ex)
+            {
+                LogManager.LogError("CustomMappingService: ExecuteAction failed: {0}", ex.Message);
+            }
+        }
+
+        public static void ToggleFanMode()
+        {
+            if (IDevice.GetCurrent() is LegionGo lego)
+            {
+                if (_isFanFullSpeed)
+                {
+                    lego.SetFanFullSpeed(false);
+                    lego.SetSmartFanMode((int)LegionGo.LegionMode.Balanced);
+                    _isFanFullSpeed = false;
+                    SystemSounds.Asterisk.Play();
+                }
+                else
+                {
+                    lego.SetFanFullSpeed(true);
+                    _isFanFullSpeed = true;
+                    SystemSounds.Exclamation.Play();
+                }
+            }
+        }
+
+        public static void SetFan100Direct()
+        {
+            if (IDevice.GetCurrent() is LegionGo lego)
+            {
+                lego.SetFanFullSpeed(true);
+                _isFanFullSpeed = true;
+                SystemSounds.Exclamation.Play();
+            }
+        }
+
+        public static void SetFanAutoDirect()
+        {
+            if (IDevice.GetCurrent() is LegionGo lego)
+            {
+                lego.SetFanFullSpeed(false);
+                lego.SetSmartFanMode((int)LegionGo.LegionMode.Balanced);
+                _isFanFullSpeed = false;
+                SystemSounds.Asterisk.Play();
+            }
         }
 
         public static bool IsRemapped(ButtonFlags button)

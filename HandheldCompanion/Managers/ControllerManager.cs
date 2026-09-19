@@ -328,7 +328,9 @@ public static class ControllerManager
                 gamepadMotion = motions.Values.FirstOrDefault(m => m is not null);
         }
 
-        if (gamepadMotion is not null)
+        bool isDS4 = VirtualManager.HIDmode == HIDmode.DualShock4Controller;
+
+        if (gamepadMotion is not null && isDS4)
         {
             // sensor override
             switch (sensorSelection)
@@ -350,6 +352,13 @@ public static class ControllerManager
             // Update motion consumers (null-safe)
             MotionManager.UpdateReport(controllerState, gamepadMotion, delta);
             // App.overlayModel?.UpdateReport(controllerState, gamepadMotion, delta);
+        }
+        else
+        {
+            controllerState.AxisState[AxisFlags.GyroX] = 0;
+            controllerState.AxisState[AxisFlags.GyroY] = 0;
+            if (!isDS4)
+                gamepadMotion = null;
         }
 
         // compute layout (null-safe mapping)
@@ -380,7 +389,7 @@ public static class ControllerManager
         DS4Touch.UpdateInputs(mapped);
         if (ManagerFactory.layoutManager?.GetCurrentMode() != LayoutModes.Desktop)
         {
-            VirtualManager.UpdateInputs(mapped, gamepadMotion);
+            VirtualManager.UpdateInputs(mapped, isDS4 ? gamepadMotion : null);
             DSUServer.UpdateInputs(mapped, motions);
         }
         DSUServer.Tick(ticks, delta);

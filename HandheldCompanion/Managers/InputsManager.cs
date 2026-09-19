@@ -13,6 +13,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Windows.Forms;
 using WindowsInput.Events;
+using HandheldCompanion.Views;
 using ButtonState = HandheldCompanion.Inputs.ButtonState;
 using Timer = System.Timers.Timer;
 
@@ -745,11 +746,34 @@ public static class InputsManager
         m_GlobalHook = null;
     }
 
+    private static readonly ButtonState _rawPrevButtonState = new();
+
     private static void UpdateInputs(ControllerState controllerState, bool IsMapped)
     {
         // skip if inputs were remapped
         if (IsMapped)
             return;
+
+        // Check rising edge for custom remappable buttons and actions
+        foreach (var btn in CustomMappingService.RemappableButtons)
+        {
+            bool isDown = controllerState.ButtonState[btn];
+            bool wasDown = _rawPrevButtonState[btn];
+
+            if (isDown && !wasDown)
+            {
+                var mapping = CustomMappingService.Instance.GetMapping(btn);
+                if (mapping.TargetType == MappingType.Action)
+                {
+                    CustomMappingService.ExecuteAction(mapping.TargetAction);
+                }
+                else if (mapping.TargetType == MappingType.None && (btn == ButtonFlags.OEM1 || btn == ButtonFlags.OEM2))
+                {
+                    MainForm.ToggleOrShowWindow();
+                }
+            }
+        }
+        ButtonState.Overwrite(controllerState.ButtonState, _rawPrevButtonState);
 
         // prepare button state
         ButtonState.Overwrite(controllerState.ButtonState, buttonState);

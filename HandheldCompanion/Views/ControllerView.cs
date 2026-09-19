@@ -21,8 +21,8 @@ namespace HandheldCompanion.Views
         private Button btnX360;
         private Button btnNative;
 
-        // ComboBox references for live updates and reset
-        private readonly Dictionary<ButtonFlags, (ComboBox typeCombo, ComboBox targetCombo)> _mappingControls = new();
+        // Controls references for live updates and reset
+        private readonly Dictionary<ButtonFlags, (ComboBox typeCombo, ComboBox targetCombo, CheckBox chkRepeat, NumericUpDown numRate)> _mappingControls = new();
 
         // Controller buttons for dropdown
         private static readonly List<(string Name, ButtonFlags Flag)> ControllerTargets = new()
@@ -183,7 +183,7 @@ namespace HandheldCompanion.Views
                 lblStatus.Text = "Active: DualShock 4 (IMU Gyro Enabled for Fortnite / Aiming)";
             });
 
-            btnX360 = CreateCompactButton("Xbox 360 (Standard XInput)", 160, 28, async () =>
+            btnX360 = CreateCompactButton("Xbox 360 (No Gyro)", 140, 28, async () =>
             {
                 PlayDisconnectSound();
                 ManagerFactory.settingsManager.SetProperty("HIDcloakonconnect", true);
@@ -194,10 +194,10 @@ namespace HandheldCompanion.Views
                 await VirtualManager.SetControllerStatus(HIDstatus.Connected);
                 PlayConnectSound();
                 UpdateActiveHighlight();
-                lblStatus.Text = "Active: Xbox 360 (Standard XInput Controller)";
+                lblStatus.Text = "Active: Xbox 360 (Standard XInput - No Gyro Aiming)";
             });
 
-            btnNative = CreateCompactButton("Native Passthrough", 140, 28, async () =>
+            btnNative = CreateCompactButton("Native Passthrough (No Gyro)", 175, 28, async () =>
             {
                 PlayDisconnectSound();
                 await VirtualManager.SetControllerMode(HIDmode.NoController);
@@ -208,7 +208,7 @@ namespace HandheldCompanion.Views
                 ManagerFactory.layoutManager.SetLayoutMode(LayoutModes.Gamepad);
                 PlayConnectSound();
                 UpdateActiveHighlight();
-                lblStatus.Text = "Active: Direct Hardware Passthrough (Uncloaked)";
+                lblStatus.Text = "Active: Direct Hardware Passthrough (No Gyro Aiming)";
             });
 
             flowEmulation.Controls.Add(btnDS4);
@@ -246,12 +246,13 @@ namespace HandheldCompanion.Views
                 Dock = DockStyle.Top,
                 AutoSize = true,
                 AutoSizeMode = AutoSizeMode.GrowAndShrink,
-                ColumnCount = 3,
+                ColumnCount = 4,
                 Padding = new Padding(4)
             };
-            tableRemap.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 42F));
             tableRemap.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 28F));
-            tableRemap.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 30F));
+            tableRemap.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 22F));
+            tableRemap.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 26F));
+            tableRemap.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 24F));
 
             int row = 0;
             foreach (var btn in CustomMappingService.RemappableButtons)
@@ -280,6 +281,7 @@ namespace HandheldCompanion.Views
                 comboType.Items.Add("None / Default");
                 comboType.Items.Add("Controller Button");
                 comboType.Items.Add("Keyboard Key");
+                comboType.Items.Add("Action");
 
                 ComboBox comboTarget = new ComboBox
                 {
@@ -290,14 +292,57 @@ namespace HandheldCompanion.Views
                     Margin = new Padding(2, 3, 2, 3)
                 };
 
+                FlowLayoutPanel flowRepeat = new FlowLayoutPanel
+                {
+                    Dock = DockStyle.Fill,
+                    AutoSize = true,
+                    WrapContents = false,
+                    Margin = new Padding(0),
+                    Padding = new Padding(0, 1, 0, 0)
+                };
+
+                CheckBox chkRepeat = new CheckBox
+                {
+                    Text = "Repeat",
+                    AutoSize = true,
+                    Font = new Font("Segoe UI", 8F, FontStyle.Regular),
+                    Margin = new Padding(2, 4, 1, 2)
+                };
+
+                NumericUpDown numRate = new NumericUpDown
+                {
+                    Minimum = 10,
+                    Maximum = 1000,
+                    Value = 50,
+                    Increment = 10,
+                    Width = 46,
+                    Height = 22,
+                    Font = new Font("Segoe UI", 8F, FontStyle.Regular),
+                    Margin = new Padding(1, 2, 1, 2)
+                };
+
+                Label lblMs = new Label
+                {
+                    Text = "ms",
+                    AutoSize = true,
+                    Font = new Font("Segoe UI", 7.5F, FontStyle.Regular),
+                    ForeColor = Color.FromArgb(90, 95, 105),
+                    Margin = new Padding(0, 5, 0, 0)
+                };
+
+                flowRepeat.Controls.Add(chkRepeat);
+                flowRepeat.Controls.Add(numRate);
+                flowRepeat.Controls.Add(lblMs);
+
                 // Populate and bind
-                SetupButtonRow(btn, comboType, comboTarget);
+                SetupButtonRow(btn, comboType, comboTarget, chkRepeat, numRate);
 
                 tableRemap.Controls.Add(lblBtn, 0, row);
                 tableRemap.Controls.Add(comboType, 1, row);
                 tableRemap.Controls.Add(comboTarget, 2, row);
+                tableRemap.Controls.Add(flowRepeat, 3, row);
 
-                _mappingControls[btn] = (comboType, comboTarget);
+                _mappingControls[btn] = (comboType, comboTarget, chkRepeat, numRate);
                 row++;
             }
 
@@ -351,27 +396,48 @@ namespace HandheldCompanion.Views
             this.ResumeLayout(false);
         }
 
-        private void SetupButtonRow(ButtonFlags btn, ComboBox comboType, ComboBox comboTarget)
+        private void SetupButtonRow(ButtonFlags btn, ComboBox comboType, ComboBox comboTarget, CheckBox chkRepeat, NumericUpDown numRate)
         {
             var current = CustomMappingService.Instance.GetMapping(btn);
 
             comboType.SelectedIndex = (int)current.TargetType;
-            PopulateTargetDropdown(comboTarget, current.TargetType, current.TargetButton, current.TargetKey);
+            PopulateTargetDropdown(comboTarget, current.TargetType, current.TargetButton, current.TargetKey, current.TargetAction);
+
+            chkRepeat.Checked = current.HasTurbo;
+            numRate.Value = Math.Clamp(current.TurboDelayMs, 10, 1000);
+
+            bool allowRepeat = (current.TargetType == MappingType.Controller || current.TargetType == MappingType.Keyboard);
+            chkRepeat.Enabled = allowRepeat;
+            numRate.Enabled = allowRepeat && chkRepeat.Checked;
 
             comboType.SelectedIndexChanged += (s, e) =>
             {
                 MappingType newType = (MappingType)comboType.SelectedIndex;
-                PopulateTargetDropdown(comboTarget, newType, ButtonFlags.None, VirtualKeyCode.NONAME);
-                SaveRowMapping(btn, comboType, comboTarget);
+                PopulateTargetDropdown(comboTarget, newType, ButtonFlags.None, VirtualKeyCode.NONAME, CustomActionType.None);
+                bool canRepeat = (newType == MappingType.Controller || newType == MappingType.Keyboard);
+                chkRepeat.Enabled = canRepeat;
+                numRate.Enabled = canRepeat && chkRepeat.Checked;
+                SaveRowMapping(btn, comboType, comboTarget, chkRepeat, numRate);
             };
 
             comboTarget.SelectedIndexChanged += (s, e) =>
             {
-                SaveRowMapping(btn, comboType, comboTarget);
+                SaveRowMapping(btn, comboType, comboTarget, chkRepeat, numRate);
+            };
+
+            chkRepeat.CheckedChanged += (s, e) =>
+            {
+                numRate.Enabled = chkRepeat.Checked && chkRepeat.Enabled;
+                SaveRowMapping(btn, comboType, comboTarget, chkRepeat, numRate);
+            };
+
+            numRate.ValueChanged += (s, e) =>
+            {
+                SaveRowMapping(btn, comboType, comboTarget, chkRepeat, numRate);
             };
         }
 
-        private void PopulateTargetDropdown(ComboBox comboTarget, MappingType type, ButtonFlags selectedBtn, VirtualKeyCode selectedKey)
+        private void PopulateTargetDropdown(ComboBox comboTarget, MappingType type, ButtonFlags selectedBtn, VirtualKeyCode selectedKey, CustomActionType selectedAction)
         {
             comboTarget.Items.Clear();
 
@@ -408,14 +474,28 @@ namespace HandheldCompanion.Views
                     }
                     comboTarget.SelectedIndex = keyIndex;
                     break;
+
+                case MappingType.Action:
+                    comboTarget.Enabled = true;
+                    int actIndex = 0;
+                    for (int i = 0; i < CustomMappingService.AvailableActions.Count; i++)
+                    {
+                        var item = CustomMappingService.AvailableActions[i];
+                        comboTarget.Items.Add(item.Name);
+                        if (item.Action == selectedAction)
+                            actIndex = i;
+                    }
+                    comboTarget.SelectedIndex = actIndex;
+                    break;
             }
         }
 
-        private void SaveRowMapping(ButtonFlags btn, ComboBox comboType, ComboBox comboTarget)
+        private void SaveRowMapping(ButtonFlags btn, ComboBox comboType, ComboBox comboTarget, CheckBox chkRepeat, NumericUpDown numRate)
         {
             MappingType type = (MappingType)comboType.SelectedIndex;
             ButtonFlags targetBtn = ButtonFlags.None;
             VirtualKeyCode targetKey = VirtualKeyCode.NONAME;
+            CustomActionType targetAction = CustomActionType.None;
 
             if (type == MappingType.Controller && comboTarget.SelectedIndex >= 0 && comboTarget.SelectedIndex < ControllerTargets.Count)
             {
@@ -425,8 +505,15 @@ namespace HandheldCompanion.Views
             {
                 targetKey = KeyboardTargets[comboTarget.SelectedIndex].Key;
             }
+            else if (type == MappingType.Action && comboTarget.SelectedIndex >= 0 && comboTarget.SelectedIndex < CustomMappingService.AvailableActions.Count)
+            {
+                targetAction = CustomMappingService.AvailableActions[comboTarget.SelectedIndex].Action;
+            }
 
-            CustomMappingService.Instance.SetMapping(btn, type, targetBtn, targetKey);
+            bool hasTurbo = chkRepeat.Checked && chkRepeat.Enabled;
+            int turboDelay = (int)numRate.Value;
+
+            CustomMappingService.Instance.SetMapping(btn, type, targetBtn, targetKey, targetAction, hasTurbo, turboDelay);
         }
 
         private void RefreshAllRows()
@@ -434,11 +521,18 @@ namespace HandheldCompanion.Views
             foreach (var kv in _mappingControls)
             {
                 var btn = kv.Key;
-                var (comboType, comboTarget) = kv.Value;
+                var (comboType, comboTarget, chkRepeat, numRate) = kv.Value;
                 var item = CustomMappingService.Instance.GetMapping(btn);
 
                 comboType.SelectedIndex = (int)item.TargetType;
-                PopulateTargetDropdown(comboTarget, item.TargetType, item.TargetButton, item.TargetKey);
+                PopulateTargetDropdown(comboTarget, item.TargetType, item.TargetButton, item.TargetKey, item.TargetAction);
+
+                chkRepeat.Checked = item.HasTurbo;
+                numRate.Value = Math.Clamp(item.TurboDelayMs, 10, 1000);
+
+                bool allowRepeat = (item.TargetType == MappingType.Controller || item.TargetType == MappingType.Keyboard);
+                chkRepeat.Enabled = allowRepeat;
+                numRate.Enabled = allowRepeat && chkRepeat.Checked;
             }
         }
 
