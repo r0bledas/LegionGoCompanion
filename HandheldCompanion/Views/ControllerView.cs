@@ -16,10 +16,9 @@ namespace HandheldCompanion.Views
 {
     public class ControllerView : UserControl
     {
-        private Label lblStatus;
-        private Button btnDS4;
-        private Button btnX360;
-        private Button btnNative;
+        private Label? lblGyroStatus;
+        private Button? btnGyroOn;
+        private Button? btnGyroOff;
 
         // Controls references for live updates and reset
         private readonly Dictionary<ButtonFlags, (ComboBox typeCombo, ComboBox targetCombo, CheckBox chkRepeat, NumericUpDown numRate)> _mappingControls = new();
@@ -147,11 +146,11 @@ namespace HandheldCompanion.Views
             };
 
             // ==========================================
-            // 1. Controller Emulation Mode GroupBox
+            // 1. Gyro Aiming GroupBox
             // ==========================================
-            GroupBox grpEmulation = new GroupBox
+            GroupBox grpGyro = new GroupBox
             {
-                Text = "Emulation Target & Gyro Aiming",
+                Text = "Gyro Aiming",
                 Dock = DockStyle.Top,
                 AutoSize = true,
                 AutoSizeMode = AutoSizeMode.GrowAndShrink,
@@ -160,7 +159,7 @@ namespace HandheldCompanion.Views
                 Margin = new Padding(0, 0, 0, 6)
             };
 
-            FlowLayoutPanel flowEmulation = new FlowLayoutPanel
+            FlowLayoutPanel flowGyro = new FlowLayoutPanel
             {
                 Dock = DockStyle.Top,
                 AutoSize = true,
@@ -169,63 +168,31 @@ namespace HandheldCompanion.Views
                 Padding = new Padding(2)
             };
 
-            btnDS4 = CreateCompactButton("DualShock 4", 95, 28, async () =>
+            btnGyroOn = CreateCompactButton("On", 50, 26, () =>
             {
-                PlayDisconnectSound();
-                ManagerFactory.settingsManager.SetProperty("HIDcloakonconnect", true);
-                ControllerManager.TargetController?.Hide(false);
-                SetLegionPassthrough(false);
-                ManagerFactory.layoutManager.SetLayoutMode(LayoutModes.Gamepad);
-                bool modeChanged = await VirtualManager.SetControllerMode(HIDmode.DualShock4Controller);
-                await VirtualManager.SetControllerStatus(HIDstatus.Connected);
-                PlayConnectSound();
-                UpdateActiveHighlight();
-                lblStatus.Text = "Active: DualShock 4 (IMU Gyro Enabled for Fortnite / Aiming)";
+                ControllerManager.GyroAimingEnabled = true;
+                UpdateGyroStatus();
             });
 
-            btnX360 = CreateCompactButton("Xbox 360", 80, 28, async () =>
+            btnGyroOff = CreateCompactButton("Off", 50, 26, () =>
             {
-                PlayDisconnectSound();
-                ManagerFactory.settingsManager.SetProperty("HIDcloakonconnect", true);
-                ControllerManager.TargetController?.Hide(false);
-                SetLegionPassthrough(false);
-                ManagerFactory.layoutManager.SetLayoutMode(LayoutModes.Gamepad);
-                bool modeChanged = await VirtualManager.SetControllerMode(HIDmode.Xbox360Controller);
-                await VirtualManager.SetControllerStatus(HIDstatus.Connected);
-                PlayConnectSound();
-                UpdateActiveHighlight();
-                lblStatus.Text = "Active: Xbox 360 (Standard XInput - No Gyro Aiming)";
+                ControllerManager.GyroAimingEnabled = false;
+                UpdateGyroStatus();
             });
 
-            btnNative = CreateCompactButton("Native", 65, 28, async () =>
-            {
-                PlayDisconnectSound();
-                await VirtualManager.SetControllerMode(HIDmode.NoController);
-                await VirtualManager.SetControllerStatus(HIDstatus.Disconnected);
-                ManagerFactory.settingsManager.SetProperty("HIDcloakonconnect", false);
-                ControllerManager.TargetController?.Unhide(false);
-                SetLegionPassthrough(true);
-                ManagerFactory.layoutManager.SetLayoutMode(LayoutModes.Gamepad);
-                PlayConnectSound();
-                UpdateActiveHighlight();
-                lblStatus.Text = "Active: Direct Hardware Passthrough (No Gyro Aiming)";
-            });
+            flowGyro.Controls.Add(btnGyroOn);
+            flowGyro.Controls.Add(btnGyroOff);
+            grpGyro.Controls.Add(flowGyro);
 
-            flowEmulation.Controls.Add(btnDS4);
-            flowEmulation.Controls.Add(btnX360);
-            flowEmulation.Controls.Add(btnNative);
-            grpEmulation.Controls.Add(flowEmulation);
-
-            this.lblStatus = new Label
+            lblGyroStatus = new Label
             {
                 Dock = DockStyle.Top,
                 AutoSize = true,
-                Font = new Font("Segoe UI", 8.5F, FontStyle.Regular),
+                Font = new Font("Segoe UI", 8F, FontStyle.Regular),
                 ForeColor = Color.FromArgb(70, 75, 85),
-                Padding = new Padding(4, 4, 4, 4),
-                Text = "Controller status: " + (VirtualManager.HIDmode != HIDmode.NoController ? VirtualManager.HIDmode.ToString() : "Passthrough")
+                Padding = new Padding(4, 4, 4, 4)
             };
-            grpEmulation.Controls.Add(this.lblStatus);
+            grpGyro.Controls.Add(lblGyroStatus);
 
             // ==========================================
             // 2. Button Remapping GroupBox
@@ -387,11 +354,11 @@ namespace HandheldCompanion.Views
 
             // Add groups to main scroll panel (dock top in reverse order)
             mainScrollPanel.Controls.Add(grpRemap);
-            mainScrollPanel.Controls.Add(grpEmulation);
+            mainScrollPanel.Controls.Add(grpGyro);
 
             this.Controls.Add(mainScrollPanel);
 
-            UpdateActiveHighlight();
+            UpdateGyroStatus();
 
             this.ResumeLayout(false);
         }
@@ -536,7 +503,16 @@ namespace HandheldCompanion.Views
             }
         }
 
-        private Button CreateCompactButton(string text, int width, int height, Func<Task> onClick)
+        protected override void OnVisibleChanged(EventArgs e)
+        {
+            base.OnVisibleChanged(e);
+            if (this.Visible)
+            {
+                UpdateGyroStatus();
+            }
+        }
+
+        private Button CreateCompactButton(string text, int width, int height, Action onClick)
         {
             Button btn = new Button
             {
@@ -550,11 +526,11 @@ namespace HandheldCompanion.Views
                 ForeColor = Color.FromArgb(30, 35, 45)
             };
             btn.FlatAppearance.BorderColor = Color.FromArgb(210, 215, 222);
-            btn.Click += async (s, e) =>
+            btn.Click += (s, e) =>
             {
                 try
                 {
-                    await onClick();
+                    onClick();
                 }
                 catch (Exception ex)
                 {
@@ -565,11 +541,36 @@ namespace HandheldCompanion.Views
             return btn;
         }
 
-        private void UpdateActiveHighlight()
+        private void UpdateGyroStatus()
         {
-            SetButtonActive(btnDS4, VirtualManager.HIDmode == HIDmode.DualShock4Controller);
-            SetButtonActive(btnX360, VirtualManager.HIDmode == HIDmode.Xbox360Controller);
-            SetButtonActive(btnNative, VirtualManager.HIDmode == HIDmode.NoController);
+            if (lblGyroStatus == null) return;
+            bool enabled = ControllerManager.GyroAimingEnabled;
+            SetButtonActive(btnGyroOn, enabled);
+            SetButtonActive(btnGyroOff, !enabled);
+
+            bool isDesktop = ManagerFactory.layoutManager?.GetCurrentMode() == LayoutModes.Desktop;
+            bool isDS4 = VirtualManager.HIDmode == HIDmode.DualShock4Controller;
+
+            if (!enabled)
+            {
+                lblGyroStatus.Text = "Gyro Aiming is Off.";
+                lblGyroStatus.ForeColor = Color.FromArgb(100, 105, 115);
+            }
+            else if (isDesktop)
+            {
+                lblGyroStatus.Text = "Gyro Aiming is On (Disabled in Desktop mode).";
+                lblGyroStatus.ForeColor = Color.FromArgb(180, 100, 20);
+            }
+            else if (!isDS4)
+            {
+                lblGyroStatus.Text = "Gyro Aiming is On (Disabled: only works when DS4 is active).";
+                lblGyroStatus.ForeColor = Color.FromArgb(180, 100, 20);
+            }
+            else
+            {
+                lblGyroStatus.Text = "Gyro Aiming is Active (DualShock 4 motion enabled).";
+                lblGyroStatus.ForeColor = Color.FromArgb(0, 130, 60);
+            }
         }
 
         private static void SetButtonActive(Button? btn, bool isActive)
@@ -579,22 +580,6 @@ namespace HandheldCompanion.Views
             btn.BackColor = isActive ? Color.FromArgb(0, 120, 215) : Color.FromArgb(245, 247, 250);
             btn.ForeColor = isActive ? Color.White : Color.FromArgb(30, 35, 45);
             btn.FlatAppearance.BorderColor = isActive ? Color.FromArgb(0, 95, 175) : Color.FromArgb(210, 215, 222);
-        }
-
-        private static void SetLegionPassthrough(bool enabled)
-        {
-            if (IDevice.GetCurrent() is LegionGo lego)
-                lego.SetPassthrough(enabled);
-        }
-
-        private void PlayDisconnectSound()
-        {
-            try { SystemSounds.Asterisk.Play(); } catch { }
-        }
-
-        private void PlayConnectSound()
-        {
-            try { SystemSounds.Exclamation.Play(); } catch { }
         }
     }
 }

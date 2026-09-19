@@ -30,7 +30,8 @@ namespace HandheldCompanion.Managers
         ShowWindow = 3,
         HideWindow = 4,
         Fan100 = 5,
-        FanAuto = 6
+        FanAuto = 6,
+        ToggleGyro = 7
     }
 
     public class MappingItem
@@ -68,6 +69,7 @@ namespace HandheldCompanion.Managers
         {
             (CustomActionType.ToggleWindow, "Toggle Window"),
             (CustomActionType.ToggleFan, "Toggle Fan"),
+            (CustomActionType.ToggleGyro, "Toggle Gyro"),
             (CustomActionType.ShowWindow, "Show Window"),
             (CustomActionType.HideWindow, "Hide Window"),
             (CustomActionType.Fan100, "Fan 100%"),
@@ -288,6 +290,13 @@ namespace HandheldCompanion.Managers
                         break;
                     case CustomActionType.FanAuto:
                         SetFanAutoDirect();
+                        break;
+                    case CustomActionType.ToggleGyro:
+                        ControllerManager.GyroAimingEnabled = !ControllerManager.GyroAimingEnabled;
+                        if (ControllerManager.GyroAimingEnabled)
+                            SystemSounds.Exclamation.Play();
+                        else
+                            SystemSounds.Asterisk.Play();
                         break;
                 }
             }

@@ -136,6 +136,20 @@ public static class ControllerManager
     #region settings
     private static bool HIDuncloakonclose => ManagerFactory.settingsManager.GetBoolean("HIDuncloakonclose");
     private static bool HIDuncloakondisconnect => ManagerFactory.settingsManager.GetBoolean("HIDuncloakondisconnect");
+    private static bool _gyroAimingEnabled = true;
+    public static bool GyroAimingEnabled
+    {
+        get => _gyroAimingEnabled;
+        set
+        {
+            _gyroAimingEnabled = value;
+            try
+            {
+                ManagerFactory.settingsManager?.SetProperty("GyroAimingEnabled", value);
+            }
+            catch { }
+        }
+    }
     #endregion
 
     public static bool IsInitialized;
@@ -259,6 +273,8 @@ public static class ControllerManager
         Controllers[string.Empty] = GetDefault();
         PickTargetController();
 
+        _gyroAimingEnabled = ManagerFactory.settingsManager?.GetBoolean("GyroAimingEnabled") ?? true;
+
         IsInitialized = true;
         Initialized?.Invoke();
 
@@ -329,8 +345,10 @@ public static class ControllerManager
         }
 
         bool isDS4 = VirtualManager.HIDmode == HIDmode.DualShock4Controller;
+        bool isDesktop = ManagerFactory.layoutManager?.GetCurrentMode() == LayoutModes.Desktop;
+        bool gyroActive = isDS4 && !isDesktop && GyroAimingEnabled;
 
-        if (gamepadMotion is not null && isDS4)
+        if (gamepadMotion is not null && gyroActive)
         {
             // sensor override
             switch (sensorSelection)
@@ -357,8 +375,7 @@ public static class ControllerManager
         {
             controllerState.AxisState[AxisFlags.GyroX] = 0;
             controllerState.AxisState[AxisFlags.GyroY] = 0;
-            if (!isDS4)
-                gamepadMotion = null;
+            gamepadMotion = null;
         }
 
         // compute layout (null-safe mapping)
@@ -387,9 +404,9 @@ public static class ControllerManager
         mapped.ButtonState[ButtonFlags.RightPadTouch] |= Math.Abs((int)mapped.AxisState[AxisFlags.RightPadX]) > PAD_TOUCH_DEADZONE || Math.Abs((int)mapped.AxisState[AxisFlags.RightPadY]) > PAD_TOUCH_DEADZONE;
 
         DS4Touch.UpdateInputs(mapped);
-        if (ManagerFactory.layoutManager?.GetCurrentMode() != LayoutModes.Desktop)
+        if (!isDesktop)
         {
-            VirtualManager.UpdateInputs(mapped, isDS4 ? gamepadMotion : null);
+            VirtualManager.UpdateInputs(mapped, gyroActive ? gamepadMotion : null);
             DSUServer.UpdateInputs(mapped, motions);
         }
         DSUServer.Tick(ticks, delta);

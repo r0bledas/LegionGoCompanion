@@ -205,6 +205,11 @@ public class SettingsManager : IManager
             case "HasVolumeSupport":
                 return ManagerFactory.multimediaManager.HasVolumeSupport();
 
+            case "GyroAimingEnabled":
+                if (Settings.TryGetValue("GyroAimingEnabled", out var gyroVal))
+                    return Convert.ToBoolean(gyroVal);
+                return true;
+
             default:
                 {
                     if (temporary && Settings.TryGetValue(name, out var property))
