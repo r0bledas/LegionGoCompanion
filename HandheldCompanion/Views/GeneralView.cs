@@ -28,11 +28,20 @@ namespace HandheldCompanion.Views
         private Button btnFanFull;
         private Button[] fanSpeedButtons;
 
-        // Display Resolution buttons
-        private Button btnRes800;
-        private Button btnRes1200;
-        private Button btnRes1600;
-        private Label lblResStatus;
+        // Display Resolution presets
+        private static readonly (string Label, int Width, int Height)[] ResolutionPresets = new[]
+        {
+            ("720p", 1280, 720),
+            ("800p", 1280, 800),
+            ("900p", 1600, 900),
+            ("1000p", 1600, 1000),
+            ("1080p", 1920, 1080),
+            ("1200p", 1920, 1200),
+            ("1440p", 2560, 1440),
+            ("1600p", 2560, 1600)
+        };
+        private Button[]? resolutionButtons;
+        private Label? lblResStatus;
 
         public GeneralView()
         {
@@ -234,9 +243,19 @@ namespace HandheldCompanion.Views
                 Padding = new Padding(1)
             };
 
-            btnRes800 = CreateCompactButton("800p", 50, 24, () => ApplyResolution(1280, 800));
-            btnRes1200 = CreateCompactButton("1200p", 54, 24, () => ApplyResolution(1920, 1200));
-            btnRes1600 = CreateCompactButton("1600p", 54, 24, () => ApplyResolution(2560, 1600));
+            resolutionButtons = new Button[ResolutionPresets.Length];
+            for (int i = 0; i < ResolutionPresets.Length; i++)
+            {
+                var preset = ResolutionPresets[i];
+                int w = preset.Width;
+                int h = preset.Height;
+                int btnWidth = preset.Label.Length <= 4 ? 46 : 52;
+                Button b = CreateCompactButton(preset.Label, btnWidth, 24, () => ApplyResolution(w, h));
+                resolutionButtons[i] = b;
+                flowResolution.Controls.Add(b);
+            }
+            if (resolutionButtons.Length > 0)
+                flowResolution.SetFlowBreak(resolutionButtons[resolutionButtons.Length - 1], true);
 
             lblResStatus = new Label
             {
@@ -246,9 +265,6 @@ namespace HandheldCompanion.Views
                 Padding = new Padding(4, 4, 2, 2)
             };
 
-            flowResolution.Controls.Add(btnRes800);
-            flowResolution.Controls.Add(btnRes1200);
-            flowResolution.Controls.Add(btnRes1600);
             flowResolution.Controls.Add(lblResStatus);
             grpResolution.Controls.Add(flowResolution);
 
@@ -496,17 +512,27 @@ namespace HandheldCompanion.Views
             var primary = ManagerFactory.multimediaManager?.PrimaryDesktop;
             bool isInternal = primary != null && primary.IsInternal;
 
-            btnRes800.Enabled = isInternal;
-            btnRes1200.Enabled = isInternal;
-            btnRes1600.Enabled = isInternal;
+            if (resolutionButtons != null)
+            {
+                foreach (var b in resolutionButtons)
+                {
+                    if (b != null) b.Enabled = isInternal;
+                }
+            }
+
+            if (lblResStatus == null) return;
 
             if (!isInternal)
             {
                 lblResStatus.Text = "Disabled (External Display Active)";
                 lblResStatus.ForeColor = Color.FromArgb(180, 50, 50);
-                SetButtonSelected(btnRes800, false);
-                SetButtonSelected(btnRes1200, false);
-                SetButtonSelected(btnRes1600, false);
+                if (resolutionButtons != null)
+                {
+                    foreach (var b in resolutionButtons)
+                    {
+                        if (b != null) SetButtonSelected(b, false);
+                    }
+                }
                 return;
             }
 
@@ -522,12 +548,16 @@ namespace HandheldCompanion.Views
 
         private void HighlightResolutionButton(int width, int height)
         {
+            if (resolutionButtons == null) return;
             int w = Math.Max(width, height);
             int h = Math.Min(width, height);
 
-            SetButtonSelected(btnRes800, (w == 1280 && h == 800) || (w == 1200 && h == 800));
-            SetButtonSelected(btnRes1200, w == 1920 && h == 1200);
-            SetButtonSelected(btnRes1600, w == 2560 && h == 1600);
+            for (int i = 0; i < ResolutionPresets.Length; i++)
+            {
+                var preset = ResolutionPresets[i];
+                bool isMatch = (preset.Width == w && preset.Height == h) || (preset.Width == h && preset.Height == w);
+                SetButtonSelected(resolutionButtons[i], isMatch);
+            }
         }
 
         private void ApplyResolution(int width, int height)
@@ -547,7 +577,8 @@ namespace HandheldCompanion.Views
                 if (success)
                 {
                     HighlightResolutionButton(width, height);
-                    lblResStatus.Text = $"Current: {width}x{height}";
+                    if (lblResStatus != null)
+                        lblResStatus.Text = $"Current: {width}x{height}";
                 }
                 else
                 {
