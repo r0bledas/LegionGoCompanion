@@ -66,12 +66,12 @@ namespace HandheldCompanion.Managers
 
         public static readonly List<(CustomActionType Action, string Name)> AvailableActions = new()
         {
-            (CustomActionType.ToggleWindow, "Toggle Window (Show/Hide)"),
-            (CustomActionType.ToggleFan, "Toggle Fan (Auto <-> 100%)"),
+            (CustomActionType.ToggleWindow, "Toggle Window"),
+            (CustomActionType.ToggleFan, "Toggle Fan"),
             (CustomActionType.ShowWindow, "Show Window"),
             (CustomActionType.HideWindow, "Hide Window"),
-            (CustomActionType.Fan100, "Fan 100% (Full Speed)"),
-            (CustomActionType.FanAuto, "Fan Auto (Balanced)")
+            (CustomActionType.Fan100, "Fan 100%"),
+            (CustomActionType.FanAuto, "Fan Auto")
         };
 
         public static readonly HashSet<ButtonFlags> RemappedButtons = new();

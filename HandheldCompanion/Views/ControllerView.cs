@@ -169,7 +169,7 @@ namespace HandheldCompanion.Views
                 Padding = new Padding(2)
             };
 
-            btnDS4 = CreateCompactButton("DualShock 4 (Gyro Active)", 160, 28, async () =>
+            btnDS4 = CreateCompactButton("DualShock 4", 95, 28, async () =>
             {
                 PlayDisconnectSound();
                 ManagerFactory.settingsManager.SetProperty("HIDcloakonconnect", true);
@@ -183,7 +183,7 @@ namespace HandheldCompanion.Views
                 lblStatus.Text = "Active: DualShock 4 (IMU Gyro Enabled for Fortnite / Aiming)";
             });
 
-            btnX360 = CreateCompactButton("Xbox 360 (No Gyro)", 140, 28, async () =>
+            btnX360 = CreateCompactButton("Xbox 360", 80, 28, async () =>
             {
                 PlayDisconnectSound();
                 ManagerFactory.settingsManager.SetProperty("HIDcloakonconnect", true);
@@ -197,7 +197,7 @@ namespace HandheldCompanion.Views
                 lblStatus.Text = "Active: Xbox 360 (Standard XInput - No Gyro Aiming)";
             });
 
-            btnNative = CreateCompactButton("Native Passthrough (No Gyro)", 175, 28, async () =>
+            btnNative = CreateCompactButton("Native", 65, 28, async () =>
             {
                 PlayDisconnectSound();
                 await VirtualManager.SetControllerMode(HIDmode.NoController);
@@ -357,8 +357,8 @@ namespace HandheldCompanion.Views
 
             Button btnReset = new Button
             {
-                Text = "Reset All Remappings",
-                Size = new Size(150, 26),
+                Text = "Reset All",
+                Size = new Size(80, 26),
                 Font = new Font("Segoe UI", 8.5F, FontStyle.Regular),
                 Cursor = Cursors.Hand,
                 FlatStyle = FlatStyle.Flat,

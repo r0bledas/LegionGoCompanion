@@ -263,8 +263,8 @@ namespace HandheldCompanion.Views
 
             Button btnCheckUpdates = new Button
             {
-                Text = "Check for Updates",
-                Size = new Size(125, 26),
+                Text = "Check Updates",
+                Size = new Size(100, 26),
                 Font = new Font("Segoe UI", 8.5F, FontStyle.Regular),
                 Margin = new Padding(2),
                 Cursor = Cursors.Hand,
@@ -273,8 +273,8 @@ namespace HandheldCompanion.Views
 
             Button btnDownloadInstall = new Button
             {
-                Text = "Download & Install",
-                Size = new Size(135, 26),
+                Text = "Install Update",
+                Size = new Size(95, 26),
                 Font = new Font("Segoe UI", 8.5F, FontStyle.Regular),
                 Margin = new Padding(2),
                 Cursor = Cursors.Hand,

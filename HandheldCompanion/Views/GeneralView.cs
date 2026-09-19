@@ -78,7 +78,7 @@ namespace HandheldCompanion.Views
                 Padding = new Padding(1)
             };
 
-            btnDS4 = CreateCompactButton("DS4 (Gyro)", 72, 26, async () =>
+            btnDS4 = CreateCompactButton("DS4", 52, 26, async () =>
             {
                 PlayDisconnectSound();
                 ManagerFactory.settingsManager.SetProperty("HIDcloakonconnect", true);
@@ -91,7 +91,7 @@ namespace HandheldCompanion.Views
                 HighlightControllerButton(btnDS4);
             });
 
-            btnX360 = CreateCompactButton("x360 (No Gyro)", 86, 26, async () =>
+            btnX360 = CreateCompactButton("x360", 52, 26, async () =>
             {
                 PlayDisconnectSound();
                 ManagerFactory.settingsManager.SetProperty("HIDcloakonconnect", true);
@@ -104,7 +104,7 @@ namespace HandheldCompanion.Views
                 HighlightControllerButton(btnX360);
             });
 
-            btnNative = CreateCompactButton("Native (No Gyro)", 96, 26, async () =>
+            btnNative = CreateCompactButton("Native", 58, 26, async () =>
             {
                 PlayDisconnectSound();
                 await VirtualManager.SetControllerMode(HIDmode.NoController);
@@ -234,9 +234,9 @@ namespace HandheldCompanion.Views
                 Padding = new Padding(1)
             };
 
-            btnRes800 = CreateCompactButton("800p (1280x800)", 110, 24, () => ApplyResolution(1280, 800));
-            btnRes1200 = CreateCompactButton("1200p (1920x1200)", 120, 24, () => ApplyResolution(1920, 1200));
-            btnRes1600 = CreateCompactButton("1600p Native (2560x1600)", 150, 24, () => ApplyResolution(2560, 1600));
+            btnRes800 = CreateCompactButton("800p", 50, 24, () => ApplyResolution(1280, 800));
+            btnRes1200 = CreateCompactButton("1200p", 54, 24, () => ApplyResolution(1920, 1200));
+            btnRes1600 = CreateCompactButton("1600p", 54, 24, () => ApplyResolution(2560, 1600));
 
             lblResStatus = new Label
             {

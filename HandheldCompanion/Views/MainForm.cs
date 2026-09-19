@@ -18,6 +18,11 @@ namespace HandheldCompanion.Views
         [DllImport("user32.dll")]
         private static extern IntPtr GetForegroundWindow();
 
+        [DllImport("user32.dll")]
+        private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+        private const int SW_RESTORE = 9;
+
         public static MainForm? Instance { get; private set; }
 
         private Panel bottomStatusPanel;
@@ -386,12 +391,12 @@ namespace HandheldCompanion.Views
             {
                 this.CreateHandle();
             }
-            if (this.WindowState == FormWindowState.Minimized)
-            {
-                this.WindowState = FormWindowState.Normal;
-            }
+
+            this.WindowState = FormWindowState.Normal;
             this.Show();
             this.Visible = true;
+            ShowWindow(this.Handle, SW_RESTORE);
+
             if (this.trayIcon != null)
             {
                 this.trayIcon.Visible = true;
@@ -403,6 +408,10 @@ namespace HandheldCompanion.Views
                 SetForegroundWindow(this.Handle);
             }
             catch { }
+
+            this.Invalidate(true);
+            this.Update();
+            this.Refresh();
         }
 
         public static void ToggleOrShowWindow()
@@ -424,7 +433,6 @@ namespace HandheldCompanion.Views
 
                 if (isVisible && isForeground)
                 {
-                    Instance.WindowState = FormWindowState.Minimized;
                     Instance.Hide();
                 }
                 else
@@ -463,7 +471,6 @@ namespace HandheldCompanion.Views
                 return;
             }
 
-            Instance.WindowState = FormWindowState.Minimized;
             Instance.Hide();
         }
 
