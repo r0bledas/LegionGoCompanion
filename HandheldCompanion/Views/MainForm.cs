@@ -75,7 +75,7 @@ namespace HandheldCompanion.Views
             this.AutoScaleMode = AutoScaleMode.Dpi;
             this.AutoScaleDimensions = new SizeF(96F, 96F);
             this.Text = "Legion Go Companion";
-            this.Size = new Size(580, 430);
+            this.Size = new Size(570, 380);
             this.MinimumSize = new Size(420, 280);
             this.StartPosition = FormStartPosition.CenterScreen;
             this.Font = new Font("Segoe UI", 9F, FontStyle.Regular);
@@ -400,10 +400,10 @@ namespace HandheldCompanion.Views
             try
             {
                 float scale = GeneralView.GetUiScaleFactor();
-                int baseW = 580;
-                int baseH = 430;
+                int baseW = 570;
+                int baseH = 380;
                 int targetW = (int)Math.Round(baseW * scale);
-                int targetH = (int)Math.Round(baseH * scale);
+                int targetH = (int)Math.Round(baseH * (1.0f + (scale - 1.0f) * 0.90f));
 
                 var screen = Screen.FromControl(this) ?? Screen.PrimaryScreen;
                 if (screen != null)
@@ -423,26 +423,26 @@ namespace HandheldCompanion.Views
                     this.Size = new Size(targetW, targetH);
                 }
 
-                this.mainTabControl.Font = new Font("Segoe UI", 9.0f * scale, FontStyle.Regular);
+                this.mainTabControl.Font = new Font("Segoe UI", 9.0f * (1.0f + (scale - 1.0f) * 0.50f), FontStyle.Regular);
                 this.mainTabControl.Padding = new Point((int)Math.Round(12 * scale), (int)Math.Round(4 * scale));
 
                 if (this.bottomStatusPanel != null)
                 {
-                    this.bottomStatusPanel.Height = (int)Math.Round(24 * scale);
+                    this.bottomStatusPanel.Height = (int)Math.Round(24 * (1.0f + (scale - 1.0f) * 0.50f));
                     if (this.lblAdminStatus != null)
                     {
-                        this.lblAdminStatus.Font = new Font("Segoe UI", 8.0f * scale, FontStyle.Bold);
+                        this.lblAdminStatus.Font = new Font("Segoe UI", 8.0f * (1.0f + (scale - 1.0f) * 0.50f), FontStyle.Bold);
                         this.lblAdminStatus.Location = new Point((int)Math.Round(8 * scale), (int)Math.Round(4 * scale));
                     }
                     if (this.btnRestartAdmin != null)
                     {
-                        this.btnRestartAdmin.Font = new Font("Segoe UI", 8.0f * scale, FontStyle.Regular);
-                        this.btnRestartAdmin.Size = new Size((int)Math.Round(120 * scale), (int)Math.Round(20 * scale));
+                        this.btnRestartAdmin.Font = new Font("Segoe UI", 8.0f * (1.0f + (scale - 1.0f) * 0.50f), FontStyle.Regular);
+                        this.btnRestartAdmin.Size = new Size((int)Math.Round(120 * scale), (int)Math.Round(22 * (1.0f + (scale - 1.0f) * 0.50f)));
                         this.btnRestartAdmin.Location = new Point((int)Math.Round(95 * scale), (int)Math.Round(2 * scale));
                     }
                     if (this.lblSystemHealth != null)
                     {
-                        this.lblSystemHealth.Font = new Font("Segoe UI", 8.0f * scale, FontStyle.Regular);
+                        this.lblSystemHealth.Font = new Font("Segoe UI", 8.0f * (1.0f + (scale - 1.0f) * 0.50f), FontStyle.Regular);
                     }
                 }
 

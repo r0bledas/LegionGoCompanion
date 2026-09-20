@@ -72,13 +72,14 @@ namespace HandheldCompanion.Views
             }
 
             int maxDim = Math.Max(screenW, screenH);
-            // Legion Go native aspect ratio (16:10) resolutions:
+            // Legion Go native modes:
             // 800p (1280x800): 1.0x
-            // 1000p (1600x1000): 1.25x
-            // 1200p (1920x1200): 1.5x
-            // 1600p (2560x1600): 2.0x
-            float scale = (float)maxDim / 1280.0f;
-            return Math.Clamp(scale, 1.0f, 2.5f);
+            // 1000p (1600x1000): 1.17x
+            // 1200p (1920x1200): 1.33x
+            // 1600p (2560x1600): 1.50x
+            float t = (maxDim - 1280f) / (2560f - 1280f);
+            t = Math.Clamp(t, 0.0f, 1.0f);
+            return 1.0f + t * 0.50f;
         }
 
         public GeneralView()
@@ -125,22 +126,22 @@ namespace HandheldCompanion.Views
                 Padding = new Padding(1)
             };
 
-            btnDS4 = CreateCompactButton("DS4", 76, 24, 8.5F, async () =>
+            btnDS4 = CreateCompactButton("DS4", 80, 32, 9.0F, async () =>
             {
                 await ControllerModeService.ApplyMode(ControllerTargetMode.DS4);
             });
 
-            btnX360 = CreateCompactButton("x360", 76, 24, 8.5F, async () =>
+            btnX360 = CreateCompactButton("x360", 80, 32, 9.0F, async () =>
             {
                 await ControllerModeService.ApplyMode(ControllerTargetMode.X360);
             });
 
-            btnNative = CreateCompactButton("Native", 76, 24, 8.5F, async () =>
+            btnNative = CreateCompactButton("Native", 80, 32, 9.0F, async () =>
             {
                 await ControllerModeService.ApplyMode(ControllerTargetMode.Native);
             });
 
-            btnDesktop = CreateCompactButton("Desktop", 76, 24, 8.5F, async () =>
+            btnDesktop = CreateCompactButton("Desktop", 80, 32, 9.0F, async () =>
             {
                 await ControllerModeService.ApplyMode(ControllerTargetMode.Desktop);
             });
@@ -180,7 +181,7 @@ namespace HandheldCompanion.Views
             for (int i = 0; i < tdpValues.Length; i++)
             {
                 int wattage = tdpValues[i];
-                Button b = CreateCompactButton(wattage + "W", 48, 24, 8.5F, () => ApplyTdp(wattage));
+                Button b = CreateCompactButton(wattage + "W", 52, 32, 9.0F, () => ApplyTdp(wattage));
                 tdpButtons[i] = b;
                 flowTdp.Controls.Add(b);
             }
@@ -209,8 +210,8 @@ namespace HandheldCompanion.Views
                 Padding = new Padding(1)
             };
 
-            btnFanAuto = CreateCompactButton("Auto", 60, 24, 8.5F, () => ApplyFanMode("Auto (Balanced)", 0, false, true, btnFanAuto));
-            btnFanFull = CreateCompactButton("100%", 60, 24, 8.5F, () => ApplyFanMode("Full Speed (100%)", 100, true, false, btnFanFull));
+            btnFanAuto = CreateCompactButton("Auto", 64, 32, 9.0F, () => ApplyFanMode("Auto (Balanced)", 0, false, true, btnFanAuto));
+            btnFanFull = CreateCompactButton("100%", 64, 32, 9.0F, () => ApplyFanMode("Full Speed (100%)", 100, true, false, btnFanFull));
 
             flowFan.Controls.Add(btnFanAuto);
             flowFan.Controls.Add(btnFanFull);
@@ -221,7 +222,7 @@ namespace HandheldCompanion.Views
             {
                 int spd = fanSpeeds[i];
                 Button b = null;
-                b = CreateCompactButton(spd + "%", 48, 24, 8.5F, () => ApplyFanMode(spd + "% Fixed", spd, false, false, b));
+                b = CreateCompactButton(spd + "%", 52, 32, 9.0F, () => ApplyFanMode(spd + "% Fixed", spd, false, false, b));
                 fanSpeedButtons[i] = b;
                 flowFan.Controls.Add(b);
             }
@@ -256,7 +257,7 @@ namespace HandheldCompanion.Views
                 var preset = ResolutionPresets[i];
                 int w = preset.Width;
                 int h = preset.Height;
-                Button b = CreateCompactButton(preset.Label, 70, 24, 8.5F, () => ApplyResolution(w, h));
+                Button b = CreateCompactButton(preset.Label, 72, 32, 9.0F, () => ApplyResolution(w, h));
                 resolutionButtons[i] = b;
                 flowResolution.Controls.Add(b);
             }
@@ -363,13 +364,13 @@ namespace HandheldCompanion.Views
 
                     spec.Button.Size = new Size(scaledW, scaledH);
                     bool isBold = spec.Button.Font?.Bold ?? false;
-                    // 1:1 proportional font scaling
-                    float scaledFontSize = spec.BaseFontSize * scale;
+                    // Proportional font scaling (9pt at 800p -> 11.7pt at 1600p)
+                    float scaledFontSize = spec.BaseFontSize * (1.0f + (scale - 1.0f) * 0.60f);
                     spec.Button.Font = new Font("Segoe UI", scaledFontSize, isBold ? FontStyle.Bold : FontStyle.Regular);
                 }
 
                 // Scale GroupBox headers and status labels
-                float headerFontSize = 8.5f * scale;
+                float headerFontSize = 8.5f * (1.0f + (scale - 1.0f) * 0.50f);
                 if (grpController != null) grpController.Font = new Font("Segoe UI", headerFontSize, FontStyle.Bold);
                 if (grpTdp != null) grpTdp.Font = new Font("Segoe UI", headerFontSize, FontStyle.Bold);
                 if (grpFan != null) grpFan.Font = new Font("Segoe UI", headerFontSize, FontStyle.Bold);
@@ -377,7 +378,7 @@ namespace HandheldCompanion.Views
 
                 if (lblResStatus != null)
                 {
-                    float statusFontSize = 8.0f * scale;
+                    float statusFontSize = 8.0f * (1.0f + (scale - 1.0f) * 0.50f);
                     lblResStatus.Font = new Font("Segoe UI", statusFontSize, FontStyle.Regular);
                 }
             }
@@ -465,7 +466,7 @@ namespace HandheldCompanion.Views
         private void SetButtonSelected(Button? b, bool isSel)
         {
             if (b == null || b.IsDisposed) return;
-            float currentSize = b.Font?.Size > 0 ? b.Font.Size : 8.5F;
+            float currentSize = b.Font?.Size > 0 ? b.Font.Size : 9.0F;
             b.Font = new Font(b.Font?.FontFamily ?? new FontFamily("Segoe UI"), currentSize, isSel ? FontStyle.Bold : FontStyle.Regular);
             b.BackColor = isSel ? Color.FromArgb(0, 120, 215) : Color.FromArgb(245, 247, 250);
             b.ForeColor = isSel ? Color.White : Color.FromArgb(30, 35, 45);

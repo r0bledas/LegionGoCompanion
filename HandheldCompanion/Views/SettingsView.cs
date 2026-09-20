@@ -170,8 +170,8 @@ namespace HandheldCompanion.Views
             Button btnLogs = new Button
             {
                 Text = "Open Logs",
-                Size = new Size(95, 24),
-                Font = new Font("Segoe UI", 8.5F, FontStyle.Regular),
+                Size = new Size(95, 32),
+                Font = new Font("Segoe UI", 9.0F, FontStyle.Regular),
                 Margin = new Padding(2),
                 Cursor = Cursors.Hand,
                 FlatStyle = FlatStyle.Flat,
@@ -180,7 +180,7 @@ namespace HandheldCompanion.Views
             };
             btnLogs.FlatAppearance.BorderColor = Color.FromArgb(210, 215, 222);
             btnLogs.FlatAppearance.BorderSize = 1;
-            _managedButtons.Add(new ManagedButtonSpec { Button = btnLogs, BaseWidth = 95, BaseHeight = 24, BaseFontSize = 8.5F });
+            _managedButtons.Add(new ManagedButtonSpec { Button = btnLogs, BaseWidth = 95, BaseHeight = 32, BaseFontSize = 9.0F });
             btnLogs.Click += (s, e) =>
             {
                 string logPath = Environment.GetEnvironmentVariable("LOG_PATH") ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "HandheldCompanion", "logs");
@@ -193,8 +193,8 @@ namespace HandheldCompanion.Views
             Button btnRestart = new Button
             {
                 Text = "Restart App",
-                Size = new Size(95, 24),
-                Font = new Font("Segoe UI", 8.5F, FontStyle.Regular),
+                Size = new Size(95, 32),
+                Font = new Font("Segoe UI", 9.0F, FontStyle.Regular),
                 Margin = new Padding(2),
                 Cursor = Cursors.Hand,
                 FlatStyle = FlatStyle.Flat,
@@ -203,7 +203,7 @@ namespace HandheldCompanion.Views
             };
             btnRestart.FlatAppearance.BorderColor = Color.FromArgb(210, 215, 222);
             btnRestart.FlatAppearance.BorderSize = 1;
-            _managedButtons.Add(new ManagedButtonSpec { Button = btnRestart, BaseWidth = 95, BaseHeight = 24, BaseFontSize = 8.5F });
+            _managedButtons.Add(new ManagedButtonSpec { Button = btnRestart, BaseWidth = 95, BaseHeight = 32, BaseFontSize = 9.0F });
             btnRestart.Click += (s, e) =>
             {
                 if (this.FindForm() is MainForm mainForm)
@@ -275,26 +275,26 @@ namespace HandheldCompanion.Views
             Button btnCheckUpdates = new Button
             {
                 Text = "Check Updates",
-                Size = new Size(110, 24),
-                Font = new Font("Segoe UI", 8.5F, FontStyle.Regular),
+                Size = new Size(120, 32),
+                Font = new Font("Segoe UI", 9.0F, FontStyle.Regular),
                 Margin = new Padding(2),
                 Cursor = Cursors.Hand,
                 FlatStyle = FlatStyle.System
             };
-            _managedButtons.Add(new ManagedButtonSpec { Button = btnCheckUpdates, BaseWidth = 110, BaseHeight = 24, BaseFontSize = 8.5F });
+            _managedButtons.Add(new ManagedButtonSpec { Button = btnCheckUpdates, BaseWidth = 120, BaseHeight = 32, BaseFontSize = 9.0F });
 
             Button btnDownloadInstall = new Button
             {
                 Text = "Install Update",
-                Size = new Size(110, 24),
-                Font = new Font("Segoe UI", 8.5F, FontStyle.Regular),
+                Size = new Size(120, 32),
+                Font = new Font("Segoe UI", 9.0F, FontStyle.Regular),
                 Margin = new Padding(2),
                 Cursor = Cursors.Hand,
                 FlatStyle = FlatStyle.System,
                 Enabled = false,
                 Visible = false
             };
-            _managedButtons.Add(new ManagedButtonSpec { Button = btnDownloadInstall, BaseWidth = 110, BaseHeight = 24, BaseFontSize = 8.5F });
+            _managedButtons.Add(new ManagedButtonSpec { Button = btnDownloadInstall, BaseWidth = 120, BaseHeight = 32, BaseFontSize = 9.0F });
 
             ReleaseInfo? foundRelease = null;
 
@@ -410,7 +410,8 @@ namespace HandheldCompanion.Views
                     if (spec.Button == null || spec.Button.IsDisposed) continue;
                     spec.Button.Size = new Size((int)Math.Round(spec.BaseWidth * scale), (int)Math.Round(spec.BaseHeight * scale));
                     bool isBold = spec.Button.Font?.Bold ?? false;
-                    spec.Button.Font = new Font("Segoe UI", spec.BaseFontSize * scale, isBold ? FontStyle.Bold : FontStyle.Regular);
+                    float scaledFontSize = spec.BaseFontSize * (1.0f + (scale - 1.0f) * 0.60f);
+                    spec.Button.Font = new Font("Segoe UI", scaledFontSize, isBold ? FontStyle.Bold : FontStyle.Regular);
                 }
 
                 ScaleChildControls(this, scale);
@@ -423,21 +424,25 @@ namespace HandheldCompanion.Views
 
         private static void ScaleChildControls(Control parent, float scale)
         {
+            float headerFontSize = 8.5f * (1.0f + (scale - 1.0f) * 0.50f);
+            float bodyFontSize = 8.5f * (1.0f + (scale - 1.0f) * 0.50f);
+            float smallFontSize = 8.0f * (1.0f + (scale - 1.0f) * 0.50f);
+
             foreach (Control c in parent.Controls)
             {
                 if (c is GroupBox grp)
                 {
-                    grp.Font = new Font("Segoe UI", 8.5f * scale, FontStyle.Bold);
+                    grp.Font = new Font("Segoe UI", headerFontSize, FontStyle.Bold);
                     ScaleChildControls(grp, scale);
                 }
                 else if (c is CheckBox chk)
                 {
-                    chk.Font = new Font("Segoe UI", 8.5f * scale, FontStyle.Regular);
+                    chk.Font = new Font("Segoe UI", bodyFontSize, FontStyle.Regular);
                 }
                 else if (c is Label lbl)
                 {
                     bool isBold = lbl.Font?.Bold ?? false;
-                    lbl.Font = new Font("Segoe UI", (isBold ? 8.5f : 8.0f) * scale, isBold ? FontStyle.Bold : FontStyle.Regular);
+                    lbl.Font = new Font("Segoe UI", isBold ? bodyFontSize : smallFontSize, isBold ? FontStyle.Bold : FontStyle.Regular);
                 }
                 else if (c is ProgressBar pb)
                 {
