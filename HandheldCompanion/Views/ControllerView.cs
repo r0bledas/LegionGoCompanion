@@ -134,6 +134,15 @@ namespace HandheldCompanion.Views
             ("9", VirtualKeyCode.VK_9)
         };
 
+        private struct ManagedButtonSpec
+        {
+            public Button Button;
+            public int BaseWidth;
+            public int BaseHeight;
+            public float BaseFontSize;
+        }
+        private readonly System.Collections.Generic.List<ManagedButtonSpec> _managedButtons = new();
+
         public ControllerView()
         {
             InitializeComponent();
@@ -143,7 +152,7 @@ namespace HandheldCompanion.Views
         {
             this.SuspendLayout();
 
-            this.AutoScaleMode = AutoScaleMode.Inherit;
+            this.AutoScaleMode = AutoScaleMode.None;
             this.Dock = DockStyle.Fill;
             this.Font = new Font("Segoe UI", 9F, FontStyle.Regular);
 
@@ -514,6 +523,7 @@ namespace HandheldCompanion.Views
                 ForeColor = Color.FromArgb(40, 45, 55)
             };
             btnReset.FlatAppearance.BorderColor = Color.FromArgb(210, 215, 222);
+            _managedButtons.Add(new ManagedButtonSpec { Button = btnReset, BaseWidth = 80, BaseHeight = 26, BaseFontSize = 8.5F });
             btnReset.Click += (s, e) =>
             {
                 var confirm = MessageBox.Show(
@@ -828,6 +838,52 @@ namespace HandheldCompanion.Views
             }
         }
 
+        protected override void OnHandleCreated(EventArgs e)
+        {
+            base.OnHandleCreated(e);
+            RefreshControlSizes();
+        }
+
+        protected override void OnDpiChangedAfterParent(EventArgs e)
+        {
+            base.OnDpiChangedAfterParent(e);
+            RefreshControlSizes();
+        }
+
+        protected override void ScaleControl(SizeF factor, BoundsSpecified specified)
+        {
+            base.ScaleControl(factor, specified);
+            RefreshControlSizes();
+        }
+
+        public void RefreshControlSizes()
+        {
+            if (this.IsDisposed) return;
+
+            float dpiScale = (this.DeviceDpi > 0 ? this.DeviceDpi : 96.0f) / 96.0f;
+            if (dpiScale <= 0) dpiScale = 1.0f;
+
+            this.SuspendLayout();
+            try
+            {
+                foreach (var spec in _managedButtons)
+                {
+                    if (spec.Button == null || spec.Button.IsDisposed) continue;
+
+                    int scaledW = (int)Math.Round(spec.BaseWidth * dpiScale);
+                    int scaledH = (int)Math.Round(spec.BaseHeight * dpiScale);
+
+                    spec.Button.Size = new Size(scaledW, scaledH);
+                    bool isBold = spec.Button.Font?.Bold ?? false;
+                    spec.Button.Font = new Font("Segoe UI", spec.BaseFontSize, isBold ? FontStyle.Bold : FontStyle.Regular);
+                }
+            }
+            finally
+            {
+                this.ResumeLayout(true);
+            }
+        }
+
         private Button CreateCompactButton(string text, int width, int height, Action onClick)
         {
             Button btn = new Button
@@ -854,6 +910,7 @@ namespace HandheldCompanion.Views
                     MessageBox.Show(ex.Message, "Controller Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
             };
+            _managedButtons.Add(new ManagedButtonSpec { Button = btn, BaseWidth = width, BaseHeight = height, BaseFontSize = 8.5F });
             return btn;
         }
 
@@ -891,8 +948,9 @@ namespace HandheldCompanion.Views
 
         private static void SetButtonActive(Button? btn, bool isActive)
         {
-            if (btn == null) return;
-            btn.Font = new Font("Segoe UI", 8.5F, isActive ? FontStyle.Bold : FontStyle.Regular);
+            if (btn == null || btn.IsDisposed) return;
+            float currentSize = btn.Font?.Size > 0 ? btn.Font.Size : 8.5F;
+            btn.Font = new Font(btn.Font?.FontFamily ?? new FontFamily("Segoe UI"), currentSize, isActive ? FontStyle.Bold : FontStyle.Regular);
             btn.BackColor = isActive ? Color.FromArgb(0, 120, 215) : Color.FromArgb(245, 247, 250);
             btn.ForeColor = isActive ? Color.White : Color.FromArgb(30, 35, 45);
             btn.FlatAppearance.BorderColor = isActive ? Color.FromArgb(0, 95, 175) : Color.FromArgb(210, 215, 222);

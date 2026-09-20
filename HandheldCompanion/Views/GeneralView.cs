@@ -39,6 +39,15 @@ namespace HandheldCompanion.Views
         private Button[]? resolutionButtons;
         private Label? lblResStatus;
 
+        private struct ManagedButtonSpec
+        {
+            public Button Button;
+            public int BaseWidth;
+            public int BaseHeight;
+            public float BaseFontSize;
+        }
+        private readonly System.Collections.Generic.List<ManagedButtonSpec> _managedButtons = new();
+
         public GeneralView()
         {
             InitializeComponent();
@@ -48,7 +57,7 @@ namespace HandheldCompanion.Views
         {
             this.SuspendLayout();
 
-            this.AutoScaleMode = AutoScaleMode.Inherit;
+            this.AutoScaleMode = AutoScaleMode.None;
             this.Dock = DockStyle.Fill;
             this.Font = new Font("Segoe UI", 9F, FontStyle.Regular);
 
@@ -251,12 +260,20 @@ namespace HandheldCompanion.Views
                 ManagerFactory.multimediaManager.DisplaySettingsChanged += (screen, res) =>
                 {
                     if (this.IsHandleCreated && !this.IsDisposed)
-                        this.BeginInvoke(new Action(UpdateResolutionControls));
+                        this.BeginInvoke(new Action(() =>
+                        {
+                            RefreshControlSizes();
+                            UpdateResolutionControls();
+                        }));
                 };
                 ManagerFactory.multimediaManager.PrimaryScreenChanged += (screen) =>
                 {
                     if (this.IsHandleCreated && !this.IsDisposed)
-                        this.BeginInvoke(new Action(UpdateResolutionControls));
+                        this.BeginInvoke(new Action(() =>
+                        {
+                            RefreshControlSizes();
+                            UpdateResolutionControls();
+                        }));
                 };
             }
 
@@ -272,10 +289,51 @@ namespace HandheldCompanion.Views
         protected override void OnHandleCreated(EventArgs e)
         {
             base.OnHandleCreated(e);
+            RefreshControlSizes();
             this.BeginInvoke(new Action(async () =>
             {
                 await ApplyStartupControllerMode();
             }));
+        }
+
+        protected override void OnDpiChangedAfterParent(EventArgs e)
+        {
+            base.OnDpiChangedAfterParent(e);
+            RefreshControlSizes();
+        }
+
+        protected override void ScaleControl(SizeF factor, BoundsSpecified specified)
+        {
+            base.ScaleControl(factor, specified);
+            RefreshControlSizes();
+        }
+
+        public void RefreshControlSizes()
+        {
+            if (this.IsDisposed) return;
+
+            float dpiScale = (this.DeviceDpi > 0 ? this.DeviceDpi : 96.0f) / 96.0f;
+            if (dpiScale <= 0) dpiScale = 1.0f;
+
+            this.SuspendLayout();
+            try
+            {
+                foreach (var spec in _managedButtons)
+                {
+                    if (spec.Button == null || spec.Button.IsDisposed) continue;
+
+                    int scaledW = (int)Math.Round(spec.BaseWidth * dpiScale);
+                    int scaledH = (int)Math.Round(spec.BaseHeight * dpiScale);
+
+                    spec.Button.Size = new Size(scaledW, scaledH);
+                    bool isBold = spec.Button.Font?.Bold ?? false;
+                    spec.Button.Font = new Font("Segoe UI", spec.BaseFontSize, isBold ? FontStyle.Bold : FontStyle.Regular);
+                }
+            }
+            finally
+            {
+                this.ResumeLayout(true);
+            }
         }
 
         private async Task ApplyStartupControllerMode()
@@ -317,6 +375,7 @@ namespace HandheldCompanion.Views
             btn.FlatAppearance.BorderColor = Color.FromArgb(210, 215, 222);
             btn.FlatAppearance.BorderSize = 1;
             btn.Click += (s, e) => onClick();
+            _managedButtons.Add(new ManagedButtonSpec { Button = btn, BaseWidth = width, BaseHeight = height, BaseFontSize = 8.5F });
             return btn;
         }
 
@@ -348,13 +407,15 @@ namespace HandheldCompanion.Views
                     MessageBox.Show(ex.Message, "Action Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
             };
+            _managedButtons.Add(new ManagedButtonSpec { Button = btn, BaseWidth = width, BaseHeight = height, BaseFontSize = 8.5F });
             return btn;
         }
 
         private void SetButtonSelected(Button? b, bool isSel)
         {
-            if (b == null) return;
-            b.Font = new Font("Segoe UI", 8.5F, isSel ? FontStyle.Bold : FontStyle.Regular);
+            if (b == null || b.IsDisposed) return;
+            float currentSize = b.Font?.Size > 0 ? b.Font.Size : 8.5F;
+            b.Font = new Font(b.Font?.FontFamily ?? new FontFamily("Segoe UI"), currentSize, isSel ? FontStyle.Bold : FontStyle.Regular);
             b.BackColor = isSel ? Color.FromArgb(0, 120, 215) : Color.FromArgb(245, 247, 250);
             b.ForeColor = isSel ? Color.White : Color.FromArgb(30, 35, 45);
             b.FlatAppearance.BorderColor = isSel ? Color.FromArgb(0, 95, 175) : Color.FromArgb(210, 215, 222);
@@ -553,6 +614,9 @@ namespace HandheldCompanion.Views
                     HighlightResolutionButton(width, height);
                     if (lblResStatus != null)
                         lblResStatus.Text = $"Current: {width}x{height}";
+
+                    if (this.IsHandleCreated && !this.IsDisposed)
+                        this.BeginInvoke(new Action(RefreshControlSizes));
                 }
                 else
                 {

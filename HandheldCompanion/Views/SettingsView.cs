@@ -22,7 +22,7 @@ namespace HandheldCompanion.Views
         {
             this.SuspendLayout();
 
-            this.AutoScaleMode = AutoScaleMode.Inherit;
+            this.AutoScaleMode = AutoScaleMode.None;
             this.Dock = DockStyle.Fill;
             this.AutoScroll = true;
             this.Font = new Font("Segoe UI", 9F, FontStyle.Regular);

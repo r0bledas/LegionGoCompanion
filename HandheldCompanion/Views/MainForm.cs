@@ -36,6 +36,10 @@ namespace HandheldCompanion.Views
         private TabPage tabController;
         private TabPage tabSettings;
 
+        private GeneralView? generalView;
+        private ControllerView? controllerView;
+        private SettingsView? settingsView;
+
         private NotifyIcon trayIcon;
         private ContextMenuStrip trayMenu;
         private bool isExiting = false;
@@ -157,22 +161,22 @@ namespace HandheldCompanion.Views
             this.tabGeneral.Text = "General";
             this.tabGeneral.Padding = new Padding(2);
             this.tabGeneral.UseVisualStyleBackColor = true;
-            GeneralView generalView = new GeneralView { Dock = DockStyle.Fill };
-            this.tabGeneral.Controls.Add(generalView);
+            this.generalView = new GeneralView { Dock = DockStyle.Fill };
+            this.tabGeneral.Controls.Add(this.generalView);
 
             // Tab 2: Controller (Emulation & Button Remapping)
             this.tabController.Text = "Controller";
             this.tabController.Padding = new Padding(2);
             this.tabController.UseVisualStyleBackColor = true;
-            ControllerView controllerView = new ControllerView { Dock = DockStyle.Fill };
-            this.tabController.Controls.Add(controllerView);
+            this.controllerView = new ControllerView { Dock = DockStyle.Fill };
+            this.tabController.Controls.Add(this.controllerView);
 
             // Tab 3: Settings (Battery cap, Logs, Restart)
             this.tabSettings.Text = "Settings";
             this.tabSettings.Padding = new Padding(2);
             this.tabSettings.UseVisualStyleBackColor = true;
-            SettingsView settingsView = new SettingsView { Dock = DockStyle.Fill };
-            this.tabSettings.Controls.Add(settingsView);
+            this.settingsView = new SettingsView { Dock = DockStyle.Fill };
+            this.tabSettings.Controls.Add(this.settingsView);
 
             // Add tabs
             this.mainTabControl.Controls.Add(this.tabGeneral);
@@ -355,6 +359,9 @@ namespace HandheldCompanion.Views
             base.SetVisibleCore(value);
         }
 
+        private const int WM_DISPLAYCHANGE = 0x007E;
+        private const int WM_DPICHANGED = 0x02E0;
+
         protected override void WndProc(ref Message m)
         {
             if (Program.WM_SHOWME != 0 && (uint)m.Msg == Program.WM_SHOWME)
@@ -367,6 +374,37 @@ namespace HandheldCompanion.Views
                 {
                     RestoreFromTray();
                 }
+            }
+            else if (m.Msg == WM_DISPLAYCHANGE || m.Msg == WM_DPICHANGED)
+            {
+                base.WndProc(ref m);
+                if (this.IsHandleCreated && !this.IsDisposed)
+                {
+                    this.BeginInvoke(new Action(() =>
+                    {
+                        try
+                        {
+                            var workingArea = Screen.FromControl(this).WorkingArea;
+                            if (this.WindowState == FormWindowState.Normal)
+                            {
+                                int maxWidth = Math.Max(420, workingArea.Width - 20);
+                                int maxHeight = Math.Max(280, workingArea.Height - 20);
+                                if (this.Width > maxWidth || this.Height > maxHeight)
+                                {
+                                    this.Size = new Size(Math.Min(this.Width, maxWidth), Math.Min(this.Height, maxHeight));
+                                }
+
+                                if (this.Right > workingArea.Right) this.Left = Math.Max(workingArea.Left, workingArea.Right - this.Width);
+                                if (this.Bottom > workingArea.Bottom) this.Top = Math.Max(workingArea.Top, workingArea.Bottom - this.Height);
+                            }
+
+                            this.generalView?.RefreshControlSizes();
+                            this.controllerView?.RefreshControlSizes();
+                        }
+                        catch { }
+                    }));
+                }
+                return;
             }
             base.WndProc(ref m);
         }
