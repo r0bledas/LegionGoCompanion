@@ -28,6 +28,12 @@ namespace HandheldCompanion.Views
         private Button btnFanFull;
         private Button[] fanSpeedButtons;
 
+        // GroupBoxes for scaling
+        private GroupBox? grpController;
+        private GroupBox? grpTdp;
+        private GroupBox? grpFan;
+        private GroupBox? grpResolution;
+
         // Display Resolution presets (Strict 16:10 aspect ratio matching Legion Go native panel)
         private static readonly (string Label, int Width, int Height)[] ResolutionPresets = new[]
         {
@@ -47,6 +53,33 @@ namespace HandheldCompanion.Views
             public float BaseFontSize;
         }
         private readonly System.Collections.Generic.List<ManagedButtonSpec> _managedButtons = new();
+
+        public static float GetUiScaleFactor()
+        {
+            int screenW = 1280;
+            int screenH = 800;
+            var primary = ManagerFactory.multimediaManager?.PrimaryDesktop;
+            var res = primary?.GetResolution();
+            if (res != null && res.Width > 0 && res.Height > 0)
+            {
+                screenW = res.Width;
+                screenH = res.Height;
+            }
+            else if (Screen.PrimaryScreen != null)
+            {
+                screenW = Screen.PrimaryScreen.Bounds.Width;
+                screenH = Screen.PrimaryScreen.Bounds.Height;
+            }
+
+            int maxDim = Math.Max(screenW, screenH);
+            // Legion Go native aspect ratio (16:10) resolutions:
+            // 800p (1280x800): 1.0x
+            // 1000p (1600x1000): 1.25x
+            // 1200p (1920x1200): 1.5x
+            // 1600p (2560x1600): 2.0x
+            float scale = (float)maxDim / 1280.0f;
+            return Math.Clamp(scale, 1.0f, 2.5f);
+        }
 
         public GeneralView()
         {
@@ -72,7 +105,7 @@ namespace HandheldCompanion.Views
             // ==========================================
             // 1. Controller GroupBox
             // ==========================================
-            GroupBox grpController = new GroupBox
+            grpController = new GroupBox
             {
                 Text = "Controller Mode",
                 Dock = DockStyle.Top,
@@ -92,22 +125,22 @@ namespace HandheldCompanion.Views
                 Padding = new Padding(1)
             };
 
-            btnDS4 = CreateCompactButton("DS4", 52, 26, async () =>
+            btnDS4 = CreateCompactButton("DS4", 76, 32, 9.5F, async () =>
             {
                 await ControllerModeService.ApplyMode(ControllerTargetMode.DS4);
             });
 
-            btnX360 = CreateCompactButton("x360", 52, 26, async () =>
+            btnX360 = CreateCompactButton("x360", 76, 32, 9.5F, async () =>
             {
                 await ControllerModeService.ApplyMode(ControllerTargetMode.X360);
             });
 
-            btnNative = CreateCompactButton("Native", 58, 26, async () =>
+            btnNative = CreateCompactButton("Native", 76, 32, 9.5F, async () =>
             {
                 await ControllerModeService.ApplyMode(ControllerTargetMode.Native);
             });
 
-            btnDesktop = CreateCompactButton("Desktop", 62, 26, async () =>
+            btnDesktop = CreateCompactButton("Desktop", 76, 32, 9.5F, async () =>
             {
                 await ControllerModeService.ApplyMode(ControllerTargetMode.Desktop);
             });
@@ -121,7 +154,7 @@ namespace HandheldCompanion.Views
             // ==========================================
             // 2. TDP & Power GroupBox
             // ==========================================
-            GroupBox grpTdp = new GroupBox
+            grpTdp = new GroupBox
             {
                 Text = "TDP Limit (Watts)",
                 Dock = DockStyle.Top,
@@ -147,7 +180,7 @@ namespace HandheldCompanion.Views
             for (int i = 0; i < tdpValues.Length; i++)
             {
                 int wattage = tdpValues[i];
-                Button b = CreateCompactButton(wattage + "W", 38, 24, () => ApplyTdp(wattage));
+                Button b = CreateCompactButton(wattage + "W", 48, 28, 9.0F, () => ApplyTdp(wattage));
                 tdpButtons[i] = b;
                 flowTdp.Controls.Add(b);
             }
@@ -156,7 +189,7 @@ namespace HandheldCompanion.Views
             // ==========================================
             // 3. Fan Control GroupBox
             // ==========================================
-            GroupBox grpFan = new GroupBox
+            grpFan = new GroupBox
             {
                 Text = "Fan Control",
                 Dock = DockStyle.Top,
@@ -176,8 +209,8 @@ namespace HandheldCompanion.Views
                 Padding = new Padding(1)
             };
 
-            btnFanAuto = CreateCompactButton("Auto", 46, 24, () => ApplyFanMode("Auto (Balanced)", 0, false, true, btnFanAuto));
-            btnFanFull = CreateCompactButton("100%", 52, 24, () => ApplyFanMode("Full Speed (100%)", 100, true, false, btnFanFull));
+            btnFanAuto = CreateCompactButton("Auto", 60, 28, 9.0F, () => ApplyFanMode("Auto (Balanced)", 0, false, true, btnFanAuto));
+            btnFanFull = CreateCompactButton("100%", 60, 28, 9.0F, () => ApplyFanMode("Full Speed (100%)", 100, true, false, btnFanFull));
 
             flowFan.Controls.Add(btnFanAuto);
             flowFan.Controls.Add(btnFanFull);
@@ -188,7 +221,7 @@ namespace HandheldCompanion.Views
             {
                 int spd = fanSpeeds[i];
                 Button b = null;
-                b = CreateCompactButton(spd + "%", 38, 24, () => ApplyFanMode(spd + "% Fixed", spd, false, false, b));
+                b = CreateCompactButton(spd + "%", 48, 28, 9.0F, () => ApplyFanMode(spd + "% Fixed", spd, false, false, b));
                 fanSpeedButtons[i] = b;
                 flowFan.Controls.Add(b);
             }
@@ -197,7 +230,7 @@ namespace HandheldCompanion.Views
             // ==========================================
             // 4. Display Resolution GroupBox (Internal Legion Go Display)
             // ==========================================
-            GroupBox grpResolution = new GroupBox
+            grpResolution = new GroupBox
             {
                 Text = "Display Resolution",
                 Dock = DockStyle.Top,
@@ -223,8 +256,7 @@ namespace HandheldCompanion.Views
                 var preset = ResolutionPresets[i];
                 int w = preset.Width;
                 int h = preset.Height;
-                int btnWidth = preset.Label.Length <= 4 ? 52 : 58;
-                Button b = CreateCompactButton(preset.Label, btnWidth, 24, () => ApplyResolution(w, h));
+                Button b = CreateCompactButton(preset.Label, 70, 30, 9.5F, () => ApplyResolution(w, h));
                 resolutionButtons[i] = b;
                 flowResolution.Controls.Add(b);
             }
@@ -317,8 +349,7 @@ namespace HandheldCompanion.Views
         {
             if (this.IsDisposed) return;
 
-            float dpiScale = (this.DeviceDpi > 0 ? this.DeviceDpi : 96.0f) / 96.0f;
-            if (dpiScale <= 0) dpiScale = 1.0f;
+            float scale = GetUiScaleFactor();
 
             this.SuspendLayout();
             try
@@ -327,12 +358,27 @@ namespace HandheldCompanion.Views
                 {
                     if (spec.Button == null || spec.Button.IsDisposed) continue;
 
-                    int scaledW = (int)Math.Round(spec.BaseWidth * dpiScale);
-                    int scaledH = (int)Math.Round(spec.BaseHeight * dpiScale);
+                    int scaledW = (int)Math.Round(spec.BaseWidth * scale);
+                    int scaledH = (int)Math.Round(spec.BaseHeight * scale);
 
                     spec.Button.Size = new Size(scaledW, scaledH);
                     bool isBold = spec.Button.Font?.Bold ?? false;
-                    spec.Button.Font = new Font("Segoe UI", spec.BaseFontSize, isBold ? FontStyle.Bold : FontStyle.Regular);
+                    // Font scales smoothly with scale factor
+                    float scaledFontSize = spec.BaseFontSize * (1.0f + (scale - 1.0f) * 0.42f);
+                    spec.Button.Font = new Font("Segoe UI", scaledFontSize, isBold ? FontStyle.Bold : FontStyle.Regular);
+                }
+
+                // Scale GroupBox headers and status labels
+                float headerFontSize = 8.5f * (1.0f + (scale - 1.0f) * 0.35f);
+                if (grpController != null) grpController.Font = new Font("Segoe UI", headerFontSize, FontStyle.Bold);
+                if (grpTdp != null) grpTdp.Font = new Font("Segoe UI", headerFontSize, FontStyle.Bold);
+                if (grpFan != null) grpFan.Font = new Font("Segoe UI", headerFontSize, FontStyle.Bold);
+                if (grpResolution != null) grpResolution.Font = new Font("Segoe UI", headerFontSize, FontStyle.Bold);
+
+                if (lblResStatus != null)
+                {
+                    float statusFontSize = 8.0f * (1.0f + (scale - 1.0f) * 0.35f);
+                    lblResStatus.Font = new Font("Segoe UI", statusFontSize, FontStyle.Regular);
                 }
             }
             finally
@@ -363,13 +409,13 @@ namespace HandheldCompanion.Views
             }
         }
 
-        private Button CreateCompactButton(string text, int width, int height, Action onClick)
+        private Button CreateCompactButton(string text, int width, int height, float fontSize, Action onClick)
         {
             Button btn = new Button
             {
                 Text = text,
                 Size = new Size(width, height),
-                Font = new Font("Segoe UI", 8.5F, FontStyle.Regular),
+                Font = new Font("Segoe UI", fontSize, FontStyle.Regular),
                 Margin = new Padding(2),
                 Padding = Padding.Empty,
                 Cursor = Cursors.Hand,
@@ -380,17 +426,17 @@ namespace HandheldCompanion.Views
             btn.FlatAppearance.BorderColor = Color.FromArgb(210, 215, 222);
             btn.FlatAppearance.BorderSize = 1;
             btn.Click += (s, e) => onClick();
-            _managedButtons.Add(new ManagedButtonSpec { Button = btn, BaseWidth = width, BaseHeight = height, BaseFontSize = 8.5F });
+            _managedButtons.Add(new ManagedButtonSpec { Button = btn, BaseWidth = width, BaseHeight = height, BaseFontSize = fontSize });
             return btn;
         }
 
-        private Button CreateCompactButton(string text, int width, int height, Func<Task> onClick)
+        private Button CreateCompactButton(string text, int width, int height, float fontSize, Func<Task> onClick)
         {
             Button btn = new Button
             {
                 Text = text,
                 Size = new Size(width, height),
-                Font = new Font("Segoe UI", 8.5F, FontStyle.Regular),
+                Font = new Font("Segoe UI", fontSize, FontStyle.Regular),
                 Margin = new Padding(2),
                 Padding = Padding.Empty,
                 Cursor = Cursors.Hand,
@@ -412,7 +458,7 @@ namespace HandheldCompanion.Views
                     MessageBox.Show(ex.Message, "Action Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
             };
-            _managedButtons.Add(new ManagedButtonSpec { Button = btn, BaseWidth = width, BaseHeight = height, BaseFontSize = 8.5F });
+            _managedButtons.Add(new ManagedButtonSpec { Button = btn, BaseWidth = width, BaseHeight = height, BaseFontSize = fontSize });
             return btn;
         }
 
@@ -619,7 +665,13 @@ namespace HandheldCompanion.Views
                         lblResStatus.Text = $"Current: {Math.Max(width, height)}x{Math.Min(width, height)}";
 
                     if (this.IsHandleCreated && !this.IsDisposed)
-                        this.BeginInvoke(new Action(RefreshControlSizes));
+                    {
+                        this.BeginInvoke(new Action(() =>
+                        {
+                            RefreshControlSizes();
+                            MainForm.Instance?.ApplyWindowScaling();
+                        }));
+                    }
                 }
                 else
                 {

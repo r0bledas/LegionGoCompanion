@@ -75,7 +75,7 @@ namespace HandheldCompanion.Views
             this.AutoScaleMode = AutoScaleMode.Dpi;
             this.AutoScaleDimensions = new SizeF(96F, 96F);
             this.Text = "Legion Go Companion";
-            this.Size = new Size(540, 390);
+            this.Size = new Size(580, 430);
             this.MinimumSize = new Size(420, 280);
             this.StartPosition = FormStartPosition.CenterScreen;
             this.Font = new Font("Segoe UI", 9F, FontStyle.Regular);
@@ -380,38 +380,72 @@ namespace HandheldCompanion.Views
                 base.WndProc(ref m);
                 if (this.IsHandleCreated && !this.IsDisposed)
                 {
-                    this.BeginInvoke(new Action(() =>
-                    {
-                        try
-                        {
-                            var workingArea = Screen.FromControl(this).WorkingArea;
-                            if (this.WindowState == FormWindowState.Normal)
-                            {
-                                int maxWidth = Math.Max(420, workingArea.Width - 20);
-                                int maxHeight = Math.Max(280, workingArea.Height - 20);
-                                if (this.Width > maxWidth || this.Height > maxHeight)
-                                {
-                                    this.Size = new Size(Math.Min(this.Width, maxWidth), Math.Min(this.Height, maxHeight));
-                                }
-
-                                if (this.Right > workingArea.Right) this.Left = Math.Max(workingArea.Left, workingArea.Right - this.Width);
-                                if (this.Bottom > workingArea.Bottom) this.Top = Math.Max(workingArea.Top, workingArea.Bottom - this.Height);
-                            }
-
-                            this.generalView?.RefreshControlSizes();
-                            this.controllerView?.RefreshControlSizes();
-                        }
-                        catch { }
-                    }));
+                    this.BeginInvoke(new Action(ApplyWindowScaling));
                 }
                 return;
             }
             base.WndProc(ref m);
         }
 
+        public void ApplyWindowScaling()
+        {
+            if (this.IsDisposed) return;
+
+            if (this.InvokeRequired)
+            {
+                this.BeginInvoke(new Action(ApplyWindowScaling));
+                return;
+            }
+
+            try
+            {
+                float scale = GeneralView.GetUiScaleFactor();
+                int baseW = 580;
+                int baseH = 430;
+                int targetW = (int)Math.Round(baseW * scale);
+                int targetH = (int)Math.Round(baseH * scale);
+
+                var screen = Screen.FromControl(this) ?? Screen.PrimaryScreen;
+                if (screen != null)
+                {
+                    var wa = screen.WorkingArea;
+                    targetW = Math.Min(targetW, wa.Width - 10);
+                    targetH = Math.Min(targetH, wa.Height - 10);
+                    this.Size = new Size(targetW, targetH);
+
+                    this.Location = new Point(
+                        wa.Left + Math.Max(0, (wa.Width - targetW) / 2),
+                        wa.Top + Math.Max(0, (wa.Height - targetH) / 2)
+                    );
+                }
+                else
+                {
+                    this.Size = new Size(targetW, targetH);
+                }
+
+                this.generalView?.RefreshControlSizes();
+                this.controllerView?.RefreshControlSizes();
+            }
+            catch (Exception ex)
+            {
+                LogManager.LogError("ApplyWindowScaling error: {0}", ex.Message);
+            }
+        }
+
         protected override void OnShown(EventArgs e)
         {
             base.OnShown(e);
+
+            // Pre-create child controls and native window handles so switching tabs is instantaneous!
+            try
+            {
+                this.controllerView?.CreateControl();
+                this.settingsView?.CreateControl();
+            }
+            catch { }
+
+            ApplyWindowScaling();
+
             if (this.trayIcon != null)
             {
                 this.trayIcon.Visible = true;
@@ -429,6 +463,8 @@ namespace HandheldCompanion.Views
             {
                 this.CreateHandle();
             }
+
+            ApplyWindowScaling();
 
             this.WindowState = FormWindowState.Normal;
             this.Show();

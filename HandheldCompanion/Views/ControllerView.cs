@@ -20,6 +20,11 @@ namespace HandheldCompanion.Views
         private Button? btnGyroOn;
         private Button? btnGyroOff;
 
+        // GroupBoxes for scaling
+        private GroupBox? grpGyro;
+        private GroupBox? grpHoldCycle;
+        private GroupBox? grpRemap;
+
         // Hold to Cycle controls
         private CheckBox? chkHoldCycleEnabled;
         private ComboBox? cmbTriggerBtn;
@@ -55,6 +60,9 @@ namespace HandheldCompanion.Views
             ("Xbox / Guide / PS", ButtonFlags.Special),
             ("Touchpad Click", ButtonFlags.TouchpadClick)
         };
+
+        // Pre-cached dropdown names for zero-lag population
+        private static readonly string[] ControllerTargetNames = ControllerTargets.ConvertAll(t => t.Name).ToArray();
 
         // Keyboard keys for dropdown
         private static readonly List<(string Name, VirtualKeyCode Key)> KeyboardTargets = new()
@@ -134,6 +142,9 @@ namespace HandheldCompanion.Views
             ("9", VirtualKeyCode.VK_9)
         };
 
+        // Pre-cached keyboard names for zero-lag population
+        private static readonly string[] KeyboardTargetNames = KeyboardTargets.ConvertAll(t => t.Name).ToArray();
+
         private struct ManagedButtonSpec
         {
             public Button Button;
@@ -145,7 +156,18 @@ namespace HandheldCompanion.Views
 
         public ControllerView()
         {
+            SetStyle(ControlStyles.OptimizedDoubleBuffer | ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint, true);
             InitializeComponent();
+        }
+
+        private static void EnableDoubleBuffering(Control control)
+        {
+            try
+            {
+                typeof(Control).GetProperty("DoubleBuffered", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)
+                    ?.SetValue(control, true, null);
+            }
+            catch { }
         }
 
         private void InitializeComponent()
@@ -163,11 +185,12 @@ namespace HandheldCompanion.Views
                 AutoScroll = true,
                 Padding = new Padding(10, 8, 10, 8)
             };
+            EnableDoubleBuffering(mainScrollPanel);
 
             // ==========================================
             // 1. Gyro Aiming GroupBox
             // ==========================================
-            GroupBox grpGyro = new GroupBox
+            grpGyro = new GroupBox
             {
                 Text = "Gyro Aiming",
                 Dock = DockStyle.Top,
@@ -187,13 +210,13 @@ namespace HandheldCompanion.Views
                 Padding = new Padding(2)
             };
 
-            btnGyroOn = CreateCompactButton("On", 50, 26, () =>
+            btnGyroOn = CreateCompactButton("On", 60, 28, 9.0F, () =>
             {
                 ControllerManager.GyroAimingEnabled = true;
                 UpdateGyroStatus();
             });
 
-            btnGyroOff = CreateCompactButton("Off", 50, 26, () =>
+            btnGyroOff = CreateCompactButton("Off", 60, 28, 9.0F, () =>
             {
                 ControllerManager.GyroAimingEnabled = false;
                 UpdateGyroStatus();
@@ -216,7 +239,7 @@ namespace HandheldCompanion.Views
             // ==========================================
             // 2. Hold to Cycle Controller Modes GroupBox
             // ==========================================
-            GroupBox grpHoldCycle = new GroupBox
+            grpHoldCycle = new GroupBox
             {
                 Text = "Hold to Cycle Controller Modes",
                 Dock = DockStyle.Top,
@@ -387,7 +410,7 @@ namespace HandheldCompanion.Views
             // ==========================================
             // 3. Button Remapping GroupBox
             // ==========================================
-            GroupBox grpRemap = new GroupBox
+            grpRemap = new GroupBox
             {
                 Text = "Button Remapping (Legion & Back Buttons)",
                 Dock = DockStyle.Top,
@@ -406,101 +429,110 @@ namespace HandheldCompanion.Views
                 ColumnCount = 4,
                 Padding = new Padding(4)
             };
+            EnableDoubleBuffering(tableRemap);
             tableRemap.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 28F));
             tableRemap.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 22F));
             tableRemap.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 26F));
             tableRemap.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 24F));
 
-            int row = 0;
-            foreach (var btn in CustomMappingService.RemappableButtons)
+            tableRemap.SuspendLayout();
+            try
             {
-                tableRemap.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-
-                Label lblBtn = new Label
+                int row = 0;
+                foreach (var btn in CustomMappingService.RemappableButtons)
                 {
-                    Text = CustomMappingService.GetButtonDisplayName(btn),
-                    Font = new Font("Segoe UI", 8.5F, FontStyle.Regular),
-                    ForeColor = Color.FromArgb(30, 35, 45),
-                    Dock = DockStyle.Fill,
-                    TextAlign = ContentAlignment.MiddleLeft,
-                    Height = 28,
-                    Margin = new Padding(2, 3, 2, 3)
-                };
+                    tableRemap.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 
-                ComboBox comboType = new ComboBox
-                {
-                    DropDownStyle = ComboBoxStyle.DropDownList,
-                    Font = new Font("Segoe UI", 8.5F, FontStyle.Regular),
-                    Dock = DockStyle.Fill,
-                    Height = 26,
-                    Margin = new Padding(2, 3, 2, 3)
-                };
-                comboType.Items.Add("None / Default");
-                comboType.Items.Add("Controller Button");
-                comboType.Items.Add("Keyboard Key");
-                comboType.Items.Add("Action");
+                    Label lblBtn = new Label
+                    {
+                        Text = CustomMappingService.GetButtonDisplayName(btn),
+                        Font = new Font("Segoe UI", 8.5F, FontStyle.Regular),
+                        ForeColor = Color.FromArgb(30, 35, 45),
+                        Dock = DockStyle.Fill,
+                        TextAlign = ContentAlignment.MiddleLeft,
+                        Height = 28,
+                        Margin = new Padding(2, 3, 2, 3)
+                    };
 
-                ComboBox comboTarget = new ComboBox
-                {
-                    DropDownStyle = ComboBoxStyle.DropDownList,
-                    Font = new Font("Segoe UI", 8.5F, FontStyle.Regular),
-                    Dock = DockStyle.Fill,
-                    Height = 26,
-                    Margin = new Padding(2, 3, 2, 3)
-                };
+                    ComboBox comboType = new ComboBox
+                    {
+                        DropDownStyle = ComboBoxStyle.DropDownList,
+                        Font = new Font("Segoe UI", 8.5F, FontStyle.Regular),
+                        Dock = DockStyle.Fill,
+                        Height = 26,
+                        Margin = new Padding(2, 3, 2, 3)
+                    };
+                    comboType.Items.Add("None / Default");
+                    comboType.Items.Add("Controller Button");
+                    comboType.Items.Add("Keyboard Key");
+                    comboType.Items.Add("Action");
 
-                FlowLayoutPanel flowRepeat = new FlowLayoutPanel
-                {
-                    Dock = DockStyle.Fill,
-                    AutoSize = true,
-                    WrapContents = false,
-                    Margin = new Padding(0),
-                    Padding = new Padding(0, 1, 0, 0)
-                };
+                    ComboBox comboTarget = new ComboBox
+                    {
+                        DropDownStyle = ComboBoxStyle.DropDownList,
+                        Font = new Font("Segoe UI", 8.5F, FontStyle.Regular),
+                        Dock = DockStyle.Fill,
+                        Height = 26,
+                        Margin = new Padding(2, 3, 2, 3)
+                    };
 
-                CheckBox chkRepeat = new CheckBox
-                {
-                    Text = "Repeat",
-                    AutoSize = true,
-                    Font = new Font("Segoe UI", 8F, FontStyle.Regular),
-                    Margin = new Padding(2, 4, 1, 2)
-                };
+                    FlowLayoutPanel flowRepeat = new FlowLayoutPanel
+                    {
+                        Dock = DockStyle.Fill,
+                        AutoSize = true,
+                        WrapContents = false,
+                        Margin = new Padding(0),
+                        Padding = new Padding(0, 1, 0, 0)
+                    };
 
-                NumericUpDown numRate = new NumericUpDown
-                {
-                    Minimum = 10,
-                    Maximum = 1000,
-                    Value = 50,
-                    Increment = 10,
-                    Width = 46,
-                    Height = 22,
-                    Font = new Font("Segoe UI", 8F, FontStyle.Regular),
-                    Margin = new Padding(1, 2, 1, 2)
-                };
+                    CheckBox chkRepeat = new CheckBox
+                    {
+                        Text = "Repeat",
+                        AutoSize = true,
+                        Font = new Font("Segoe UI", 8F, FontStyle.Regular),
+                        Margin = new Padding(2, 4, 1, 2)
+                    };
 
-                Label lblMs = new Label
-                {
-                    Text = "ms",
-                    AutoSize = true,
-                    Font = new Font("Segoe UI", 7.5F, FontStyle.Regular),
-                    ForeColor = Color.FromArgb(90, 95, 105),
-                    Margin = new Padding(0, 5, 0, 0)
-                };
+                    NumericUpDown numRate = new NumericUpDown
+                    {
+                        Minimum = 10,
+                        Maximum = 1000,
+                        Value = 50,
+                        Increment = 10,
+                        Width = 46,
+                        Height = 22,
+                        Font = new Font("Segoe UI", 8F, FontStyle.Regular),
+                        Margin = new Padding(1, 2, 1, 2)
+                    };
 
-                flowRepeat.Controls.Add(chkRepeat);
-                flowRepeat.Controls.Add(numRate);
-                flowRepeat.Controls.Add(lblMs);
+                    Label lblMs = new Label
+                    {
+                        Text = "ms",
+                        AutoSize = true,
+                        Font = new Font("Segoe UI", 7.5F, FontStyle.Regular),
+                        ForeColor = Color.FromArgb(90, 95, 105),
+                        Margin = new Padding(0, 5, 0, 0)
+                    };
 
-                // Populate and bind
-                SetupButtonRow(btn, comboType, comboTarget, chkRepeat, numRate);
+                    flowRepeat.Controls.Add(chkRepeat);
+                    flowRepeat.Controls.Add(numRate);
+                    flowRepeat.Controls.Add(lblMs);
 
-                tableRemap.Controls.Add(lblBtn, 0, row);
-                tableRemap.Controls.Add(comboType, 1, row);
-                tableRemap.Controls.Add(comboTarget, 2, row);
-                tableRemap.Controls.Add(flowRepeat, 3, row);
+                    // Populate and bind
+                    SetupButtonRow(btn, comboType, comboTarget, chkRepeat, numRate);
 
-                _mappingControls[btn] = (comboType, comboTarget, chkRepeat, numRate);
-                row++;
+                    tableRemap.Controls.Add(lblBtn, 0, row);
+                    tableRemap.Controls.Add(comboType, 1, row);
+                    tableRemap.Controls.Add(comboTarget, 2, row);
+                    tableRemap.Controls.Add(flowRepeat, 3, row);
+
+                    _mappingControls[btn] = (comboType, comboTarget, chkRepeat, numRate);
+                    row++;
+                }
+            }
+            finally
+            {
+                tableRemap.ResumeLayout(false);
             }
 
             // Reset Button row
@@ -515,15 +547,15 @@ namespace HandheldCompanion.Views
             Button btnReset = new Button
             {
                 Text = "Reset All",
-                Size = new Size(80, 26),
-                Font = new Font("Segoe UI", 8.5F, FontStyle.Regular),
+                Size = new Size(90, 28),
+                Font = new Font("Segoe UI", 9.0F, FontStyle.Regular),
                 Cursor = Cursors.Hand,
                 FlatStyle = FlatStyle.Flat,
                 BackColor = Color.FromArgb(245, 247, 250),
                 ForeColor = Color.FromArgb(40, 45, 55)
             };
             btnReset.FlatAppearance.BorderColor = Color.FromArgb(210, 215, 222);
-            _managedButtons.Add(new ManagedButtonSpec { Button = btnReset, BaseWidth = 80, BaseHeight = 26, BaseFontSize = 8.5F });
+            _managedButtons.Add(new ManagedButtonSpec { Button = btnReset, BaseWidth = 90, BaseHeight = 28, BaseFontSize = 9.0F });
             btnReset.Click += (s, e) =>
             {
                 var confirm = MessageBox.Show(
@@ -598,54 +630,52 @@ namespace HandheldCompanion.Views
 
         private void PopulateTargetDropdown(ComboBox comboTarget, MappingType type, ButtonFlags selectedBtn, VirtualKeyCode selectedKey, CustomActionType selectedAction)
         {
-            comboTarget.Items.Clear();
-
-            switch (type)
+            comboTarget.BeginUpdate();
+            try
             {
-                case MappingType.None:
-                    comboTarget.Items.Add("(Default)");
-                    comboTarget.SelectedIndex = 0;
-                    comboTarget.Enabled = false;
-                    break;
+                comboTarget.Items.Clear();
 
-                case MappingType.Controller:
-                    comboTarget.Enabled = true;
-                    int selIndex = 0;
-                    for (int i = 0; i < ControllerTargets.Count; i++)
-                    {
-                        var item = ControllerTargets[i];
-                        comboTarget.Items.Add(item.Name);
-                        if (item.Flag == selectedBtn)
-                            selIndex = i;
-                    }
-                    comboTarget.SelectedIndex = selIndex;
-                    break;
+                switch (type)
+                {
+                    case MappingType.None:
+                        comboTarget.Items.Add("(Default)");
+                        comboTarget.SelectedIndex = 0;
+                        comboTarget.Enabled = false;
+                        break;
 
-                case MappingType.Keyboard:
-                    comboTarget.Enabled = true;
-                    int keyIndex = 0;
-                    for (int i = 0; i < KeyboardTargets.Count; i++)
-                    {
-                        var item = KeyboardTargets[i];
-                        comboTarget.Items.Add(item.Name);
-                        if (item.Key == selectedKey)
-                            keyIndex = i;
-                    }
-                    comboTarget.SelectedIndex = keyIndex;
-                    break;
+                    case MappingType.Controller:
+                        comboTarget.Enabled = true;
+                        comboTarget.Items.AddRange(ControllerTargetNames);
+                        int selIndex = ControllerTargets.FindIndex(item => item.Flag == selectedBtn);
+                        comboTarget.SelectedIndex = selIndex >= 0 ? selIndex : 0;
+                        break;
 
-                case MappingType.Action:
-                    comboTarget.Enabled = true;
-                    int actIndex = 0;
-                    for (int i = 0; i < CustomMappingService.AvailableActions.Count; i++)
-                    {
-                        var item = CustomMappingService.AvailableActions[i];
-                        comboTarget.Items.Add(item.Name);
-                        if (item.Action == selectedAction)
-                            actIndex = i;
-                    }
-                    comboTarget.SelectedIndex = actIndex;
-                    break;
+                    case MappingType.Keyboard:
+                        comboTarget.Enabled = true;
+                        comboTarget.Items.AddRange(KeyboardTargetNames);
+                        int keyIndex = KeyboardTargets.FindIndex(item => item.Key == selectedKey);
+                        comboTarget.SelectedIndex = keyIndex >= 0 ? keyIndex : 0;
+                        break;
+
+                    case MappingType.Action:
+                        comboTarget.Enabled = true;
+                        var actions = CustomMappingService.AvailableActions;
+                        string[] actionNames = new string[actions.Count];
+                        int actIndex = 0;
+                        for (int i = 0; i < actions.Count; i++)
+                        {
+                            actionNames[i] = actions[i].Name;
+                            if (actions[i].Action == selectedAction)
+                                actIndex = i;
+                        }
+                        comboTarget.Items.AddRange(actionNames);
+                        comboTarget.SelectedIndex = actIndex;
+                        break;
+                }
+            }
+            finally
+            {
+                comboTarget.EndUpdate();
             }
         }
 
@@ -860,8 +890,7 @@ namespace HandheldCompanion.Views
         {
             if (this.IsDisposed) return;
 
-            float dpiScale = (this.DeviceDpi > 0 ? this.DeviceDpi : 96.0f) / 96.0f;
-            if (dpiScale <= 0) dpiScale = 1.0f;
+            float scale = GeneralView.GetUiScaleFactor();
 
             this.SuspendLayout();
             try
@@ -870,13 +899,20 @@ namespace HandheldCompanion.Views
                 {
                     if (spec.Button == null || spec.Button.IsDisposed) continue;
 
-                    int scaledW = (int)Math.Round(spec.BaseWidth * dpiScale);
-                    int scaledH = (int)Math.Round(spec.BaseHeight * dpiScale);
+                    int scaledW = (int)Math.Round(spec.BaseWidth * scale);
+                    int scaledH = (int)Math.Round(spec.BaseHeight * scale);
 
                     spec.Button.Size = new Size(scaledW, scaledH);
                     bool isBold = spec.Button.Font?.Bold ?? false;
-                    spec.Button.Font = new Font("Segoe UI", spec.BaseFontSize, isBold ? FontStyle.Bold : FontStyle.Regular);
+                    float scaledFontSize = spec.BaseFontSize * (1.0f + (scale - 1.0f) * 0.42f);
+                    spec.Button.Font = new Font("Segoe UI", scaledFontSize, isBold ? FontStyle.Bold : FontStyle.Regular);
                 }
+
+                // Scale GroupBox headers
+                float headerFontSize = 8.5f * (1.0f + (scale - 1.0f) * 0.35f);
+                if (grpGyro != null) grpGyro.Font = new Font("Segoe UI", headerFontSize, FontStyle.Bold);
+                if (grpHoldCycle != null) grpHoldCycle.Font = new Font("Segoe UI", headerFontSize, FontStyle.Bold);
+                if (grpRemap != null) grpRemap.Font = new Font("Segoe UI", headerFontSize, FontStyle.Bold);
             }
             finally
             {
@@ -884,13 +920,13 @@ namespace HandheldCompanion.Views
             }
         }
 
-        private Button CreateCompactButton(string text, int width, int height, Action onClick)
+        private Button CreateCompactButton(string text, int width, int height, float fontSize, Action onClick)
         {
             Button btn = new Button
             {
                 Text = text,
                 Size = new Size(width, height),
-                Font = new Font("Segoe UI", 8.5F, FontStyle.Regular),
+                Font = new Font("Segoe UI", fontSize, FontStyle.Regular),
                 Margin = new Padding(3),
                 Cursor = Cursors.Hand,
                 FlatStyle = FlatStyle.Flat,
@@ -910,7 +946,7 @@ namespace HandheldCompanion.Views
                     MessageBox.Show(ex.Message, "Controller Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
             };
-            _managedButtons.Add(new ManagedButtonSpec { Button = btn, BaseWidth = width, BaseHeight = height, BaseFontSize = 8.5F });
+            _managedButtons.Add(new ManagedButtonSpec { Button = btn, BaseWidth = width, BaseHeight = height, BaseFontSize = fontSize });
             return btn;
         }
 
