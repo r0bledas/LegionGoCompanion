@@ -608,11 +608,8 @@ public class MultimediaManager : IManager
 
     public bool SetResolution(int width, int height, int displayFrequency, int bitsPerPel)
     {
-        if (Status != ManagerStatus.Initialized)
-            return false;
-
         // Get the primary screen's device name
-        string? deviceName = PrimaryDesktop?.screen?.DeviceName;
+        string? deviceName = PrimaryDesktop?.screen?.DeviceName ?? Screen.PrimaryScreen?.DeviceName;
         if (string.IsNullOrEmpty(deviceName))
             return false;
 

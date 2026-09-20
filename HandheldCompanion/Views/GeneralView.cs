@@ -257,6 +257,11 @@ namespace HandheldCompanion.Views
 
             if (ManagerFactory.multimediaManager != null)
             {
+                ManagerFactory.multimediaManager.Initialized += () =>
+                {
+                    if (this.IsHandleCreated && !this.IsDisposed)
+                        this.BeginInvoke(new Action(UpdateResolutionControls));
+                };
                 ManagerFactory.multimediaManager.DisplaySettingsChanged += (screen, res) =>
                 {
                     if (this.IsHandleCreated && !this.IsDisposed)
@@ -544,40 +549,40 @@ namespace HandheldCompanion.Views
 
         private void UpdateResolutionControls()
         {
-            var primary = ManagerFactory.multimediaManager?.PrimaryDesktop;
-            bool isInternal = primary != null && primary.IsInternal;
-
             if (resolutionButtons != null)
             {
                 foreach (var b in resolutionButtons)
                 {
-                    if (b != null) b.Enabled = isInternal;
+                    if (b != null) b.Enabled = true;
                 }
             }
 
-            if (lblResStatus == null) return;
+            int currentW = 0;
+            int currentH = 0;
 
-            if (!isInternal)
-            {
-                lblResStatus.Text = "Disabled (External Display Active)";
-                lblResStatus.ForeColor = Color.FromArgb(180, 50, 50);
-                if (resolutionButtons != null)
-                {
-                    foreach (var b in resolutionButtons)
-                    {
-                        if (b != null) SetButtonSelected(b, false);
-                    }
-                }
-                return;
-            }
-
+            var primary = ManagerFactory.multimediaManager?.PrimaryDesktop;
             var current = primary?.GetResolution();
             if (current != null)
             {
-                lblResStatus.Text = $"Current: {current.Width}x{current.Height}";
+                currentW = current.Width;
+                currentH = current.Height;
+            }
+            else
+            {
+                var scr = Screen.PrimaryScreen;
+                if (scr != null)
+                {
+                    currentW = scr.Bounds.Width;
+                    currentH = scr.Bounds.Height;
+                }
+            }
+
+            if (lblResStatus != null && currentW > 0 && currentH > 0)
+            {
+                lblResStatus.Text = $"Current: {Math.Max(currentW, currentH)}x{Math.Min(currentW, currentH)}";
                 lblResStatus.ForeColor = Color.FromArgb(60, 65, 75);
 
-                HighlightResolutionButton(current.Width, current.Height);
+                HighlightResolutionButton(currentW, currentH);
             }
         }
 
@@ -599,21 +604,19 @@ namespace HandheldCompanion.Views
         {
             try
             {
+                int freq = 0;
                 var primary = ManagerFactory.multimediaManager?.PrimaryDesktop;
-                if (primary == null || !primary.IsInternal)
+                if (primary != null)
                 {
-                    MessageBox.Show("Resolution quick adjustment is only available on the internal Legion Go display.",
-                        "Display Resolution", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                    return;
+                    freq = primary.GetCurrentFrequency();
                 }
 
-                int freq = primary.GetCurrentFrequency();
-                bool success = ManagerFactory.multimediaManager.SetResolution(width, height, freq);
+                bool success = ManagerFactory.multimediaManager?.SetResolution(width, height, freq) ?? false;
                 if (success)
                 {
                     HighlightResolutionButton(width, height);
                     if (lblResStatus != null)
-                        lblResStatus.Text = $"Current: {width}x{height}";
+                        lblResStatus.Text = $"Current: {Math.Max(width, height)}x{Math.Min(width, height)}";
 
                     if (this.IsHandleCreated && !this.IsDisposed)
                         this.BeginInvoke(new Action(RefreshControlSizes));
