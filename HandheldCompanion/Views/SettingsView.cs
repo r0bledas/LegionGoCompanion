@@ -13,6 +13,15 @@ namespace HandheldCompanion.Views
 {
     public class SettingsView : UserControl
     {
+        private struct ManagedButtonSpec
+        {
+            public Button Button;
+            public int BaseWidth;
+            public int BaseHeight;
+            public float BaseFontSize;
+        }
+        private readonly System.Collections.Generic.List<ManagedButtonSpec> _managedButtons = new();
+
         public SettingsView()
         {
             InitializeComponent();
@@ -161,7 +170,7 @@ namespace HandheldCompanion.Views
             Button btnLogs = new Button
             {
                 Text = "Open Logs",
-                Size = new Size(95, 26),
+                Size = new Size(95, 24),
                 Font = new Font("Segoe UI", 8.5F, FontStyle.Regular),
                 Margin = new Padding(2),
                 Cursor = Cursors.Hand,
@@ -171,6 +180,7 @@ namespace HandheldCompanion.Views
             };
             btnLogs.FlatAppearance.BorderColor = Color.FromArgb(210, 215, 222);
             btnLogs.FlatAppearance.BorderSize = 1;
+            _managedButtons.Add(new ManagedButtonSpec { Button = btnLogs, BaseWidth = 95, BaseHeight = 24, BaseFontSize = 8.5F });
             btnLogs.Click += (s, e) =>
             {
                 string logPath = Environment.GetEnvironmentVariable("LOG_PATH") ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "HandheldCompanion", "logs");
@@ -183,7 +193,7 @@ namespace HandheldCompanion.Views
             Button btnRestart = new Button
             {
                 Text = "Restart App",
-                Size = new Size(95, 26),
+                Size = new Size(95, 24),
                 Font = new Font("Segoe UI", 8.5F, FontStyle.Regular),
                 Margin = new Padding(2),
                 Cursor = Cursors.Hand,
@@ -193,6 +203,7 @@ namespace HandheldCompanion.Views
             };
             btnRestart.FlatAppearance.BorderColor = Color.FromArgb(210, 215, 222);
             btnRestart.FlatAppearance.BorderSize = 1;
+            _managedButtons.Add(new ManagedButtonSpec { Button = btnRestart, BaseWidth = 95, BaseHeight = 24, BaseFontSize = 8.5F });
             btnRestart.Click += (s, e) =>
             {
                 if (this.FindForm() is MainForm mainForm)
@@ -264,17 +275,18 @@ namespace HandheldCompanion.Views
             Button btnCheckUpdates = new Button
             {
                 Text = "Check Updates",
-                Size = new Size(100, 26),
+                Size = new Size(110, 24),
                 Font = new Font("Segoe UI", 8.5F, FontStyle.Regular),
                 Margin = new Padding(2),
                 Cursor = Cursors.Hand,
                 FlatStyle = FlatStyle.System
             };
+            _managedButtons.Add(new ManagedButtonSpec { Button = btnCheckUpdates, BaseWidth = 110, BaseHeight = 24, BaseFontSize = 8.5F });
 
             Button btnDownloadInstall = new Button
             {
                 Text = "Install Update",
-                Size = new Size(95, 26),
+                Size = new Size(110, 24),
                 Font = new Font("Segoe UI", 8.5F, FontStyle.Regular),
                 Margin = new Padding(2),
                 Cursor = Cursors.Hand,
@@ -282,6 +294,7 @@ namespace HandheldCompanion.Views
                 Enabled = false,
                 Visible = false
             };
+            _managedButtons.Add(new ManagedButtonSpec { Button = btnDownloadInstall, BaseWidth = 110, BaseHeight = 24, BaseFontSize = 8.5F });
 
             ReleaseInfo? foundRelease = null;
 
@@ -383,6 +396,59 @@ namespace HandheldCompanion.Views
             this.Controls.Add(contentPanel);
 
             this.ResumeLayout(false);
+        }
+
+        public void RefreshControlSizes()
+        {
+            if (this.IsDisposed) return;
+            float scale = GeneralView.GetUiScaleFactor();
+            this.SuspendLayout();
+            try
+            {
+                foreach (var spec in _managedButtons)
+                {
+                    if (spec.Button == null || spec.Button.IsDisposed) continue;
+                    spec.Button.Size = new Size((int)Math.Round(spec.BaseWidth * scale), (int)Math.Round(spec.BaseHeight * scale));
+                    bool isBold = spec.Button.Font?.Bold ?? false;
+                    spec.Button.Font = new Font("Segoe UI", spec.BaseFontSize * scale, isBold ? FontStyle.Bold : FontStyle.Regular);
+                }
+
+                ScaleChildControls(this, scale);
+            }
+            finally
+            {
+                this.ResumeLayout(true);
+            }
+        }
+
+        private static void ScaleChildControls(Control parent, float scale)
+        {
+            foreach (Control c in parent.Controls)
+            {
+                if (c is GroupBox grp)
+                {
+                    grp.Font = new Font("Segoe UI", 8.5f * scale, FontStyle.Bold);
+                    ScaleChildControls(grp, scale);
+                }
+                else if (c is CheckBox chk)
+                {
+                    chk.Font = new Font("Segoe UI", 8.5f * scale, FontStyle.Regular);
+                }
+                else if (c is Label lbl)
+                {
+                    bool isBold = lbl.Font?.Bold ?? false;
+                    lbl.Font = new Font("Segoe UI", (isBold ? 8.5f : 8.0f) * scale, isBold ? FontStyle.Bold : FontStyle.Regular);
+                }
+                else if (c is ProgressBar pb)
+                {
+                    pb.Height = (int)Math.Round(14 * scale);
+                    pb.Width = (int)Math.Round(260 * scale);
+                }
+                else if (c.HasChildren)
+                {
+                    ScaleChildControls(c, scale);
+                }
+            }
         }
     }
 }

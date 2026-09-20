@@ -423,8 +423,32 @@ namespace HandheldCompanion.Views
                     this.Size = new Size(targetW, targetH);
                 }
 
+                this.mainTabControl.Font = new Font("Segoe UI", 9.0f * scale, FontStyle.Regular);
+                this.mainTabControl.Padding = new Point((int)Math.Round(12 * scale), (int)Math.Round(4 * scale));
+
+                if (this.bottomStatusPanel != null)
+                {
+                    this.bottomStatusPanel.Height = (int)Math.Round(24 * scale);
+                    if (this.lblAdminStatus != null)
+                    {
+                        this.lblAdminStatus.Font = new Font("Segoe UI", 8.0f * scale, FontStyle.Bold);
+                        this.lblAdminStatus.Location = new Point((int)Math.Round(8 * scale), (int)Math.Round(4 * scale));
+                    }
+                    if (this.btnRestartAdmin != null)
+                    {
+                        this.btnRestartAdmin.Font = new Font("Segoe UI", 8.0f * scale, FontStyle.Regular);
+                        this.btnRestartAdmin.Size = new Size((int)Math.Round(120 * scale), (int)Math.Round(20 * scale));
+                        this.btnRestartAdmin.Location = new Point((int)Math.Round(95 * scale), (int)Math.Round(2 * scale));
+                    }
+                    if (this.lblSystemHealth != null)
+                    {
+                        this.lblSystemHealth.Font = new Font("Segoe UI", 8.0f * scale, FontStyle.Regular);
+                    }
+                }
+
                 this.generalView?.RefreshControlSizes();
                 this.controllerView?.RefreshControlSizes();
+                this.settingsView?.RefreshControlSizes();
             }
             catch (Exception ex)
             {

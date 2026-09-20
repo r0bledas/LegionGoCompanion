@@ -210,13 +210,13 @@ namespace HandheldCompanion.Views
                 Padding = new Padding(2)
             };
 
-            btnGyroOn = CreateCompactButton("On", 60, 28, 9.0F, () =>
+            btnGyroOn = CreateCompactButton("On", 60, 24, 8.5F, () =>
             {
                 ControllerManager.GyroAimingEnabled = true;
                 UpdateGyroStatus();
             });
 
-            btnGyroOff = CreateCompactButton("Off", 60, 28, 9.0F, () =>
+            btnGyroOff = CreateCompactButton("Off", 60, 24, 8.5F, () =>
             {
                 ControllerManager.GyroAimingEnabled = false;
                 UpdateGyroStatus();
@@ -547,15 +547,15 @@ namespace HandheldCompanion.Views
             Button btnReset = new Button
             {
                 Text = "Reset All",
-                Size = new Size(90, 28),
-                Font = new Font("Segoe UI", 9.0F, FontStyle.Regular),
+                Size = new Size(90, 24),
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Regular),
                 Cursor = Cursors.Hand,
                 FlatStyle = FlatStyle.Flat,
                 BackColor = Color.FromArgb(245, 247, 250),
                 ForeColor = Color.FromArgb(40, 45, 55)
             };
             btnReset.FlatAppearance.BorderColor = Color.FromArgb(210, 215, 222);
-            _managedButtons.Add(new ManagedButtonSpec { Button = btnReset, BaseWidth = 90, BaseHeight = 28, BaseFontSize = 9.0F });
+            _managedButtons.Add(new ManagedButtonSpec { Button = btnReset, BaseWidth = 90, BaseHeight = 24, BaseFontSize = 8.5F });
             btnReset.Click += (s, e) =>
             {
                 var confirm = MessageBox.Show(
@@ -904,19 +904,71 @@ namespace HandheldCompanion.Views
 
                     spec.Button.Size = new Size(scaledW, scaledH);
                     bool isBold = spec.Button.Font?.Bold ?? false;
-                    float scaledFontSize = spec.BaseFontSize * (1.0f + (scale - 1.0f) * 0.42f);
+                    float scaledFontSize = spec.BaseFontSize * scale;
                     spec.Button.Font = new Font("Segoe UI", scaledFontSize, isBold ? FontStyle.Bold : FontStyle.Regular);
                 }
 
                 // Scale GroupBox headers
-                float headerFontSize = 8.5f * (1.0f + (scale - 1.0f) * 0.35f);
+                float headerFontSize = 8.5f * scale;
                 if (grpGyro != null) grpGyro.Font = new Font("Segoe UI", headerFontSize, FontStyle.Bold);
                 if (grpHoldCycle != null) grpHoldCycle.Font = new Font("Segoe UI", headerFontSize, FontStyle.Bold);
                 if (grpRemap != null) grpRemap.Font = new Font("Segoe UI", headerFontSize, FontStyle.Bold);
+
+                if (lblGyroStatus != null) lblGyroStatus.Font = new Font("Segoe UI", 8.0f * scale, FontStyle.Regular);
+
+                // Scale Hold to Cycle controls
+                if (chkHoldCycleEnabled != null) chkHoldCycleEnabled.Font = new Font("Segoe UI", 8.5f * scale, FontStyle.Regular);
+                if (cmbTriggerBtn != null)
+                {
+                    cmbTriggerBtn.Font = new Font("Segoe UI", 8.5f * scale, FontStyle.Regular);
+                    cmbTriggerBtn.Width = (int)Math.Round(160 * scale);
+                }
+                if (numHoldTime != null)
+                {
+                    numHoldTime.Font = new Font("Segoe UI", 8.5f * scale, FontStyle.Regular);
+                    numHoldTime.Width = (int)Math.Round(55 * scale);
+                }
+                if (chkCycleDesktop != null) chkCycleDesktop.Font = new Font("Segoe UI", 8.5f * scale, FontStyle.Regular);
+                if (chkCycleX360 != null) chkCycleX360.Font = new Font("Segoe UI", 8.5f * scale, FontStyle.Regular);
+                if (chkCycleDS4 != null) chkCycleDS4.Font = new Font("Segoe UI", 8.5f * scale, FontStyle.Regular);
+                if (chkCycleNative != null) chkCycleNative.Font = new Font("Segoe UI", 8.5f * scale, FontStyle.Regular);
+                if (lblCycleSummary != null) lblCycleSummary.Font = new Font("Segoe UI", 8.0f * scale, FontStyle.Bold);
+
+                // Scale Remapping dropdowns and steppers
+                foreach (var (typeCombo, targetCombo, chkRepeat, numRate) in _mappingControls.Values)
+                {
+                    if (typeCombo != null) typeCombo.Font = new Font("Segoe UI", 8.5f * scale, FontStyle.Regular);
+                    if (targetCombo != null) targetCombo.Font = new Font("Segoe UI", 8.5f * scale, FontStyle.Regular);
+                    if (chkRepeat != null) chkRepeat.Font = new Font("Segoe UI", 8.0f * scale, FontStyle.Regular);
+                    if (numRate != null)
+                    {
+                        numRate.Font = new Font("Segoe UI", 8.0f * scale, FontStyle.Regular);
+                        numRate.Width = (int)Math.Round(46 * scale);
+                    }
+                }
+
+                ScaleChildLabels(grpHoldCycle, scale);
+                ScaleChildLabels(grpRemap, scale);
             }
             finally
             {
                 this.ResumeLayout(true);
+            }
+        }
+
+        private static void ScaleChildLabels(Control? parent, float scale)
+        {
+            if (parent == null) return;
+            foreach (Control c in parent.Controls)
+            {
+                if (c is Label lbl && c.Name != "lblCycleSummary" && c.Name != "lblGyroStatus")
+                {
+                    lbl.Font = new Font("Segoe UI", 8.5f * scale, FontStyle.Regular);
+                }
+                else if (c.HasChildren)
+                {
+                    ScaleChildLabels(c, scale);
+                }
             }
         }
 

@@ -125,22 +125,22 @@ namespace HandheldCompanion.Views
                 Padding = new Padding(1)
             };
 
-            btnDS4 = CreateCompactButton("DS4", 76, 32, 9.5F, async () =>
+            btnDS4 = CreateCompactButton("DS4", 76, 24, 8.5F, async () =>
             {
                 await ControllerModeService.ApplyMode(ControllerTargetMode.DS4);
             });
 
-            btnX360 = CreateCompactButton("x360", 76, 32, 9.5F, async () =>
+            btnX360 = CreateCompactButton("x360", 76, 24, 8.5F, async () =>
             {
                 await ControllerModeService.ApplyMode(ControllerTargetMode.X360);
             });
 
-            btnNative = CreateCompactButton("Native", 76, 32, 9.5F, async () =>
+            btnNative = CreateCompactButton("Native", 76, 24, 8.5F, async () =>
             {
                 await ControllerModeService.ApplyMode(ControllerTargetMode.Native);
             });
 
-            btnDesktop = CreateCompactButton("Desktop", 76, 32, 9.5F, async () =>
+            btnDesktop = CreateCompactButton("Desktop", 76, 24, 8.5F, async () =>
             {
                 await ControllerModeService.ApplyMode(ControllerTargetMode.Desktop);
             });
@@ -180,7 +180,7 @@ namespace HandheldCompanion.Views
             for (int i = 0; i < tdpValues.Length; i++)
             {
                 int wattage = tdpValues[i];
-                Button b = CreateCompactButton(wattage + "W", 48, 28, 9.0F, () => ApplyTdp(wattage));
+                Button b = CreateCompactButton(wattage + "W", 48, 24, 8.5F, () => ApplyTdp(wattage));
                 tdpButtons[i] = b;
                 flowTdp.Controls.Add(b);
             }
@@ -209,8 +209,8 @@ namespace HandheldCompanion.Views
                 Padding = new Padding(1)
             };
 
-            btnFanAuto = CreateCompactButton("Auto", 60, 28, 9.0F, () => ApplyFanMode("Auto (Balanced)", 0, false, true, btnFanAuto));
-            btnFanFull = CreateCompactButton("100%", 60, 28, 9.0F, () => ApplyFanMode("Full Speed (100%)", 100, true, false, btnFanFull));
+            btnFanAuto = CreateCompactButton("Auto", 60, 24, 8.5F, () => ApplyFanMode("Auto (Balanced)", 0, false, true, btnFanAuto));
+            btnFanFull = CreateCompactButton("100%", 60, 24, 8.5F, () => ApplyFanMode("Full Speed (100%)", 100, true, false, btnFanFull));
 
             flowFan.Controls.Add(btnFanAuto);
             flowFan.Controls.Add(btnFanFull);
@@ -221,7 +221,7 @@ namespace HandheldCompanion.Views
             {
                 int spd = fanSpeeds[i];
                 Button b = null;
-                b = CreateCompactButton(spd + "%", 48, 28, 9.0F, () => ApplyFanMode(spd + "% Fixed", spd, false, false, b));
+                b = CreateCompactButton(spd + "%", 48, 24, 8.5F, () => ApplyFanMode(spd + "% Fixed", spd, false, false, b));
                 fanSpeedButtons[i] = b;
                 flowFan.Controls.Add(b);
             }
@@ -256,7 +256,7 @@ namespace HandheldCompanion.Views
                 var preset = ResolutionPresets[i];
                 int w = preset.Width;
                 int h = preset.Height;
-                Button b = CreateCompactButton(preset.Label, 70, 30, 9.5F, () => ApplyResolution(w, h));
+                Button b = CreateCompactButton(preset.Label, 70, 24, 8.5F, () => ApplyResolution(w, h));
                 resolutionButtons[i] = b;
                 flowResolution.Controls.Add(b);
             }
@@ -363,13 +363,13 @@ namespace HandheldCompanion.Views
 
                     spec.Button.Size = new Size(scaledW, scaledH);
                     bool isBold = spec.Button.Font?.Bold ?? false;
-                    // Font scales smoothly with scale factor
-                    float scaledFontSize = spec.BaseFontSize * (1.0f + (scale - 1.0f) * 0.42f);
+                    // 1:1 proportional font scaling
+                    float scaledFontSize = spec.BaseFontSize * scale;
                     spec.Button.Font = new Font("Segoe UI", scaledFontSize, isBold ? FontStyle.Bold : FontStyle.Regular);
                 }
 
                 // Scale GroupBox headers and status labels
-                float headerFontSize = 8.5f * (1.0f + (scale - 1.0f) * 0.35f);
+                float headerFontSize = 8.5f * scale;
                 if (grpController != null) grpController.Font = new Font("Segoe UI", headerFontSize, FontStyle.Bold);
                 if (grpTdp != null) grpTdp.Font = new Font("Segoe UI", headerFontSize, FontStyle.Bold);
                 if (grpFan != null) grpFan.Font = new Font("Segoe UI", headerFontSize, FontStyle.Bold);
@@ -377,7 +377,7 @@ namespace HandheldCompanion.Views
 
                 if (lblResStatus != null)
                 {
-                    float statusFontSize = 8.0f * (1.0f + (scale - 1.0f) * 0.35f);
+                    float statusFontSize = 8.0f * scale;
                     lblResStatus.Font = new Font("Segoe UI", statusFontSize, FontStyle.Regular);
                 }
             }
