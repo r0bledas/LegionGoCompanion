@@ -85,53 +85,22 @@ namespace HandheldCompanion.Views
 
             btnDS4 = CreateCompactButton("DS4", 52, 26, async () =>
             {
-                PlayDisconnectSound();
-                ManagerFactory.settingsManager.SetProperty("HIDcloakonconnect", true);
-                ControllerManager.TargetController?.Hide(false);
-                SetLegionPassthrough(false);
-                ManagerFactory.layoutManager.SetLayoutMode(LayoutModes.Gamepad);
-                bool modeChanged = await VirtualManager.SetControllerMode(HIDmode.DualShock4Controller);
-                await VirtualManager.SetControllerStatus(HIDstatus.Connected);
-                PlayConnectSound();
-                HighlightControllerButton(btnDS4);
+                await ControllerModeService.ApplyMode(ControllerTargetMode.DS4);
             });
 
             btnX360 = CreateCompactButton("x360", 52, 26, async () =>
             {
-                PlayDisconnectSound();
-                ManagerFactory.settingsManager.SetProperty("HIDcloakonconnect", true);
-                ControllerManager.TargetController?.Hide(false);
-                SetLegionPassthrough(false);
-                ManagerFactory.layoutManager.SetLayoutMode(LayoutModes.Gamepad);
-                bool modeChanged = await VirtualManager.SetControllerMode(HIDmode.Xbox360Controller);
-                await VirtualManager.SetControllerStatus(HIDstatus.Connected);
-                PlayConnectSound();
-                HighlightControllerButton(btnX360);
+                await ControllerModeService.ApplyMode(ControllerTargetMode.X360);
             });
 
             btnNative = CreateCompactButton("Native", 58, 26, async () =>
             {
-                PlayDisconnectSound();
-                await VirtualManager.SetControllerMode(HIDmode.NoController);
-                await VirtualManager.SetControllerStatus(HIDstatus.Disconnected);
-                ManagerFactory.settingsManager.SetProperty("HIDcloakonconnect", false);
-                ControllerManager.TargetController?.Unhide(false);
-                SetLegionPassthrough(true);
-                ManagerFactory.layoutManager.SetLayoutMode(LayoutModes.Gamepad);
-                PlayConnectSound();
-                HighlightControllerButton(btnNative);
+                await ControllerModeService.ApplyMode(ControllerTargetMode.Native);
             });
 
             btnDesktop = CreateCompactButton("Desktop", 62, 26, async () =>
             {
-                PlayConnectSound();
-                ManagerFactory.settingsManager.SetProperty("HIDcloakonconnect", true);
-                ControllerManager.TargetController?.Hide(false);
-                SetLegionPassthrough(false);
-                await VirtualManager.SetControllerMode(HIDmode.NoController);
-                await VirtualManager.SetControllerStatus(HIDstatus.Disconnected);
-                ManagerFactory.layoutManager.SetLayoutMode(LayoutModes.Desktop);
-                HighlightControllerButton(btnDesktop);
+                await ControllerModeService.ApplyMode(ControllerTargetMode.Desktop);
             });
 
             flowController.Controls.Add(btnDS4);
@@ -291,6 +260,12 @@ namespace HandheldCompanion.Views
                 };
             }
 
+            ControllerModeService.ModeChanged += (mode) =>
+            {
+                if (this.IsHandleCreated && !this.IsDisposed)
+                    this.BeginInvoke(new Action(UpdateActiveControllerHighlight));
+            };
+
             this.ResumeLayout(false);
         }
 
@@ -387,19 +362,22 @@ namespace HandheldCompanion.Views
 
         private void UpdateActiveControllerHighlight()
         {
-            LayoutModes currentLayoutMode = ManagerFactory.layoutManager.GetCurrentMode();
-            if (currentLayoutMode == LayoutModes.Desktop)
+            var mode = ControllerModeService.GetCurrentMode();
+            switch (mode)
             {
-                HighlightControllerButton(btnDesktop);
-                return;
+                case ControllerTargetMode.Desktop:
+                    HighlightControllerButton(btnDesktop);
+                    break;
+                case ControllerTargetMode.DS4:
+                    HighlightControllerButton(btnDS4);
+                    break;
+                case ControllerTargetMode.X360:
+                    HighlightControllerButton(btnX360);
+                    break;
+                case ControllerTargetMode.Native:
+                    HighlightControllerButton(btnNative);
+                    break;
             }
-
-            if (VirtualManager.HIDmode == HIDmode.DualShock4Controller)
-                HighlightControllerButton(btnDS4);
-            else if (VirtualManager.HIDmode == HIDmode.Xbox360Controller)
-                HighlightControllerButton(btnX360);
-            else
-                HighlightControllerButton(btnNative);
         }
 
         private void HighlightControllerButton(Button selected)

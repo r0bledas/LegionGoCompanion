@@ -20,6 +20,16 @@ namespace HandheldCompanion.Views
         private Button? btnGyroOn;
         private Button? btnGyroOff;
 
+        // Hold to Cycle controls
+        private CheckBox? chkHoldCycleEnabled;
+        private ComboBox? cmbTriggerBtn;
+        private NumericUpDown? numHoldTime;
+        private CheckBox? chkCycleDesktop;
+        private CheckBox? chkCycleX360;
+        private CheckBox? chkCycleDS4;
+        private CheckBox? chkCycleNative;
+        private Label? lblCycleSummary;
+
         // Controls references for live updates and reset
         private readonly Dictionary<ButtonFlags, (ComboBox typeCombo, ComboBox targetCombo, CheckBox chkRepeat, NumericUpDown numRate)> _mappingControls = new();
 
@@ -195,7 +205,178 @@ namespace HandheldCompanion.Views
             grpGyro.Controls.Add(lblGyroStatus);
 
             // ==========================================
-            // 2. Button Remapping GroupBox
+            // 2. Hold to Cycle Controller Modes GroupBox
+            // ==========================================
+            GroupBox grpHoldCycle = new GroupBox
+            {
+                Text = "Hold to Cycle Controller Modes",
+                Dock = DockStyle.Top,
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
+                Padding = new Padding(8, 6, 8, 8),
+                Margin = new Padding(0, 0, 0, 6)
+            };
+
+            FlowLayoutPanel flowTop = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Top,
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                WrapContents = true,
+                Padding = new Padding(2)
+            };
+
+            chkHoldCycleEnabled = new CheckBox
+            {
+                Text = "Enable Hold to Cycle",
+                AutoSize = true,
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Regular),
+                Margin = new Padding(3, 4, 12, 3)
+            };
+
+            Label lblTrigger = new Label
+            {
+                Text = "Trigger Button:",
+                AutoSize = true,
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Regular),
+                ForeColor = Color.FromArgb(40, 45, 55),
+                Margin = new Padding(0, 6, 3, 3)
+            };
+
+            cmbTriggerBtn = new ComboBox
+            {
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Regular),
+                Width = 160,
+                Margin = new Padding(0, 2, 12, 2)
+            };
+            cmbTriggerBtn.Items.Add("(None / Disabled)");
+            foreach (var b in CustomMappingService.RemappableButtons)
+            {
+                cmbTriggerBtn.Items.Add(CustomMappingService.GetButtonDisplayName(b));
+            }
+
+            Label lblHoldTime = new Label
+            {
+                Text = "Hold Time:",
+                AutoSize = true,
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Regular),
+                ForeColor = Color.FromArgb(40, 45, 55),
+                Margin = new Padding(0, 6, 3, 3)
+            };
+
+            numHoldTime = new NumericUpDown
+            {
+                Minimum = 200,
+                Maximum = 2000,
+                Value = 500,
+                Increment = 50,
+                Width = 55,
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Regular),
+                Margin = new Padding(0, 2, 2, 2)
+            };
+
+            Label lblMsHold = new Label
+            {
+                Text = "ms",
+                AutoSize = true,
+                Font = new Font("Segoe UI", 8F, FontStyle.Regular),
+                ForeColor = Color.FromArgb(90, 95, 105),
+                Margin = new Padding(0, 6, 3, 3)
+            };
+
+            flowTop.Controls.Add(chkHoldCycleEnabled);
+            flowTop.Controls.Add(lblTrigger);
+            flowTop.Controls.Add(cmbTriggerBtn);
+            flowTop.Controls.Add(lblHoldTime);
+            flowTop.Controls.Add(numHoldTime);
+            flowTop.Controls.Add(lblMsHold);
+
+            FlowLayoutPanel flowModes = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Top,
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                WrapContents = true,
+                Padding = new Padding(2)
+            };
+
+            Label lblIncluded = new Label
+            {
+                Text = "Cycle through:",
+                AutoSize = true,
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Regular),
+                ForeColor = Color.FromArgb(40, 45, 55),
+                Margin = new Padding(3, 5, 8, 3)
+            };
+
+            chkCycleDesktop = new CheckBox
+            {
+                Text = "Desktop",
+                AutoSize = true,
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Regular),
+                Margin = new Padding(3, 4, 10, 3)
+            };
+
+            chkCycleX360 = new CheckBox
+            {
+                Text = "Xbox 360 (x360)",
+                AutoSize = true,
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Regular),
+                Margin = new Padding(3, 4, 10, 3)
+            };
+
+            chkCycleDS4 = new CheckBox
+            {
+                Text = "DualShock 4 (DS4)",
+                AutoSize = true,
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Regular),
+                Margin = new Padding(3, 4, 10, 3)
+            };
+
+            chkCycleNative = new CheckBox
+            {
+                Text = "Native",
+                AutoSize = true,
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Regular),
+                Margin = new Padding(3, 4, 10, 3)
+            };
+
+            flowModes.Controls.Add(lblIncluded);
+            flowModes.Controls.Add(chkCycleDesktop);
+            flowModes.Controls.Add(chkCycleX360);
+            flowModes.Controls.Add(chkCycleDS4);
+            flowModes.Controls.Add(chkCycleNative);
+
+            lblCycleSummary = new Label
+            {
+                Dock = DockStyle.Top,
+                AutoSize = true,
+                Font = new Font("Segoe UI", 8F, FontStyle.Bold),
+                ForeColor = Color.FromArgb(0, 100, 180),
+                Padding = new Padding(5, 4, 5, 2)
+            };
+
+            Label lblCycleNote = new Label
+            {
+                Dock = DockStyle.Top,
+                AutoSize = true,
+                Font = new Font("Segoe UI", 7.5F, FontStyle.Regular),
+                ForeColor = Color.FromArgb(100, 105, 115),
+                Text = "Hold the trigger button for the set duration to cycle modes. A quick tap (< hold time) performs the button's normal action.",
+                Padding = new Padding(5, 2, 5, 4)
+            };
+
+            InitializeHoldCycleControls();
+
+            grpHoldCycle.Controls.Add(lblCycleNote);
+            grpHoldCycle.Controls.Add(lblCycleSummary);
+            grpHoldCycle.Controls.Add(flowModes);
+            grpHoldCycle.Controls.Add(flowTop);
+
+            // ==========================================
+            // 3. Button Remapping GroupBox
             // ==========================================
             GroupBox grpRemap = new GroupBox
             {
@@ -354,6 +535,7 @@ namespace HandheldCompanion.Views
 
             // Add groups to main scroll panel (dock top in reverse order)
             mainScrollPanel.Controls.Add(grpRemap);
+            mainScrollPanel.Controls.Add(grpHoldCycle);
             mainScrollPanel.Controls.Add(grpGyro);
 
             this.Controls.Add(mainScrollPanel);
@@ -501,6 +683,140 @@ namespace HandheldCompanion.Views
                 chkRepeat.Enabled = allowRepeat;
                 numRate.Enabled = allowRepeat && chkRepeat.Checked;
             }
+
+            // Refresh hold cycle controls
+            var svc = CustomMappingService.Instance;
+            if (chkHoldCycleEnabled != null) chkHoldCycleEnabled.Checked = svc.HoldCycleEnabled;
+            if (numHoldTime != null) numHoldTime.Value = Math.Clamp(svc.HoldCycleDurationMs, 200, 2000);
+            if (chkCycleDesktop != null) chkCycleDesktop.Checked = svc.CycleDesktop;
+            if (chkCycleX360 != null) chkCycleX360.Checked = svc.CycleX360;
+            if (chkCycleDS4 != null) chkCycleDS4.Checked = svc.CycleDS4;
+            if (chkCycleNative != null) chkCycleNative.Checked = svc.CycleNative;
+            if (cmbTriggerBtn != null)
+            {
+                int idx = Array.IndexOf(CustomMappingService.RemappableButtons, svc.HoldCycleButton);
+                cmbTriggerBtn.SelectedIndex = idx >= 0 ? idx + 1 : 0;
+            }
+            UpdateHoldCycleControlStates();
+            UpdateCycleSummary();
+        }
+
+        private void InitializeHoldCycleControls()
+        {
+            if (chkHoldCycleEnabled == null || cmbTriggerBtn == null || numHoldTime == null ||
+                chkCycleDesktop == null || chkCycleX360 == null || chkCycleDS4 == null || chkCycleNative == null)
+                return;
+
+            var svc = CustomMappingService.Instance;
+
+            chkHoldCycleEnabled.Checked = svc.HoldCycleEnabled;
+            numHoldTime.Value = Math.Clamp(svc.HoldCycleDurationMs, 200, 2000);
+            chkCycleDesktop.Checked = svc.CycleDesktop;
+            chkCycleX360.Checked = svc.CycleX360;
+            chkCycleDS4.Checked = svc.CycleDS4;
+            chkCycleNative.Checked = svc.CycleNative;
+
+            if (svc.HoldCycleButton == ButtonFlags.None)
+            {
+                cmbTriggerBtn.SelectedIndex = 0;
+            }
+            else
+            {
+                int idx = Array.IndexOf(CustomMappingService.RemappableButtons, svc.HoldCycleButton);
+                cmbTriggerBtn.SelectedIndex = idx >= 0 ? idx + 1 : 0;
+            }
+
+            UpdateHoldCycleControlStates();
+            UpdateCycleSummary();
+
+            chkHoldCycleEnabled.CheckedChanged += (s, e) =>
+            {
+                UpdateHoldCycleControlStates();
+                SaveHoldCycleConfig();
+            };
+
+            cmbTriggerBtn.SelectedIndexChanged += (s, e) => SaveHoldCycleConfig();
+            numHoldTime.ValueChanged += (s, e) => SaveHoldCycleConfig();
+
+            Action<CheckBox> onModeCheckChanged = (cb) =>
+            {
+                int count = (chkCycleDesktop.Checked ? 1 : 0) +
+                            (chkCycleX360.Checked ? 1 : 0) +
+                            (chkCycleDS4.Checked ? 1 : 0) +
+                            (chkCycleNative.Checked ? 1 : 0);
+                if (count < 2)
+                {
+                    cb.Checked = true;
+                    MessageBox.Show("Please keep at least 2 modes selected for cycling.", "Cycle Controller Modes", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
+
+                UpdateCycleSummary();
+                SaveHoldCycleConfig();
+            };
+
+            chkCycleDesktop.CheckedChanged += (s, e) => onModeCheckChanged(chkCycleDesktop);
+            chkCycleX360.CheckedChanged += (s, e) => onModeCheckChanged(chkCycleX360);
+            chkCycleDS4.CheckedChanged += (s, e) => onModeCheckChanged(chkCycleDS4);
+            chkCycleNative.CheckedChanged += (s, e) => onModeCheckChanged(chkCycleNative);
+        }
+
+        private void UpdateHoldCycleControlStates()
+        {
+            if (chkHoldCycleEnabled == null) return;
+            bool enabled = chkHoldCycleEnabled.Checked;
+            if (cmbTriggerBtn != null) cmbTriggerBtn.Enabled = enabled;
+            if (numHoldTime != null) numHoldTime.Enabled = enabled;
+            if (chkCycleDesktop != null) chkCycleDesktop.Enabled = enabled;
+            if (chkCycleX360 != null) chkCycleX360.Enabled = enabled;
+            if (chkCycleDS4 != null) chkCycleDS4.Enabled = enabled;
+            if (chkCycleNative != null) chkCycleNative.Enabled = enabled;
+        }
+
+        private void UpdateCycleSummary()
+        {
+            if (lblCycleSummary == null || chkCycleDesktop == null || chkCycleX360 == null || chkCycleDS4 == null || chkCycleNative == null)
+                return;
+
+            var modes = new List<string>();
+            if (chkCycleDesktop.Checked) modes.Add("Desktop");
+            if (chkCycleDS4.Checked) modes.Add("DS4");
+            if (chkCycleX360.Checked) modes.Add("x360");
+            if (chkCycleNative.Checked) modes.Add("Native");
+
+            if (modes.Count >= 2)
+            {
+                lblCycleSummary.Text = "Cycle sequence: " + string.Join(" -> ", modes) + " -> " + modes[0];
+                lblCycleSummary.ForeColor = Color.FromArgb(0, 100, 180);
+            }
+            else
+            {
+                lblCycleSummary.Text = "Select at least 2 modes to cycle between.";
+                lblCycleSummary.ForeColor = Color.FromArgb(180, 50, 50);
+            }
+        }
+
+        private void SaveHoldCycleConfig()
+        {
+            if (chkHoldCycleEnabled == null || cmbTriggerBtn == null || numHoldTime == null ||
+                chkCycleDesktop == null || chkCycleX360 == null || chkCycleDS4 == null || chkCycleNative == null)
+                return;
+
+            ButtonFlags selectedBtn = ButtonFlags.None;
+            if (cmbTriggerBtn.SelectedIndex > 0 && cmbTriggerBtn.SelectedIndex - 1 < CustomMappingService.RemappableButtons.Length)
+            {
+                selectedBtn = CustomMappingService.RemappableButtons[cmbTriggerBtn.SelectedIndex - 1];
+            }
+
+            CustomMappingService.Instance.SetHoldCycleConfig(
+                chkHoldCycleEnabled.Checked,
+                selectedBtn,
+                (int)numHoldTime.Value,
+                chkCycleDesktop.Checked,
+                chkCycleX360.Checked,
+                chkCycleDS4.Checked,
+                chkCycleNative.Checked
+            );
         }
 
         protected override void OnVisibleChanged(EventArgs e)

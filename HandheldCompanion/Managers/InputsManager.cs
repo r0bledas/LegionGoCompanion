@@ -747,6 +747,9 @@ public static class InputsManager
     }
 
     private static readonly ButtonState _rawPrevButtonState = new();
+    private static readonly Dictionary<ButtonFlags, long> _buttonDownTime = new();
+    private static readonly Dictionary<ButtonFlags, bool> _buttonHoldTriggered = new();
+    private static readonly Dictionary<ButtonFlags, long> _buttonNextRepeatTime = new();
 
     private static void UpdateInputs(ControllerState controllerState, bool IsMapped)
     {
@@ -754,22 +757,90 @@ public static class InputsManager
         if (IsMapped)
             return;
 
-        // Check rising edge for custom remappable buttons and actions
+        long now = Environment.TickCount64;
+
+        // Check rising/falling edge and hold detection for custom remappable buttons and actions
         foreach (var btn in CustomMappingService.RemappableButtons)
         {
             bool isDown = controllerState.ButtonState[btn];
             bool wasDown = _rawPrevButtonState[btn];
 
-            if (isDown && !wasDown)
+            var mapping = CustomMappingService.Instance.GetMapping(btn);
+            bool isHoldCycleButton = (CustomMappingService.Instance.HoldCycleEnabled && CustomMappingService.Instance.HoldCycleButton == btn)
+                || (mapping.TargetType == MappingType.Action && mapping.TargetAction == CustomActionType.CycleControllerMode);
+
+            if (isHoldCycleButton)
             {
-                var mapping = CustomMappingService.Instance.GetMapping(btn);
-                if (mapping.TargetType == MappingType.Action)
+                if (isDown && !wasDown)
                 {
-                    CustomMappingService.ExecuteAction(mapping.TargetAction);
+                    // Rising edge: record press start time
+                    _buttonDownTime[btn] = now;
+                    _buttonHoldTriggered[btn] = false;
+                    _buttonNextRepeatTime[btn] = now + CustomMappingService.Instance.HoldCycleDurationMs;
                 }
-                else if (mapping.TargetType == MappingType.None && (btn == ButtonFlags.OEM1 || btn == ButtonFlags.OEM2))
+                else if (isDown && wasDown)
                 {
-                    MainForm.ToggleOrShowWindow();
+                    // Button is currently being held down
+                    if (_buttonDownTime.TryGetValue(btn, out long downTime))
+                    {
+                        if (!_buttonHoldTriggered.TryGetValue(btn, out bool triggered) || !triggered)
+                        {
+                            if (now - downTime >= CustomMappingService.Instance.HoldCycleDurationMs)
+                            {
+                                _buttonHoldTriggered[btn] = true;
+                                _buttonNextRepeatTime[btn] = now + 1200; // Continuous hold repeat: 1200ms
+                                ControllerModeService.CycleToNextMode();
+                            }
+                        }
+                        else
+                        {
+                            // Hold already triggered, check continuous hold repeat
+                            if (_buttonNextRepeatTime.TryGetValue(btn, out long nextRepeat) && now >= nextRepeat)
+                            {
+                                _buttonNextRepeatTime[btn] = now + 1200;
+                                ControllerModeService.CycleToNextMode();
+                            }
+                        }
+                    }
+                }
+                else if (!isDown && wasDown)
+                {
+                    // Falling edge: button was released
+                    bool holdTriggered = _buttonHoldTriggered.TryGetValue(btn, out bool trig) && trig;
+                    _buttonDownTime.Remove(btn);
+                    _buttonHoldTriggered.Remove(btn);
+                    _buttonNextRepeatTime.Remove(btn);
+
+                    // If released before hold threshold, execute normal tap action
+                    if (!holdTriggered)
+                    {
+                        if (mapping.TargetType == MappingType.Action)
+                        {
+                            if (mapping.TargetAction != CustomActionType.CycleControllerMode)
+                            {
+                                CustomMappingService.ExecuteAction(mapping.TargetAction);
+                            }
+                        }
+                        else if (mapping.TargetType == MappingType.None && (btn == ButtonFlags.OEM1 || btn == ButtonFlags.OEM2))
+                        {
+                            MainForm.ToggleOrShowWindow();
+                        }
+                    }
+                }
+            }
+            else
+            {
+                // Normal button without hold-cycle: execute immediately on key down
+                if (isDown && !wasDown)
+                {
+                    if (mapping.TargetType == MappingType.Action)
+                    {
+                        CustomMappingService.ExecuteAction(mapping.TargetAction);
+                    }
+                    else if (mapping.TargetType == MappingType.None && (btn == ButtonFlags.OEM1 || btn == ButtonFlags.OEM2))
+                    {
+                        MainForm.ToggleOrShowWindow();
+                    }
                 }
             }
         }

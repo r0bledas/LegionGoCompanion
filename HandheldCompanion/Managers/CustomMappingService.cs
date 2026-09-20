@@ -31,7 +31,20 @@ namespace HandheldCompanion.Managers
         HideWindow = 4,
         Fan100 = 5,
         FanAuto = 6,
-        ToggleGyro = 7
+        ToggleGyro = 7,
+        CycleControllerMode = 8
+    }
+
+    public class CustomMappingConfigFile
+    {
+        public bool HoldCycleEnabled { get; set; } = false;
+        public ButtonFlags HoldCycleButton { get; set; } = ButtonFlags.None;
+        public int HoldCycleDurationMs { get; set; } = 500;
+        public bool CycleDesktop { get; set; } = true;
+        public bool CycleX360 { get; set; } = true;
+        public bool CycleDS4 { get; set; } = false;
+        public bool CycleNative { get; set; } = false;
+        public List<MappingItem> Mappings { get; set; } = new();
     }
 
     public class MappingItem
@@ -70,6 +83,7 @@ namespace HandheldCompanion.Managers
             (CustomActionType.ToggleWindow, "Toggle Window"),
             (CustomActionType.ToggleFan, "Toggle Fan"),
             (CustomActionType.ToggleGyro, "Toggle Gyro"),
+            (CustomActionType.CycleControllerMode, "Cycle Controller Mode (Hold)"),
             (CustomActionType.ShowWindow, "Show Window"),
             (CustomActionType.HideWindow, "Hide Window"),
             (CustomActionType.Fan100, "Fan 100%"),
@@ -81,6 +95,14 @@ namespace HandheldCompanion.Managers
         private Dictionary<ButtonFlags, MappingItem> _mappings = new();
         private static bool _isFanFullSpeed = false;
 
+        public bool HoldCycleEnabled { get; set; } = false;
+        public ButtonFlags HoldCycleButton { get; set; } = ButtonFlags.None;
+        public int HoldCycleDurationMs { get; set; } = 500;
+        public bool CycleDesktop { get; set; } = true;
+        public bool CycleX360 { get; set; } = true;
+        public bool CycleDS4 { get; set; } = false;
+        public bool CycleNative { get; set; } = false;
+
         public CustomMappingService()
         {
             string appData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
@@ -88,6 +110,39 @@ namespace HandheldCompanion.Managers
             Directory.CreateDirectory(dir);
             _filePath = Path.Combine(dir, "custom_mappings.json");
             Load();
+        }
+
+        public List<ControllerTargetMode> GetEnabledCycleModes()
+        {
+            lock (_lock)
+            {
+                var list = new List<ControllerTargetMode>();
+                if (CycleDesktop) list.Add(ControllerTargetMode.Desktop);
+                if (CycleDS4) list.Add(ControllerTargetMode.DS4);
+                if (CycleX360) list.Add(ControllerTargetMode.X360);
+                if (CycleNative) list.Add(ControllerTargetMode.Native);
+                if (list.Count == 0)
+                {
+                    list.Add(ControllerTargetMode.Desktop);
+                    list.Add(ControllerTargetMode.X360);
+                }
+                return list;
+            }
+        }
+
+        public void SetHoldCycleConfig(bool enabled, ButtonFlags button, int durationMs, bool desktop, bool x360, bool ds4, bool @native)
+        {
+            lock (_lock)
+            {
+                HoldCycleEnabled = enabled;
+                HoldCycleButton = button;
+                HoldCycleDurationMs = Math.Clamp(durationMs, 200, 2000);
+                CycleDesktop = desktop;
+                CycleX360 = x360;
+                CycleDS4 = ds4;
+                CycleNative = @native;
+            }
+            Save();
         }
 
         public void Load()
@@ -117,14 +172,42 @@ namespace HandheldCompanion.Managers
                     if (File.Exists(_filePath))
                     {
                         string json = File.ReadAllText(_filePath);
-                        var loaded = JsonConvert.DeserializeObject<List<MappingItem>>(json);
-                        if (loaded != null)
+                        if (json.TrimStart().StartsWith("["))
                         {
-                            foreach (var item in loaded)
+                            var loaded = JsonConvert.DeserializeObject<List<MappingItem>>(json);
+                            if (loaded != null)
                             {
-                                if (_mappings.ContainsKey(item.PhysicalButton))
+                                foreach (var item in loaded)
                                 {
-                                    _mappings[item.PhysicalButton] = item;
+                                    if (_mappings.ContainsKey(item.PhysicalButton))
+                                    {
+                                        _mappings[item.PhysicalButton] = item;
+                                    }
+                                }
+                            }
+                        }
+                        else
+                        {
+                            var config = JsonConvert.DeserializeObject<CustomMappingConfigFile>(json);
+                            if (config != null)
+                            {
+                                HoldCycleEnabled = config.HoldCycleEnabled;
+                                HoldCycleButton = config.HoldCycleButton;
+                                HoldCycleDurationMs = config.HoldCycleDurationMs >= 200 ? config.HoldCycleDurationMs : 500;
+                                CycleDesktop = config.CycleDesktop;
+                                CycleX360 = config.CycleX360;
+                                CycleDS4 = config.CycleDS4;
+                                CycleNative = config.CycleNative;
+
+                                if (config.Mappings != null)
+                                {
+                                    foreach (var item in config.Mappings)
+                                    {
+                                        if (_mappings.ContainsKey(item.PhysicalButton))
+                                        {
+                                            _mappings[item.PhysicalButton] = item;
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -145,7 +228,18 @@ namespace HandheldCompanion.Managers
             {
                 try
                 {
-                    string json = JsonConvert.SerializeObject(_mappings.Values.ToList(), Formatting.Indented);
+                    var config = new CustomMappingConfigFile
+                    {
+                        HoldCycleEnabled = HoldCycleEnabled,
+                        HoldCycleButton = HoldCycleButton,
+                        HoldCycleDurationMs = HoldCycleDurationMs,
+                        CycleDesktop = CycleDesktop,
+                        CycleX360 = CycleX360,
+                        CycleDS4 = CycleDS4,
+                        CycleNative = CycleNative,
+                        Mappings = _mappings.Values.ToList()
+                    };
+                    string json = JsonConvert.SerializeObject(config, Formatting.Indented);
                     File.WriteAllText(_filePath, json);
                 }
                 catch (Exception ex)
@@ -168,6 +262,10 @@ namespace HandheldCompanion.Managers
                     {
                         RemappedButtons.Add(kv.Key);
                     }
+                }
+                if (HoldCycleEnabled && HoldCycleButton != ButtonFlags.None)
+                {
+                    RemappedButtons.Add(HoldCycleButton);
                 }
             }
         }
@@ -233,6 +331,14 @@ namespace HandheldCompanion.Managers
                         _mappings[btn] = new MappingItem { PhysicalButton = btn, TargetType = MappingType.None };
                     }
                 }
+
+                HoldCycleEnabled = false;
+                HoldCycleButton = ButtonFlags.None;
+                HoldCycleDurationMs = 500;
+                CycleDesktop = true;
+                CycleX360 = true;
+                CycleDS4 = false;
+                CycleNative = false;
             }
             Save();
             ApplyMappings();
@@ -297,6 +403,9 @@ namespace HandheldCompanion.Managers
                             SystemSounds.Exclamation.Play();
                         else
                             SystemSounds.Asterisk.Play();
+                        break;
+                    case CustomActionType.CycleControllerMode:
+                        ControllerModeService.CycleToNextMode();
                         break;
                 }
             }
