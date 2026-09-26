@@ -1,4 +1,4 @@
-﻿using hidapi;
+using hidapi;
 using System;
 
 namespace controller_hidapi.net
@@ -29,8 +29,18 @@ namespace controller_hidapi.net
             };
         }
 
+        protected readonly byte[] _lastBuffer = new byte[64];
+        public byte[] LastBuffer => _lastBuffer;
+
         internal virtual void OnInputReceived(HidDeviceInputReceivedEventArgs e)
         {
+            if (e.Buffer != null)
+            {
+                lock (_lastBuffer)
+                {
+                    Buffer.BlockCopy(e.Buffer, 0, _lastBuffer, 0, Math.Min(e.Buffer.Length, _lastBuffer.Length));
+                }
+            }
             OnControllerInputReceived?.Invoke(e.Buffer);
         }
 

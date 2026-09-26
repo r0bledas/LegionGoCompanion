@@ -72,13 +72,13 @@ namespace HandheldCompanion.Controllers.Lenovo
         public byte LCONTROLLER_STATE_IDX { get; protected set; } = 12;
         public byte RCONTROLLER_STATE_IDX { get; protected set; } = 13;
 
-        private byte LCONTROLLER_TIMESTAMP = 32;
-        private byte LCONTROLLER_ACCE_IDX = 35;
-        private byte LCONTROLLER_GYRO_IDX = 41;
+        protected byte LCONTROLLER_TIMESTAMP = 32;
+        protected byte LCONTROLLER_ACCE_IDX = 35;
+        protected byte LCONTROLLER_GYRO_IDX = 41;
 
-        private byte RCONTROLLER_TIMESTAMP = 45;
-        private byte RCONTROLLER_ACCE_IDX = 48;
-        private byte RCONTROLLER_GYRO_IDX = 54;
+        protected byte RCONTROLLER_TIMESTAMP = 45;
+        protected byte RCONTROLLER_ACCE_IDX = 48;
+        protected byte RCONTROLLER_GYRO_IDX = 54;
 
         #region TouchVariables
         private bool touchpadTouched = false;
@@ -95,8 +95,6 @@ namespace HandheldCompanion.Controllers.Lenovo
         private int lastTapX, lastTapY;
         private int lastKnownX, lastKnownY;
         #endregion
-
-        public override bool IsReady => IsWireless() || IsWired();
 
         public LegionController() : base()
         {
@@ -144,49 +142,82 @@ namespace HandheldCompanion.Controllers.Lenovo
             SourceAxis.Add(AxisLayoutFlags.Gyroscope);
         }
 
+        protected bool isMisaligned = false;
+
         public byte GetLeftControllerStatus()
         {
-            if (Controller != null)
-            {
-                byte status = Controller.GetStatus(LCONTROLLER_STATE_IDX);
-                if (status != 0) return status;
-            }
-            if (data != null && data.Length > LCONTROLLER_STATE_IDX)
+            IsHidReportMisaligned();
+            if (data != null && data.Length > LCONTROLLER_STATE_IDX && data[LCONTROLLER_STATE_IDX] != 0)
                 return data[LCONTROLLER_STATE_IDX];
+            if (Controller != null)
+                return Controller.GetStatus(LCONTROLLER_STATE_IDX);
             return 0;
         }
 
         public byte GetRightControllerStatus()
         {
-            if (Controller != null)
-            {
-                byte status = Controller.GetStatus(RCONTROLLER_STATE_IDX);
-                if (status != 0) return status;
-            }
-            if (data != null && data.Length > RCONTROLLER_STATE_IDX)
+            IsHidReportMisaligned();
+            if (data != null && data.Length > RCONTROLLER_STATE_IDX && data[RCONTROLLER_STATE_IDX] != 0)
                 return data[RCONTROLLER_STATE_IDX];
+            if (Controller != null)
+                return Controller.GetStatus(RCONTROLLER_STATE_IDX);
             return 0;
         }
 
         public bool IsLeftWired => GetLeftControllerStatus() == (byte)ControllerState.Wired;
         public bool IsLeftWireless => GetLeftControllerStatus() == (byte)ControllerState.Wireless;
-        public bool IsLeftConnected => IsLeftWired || IsLeftWireless;
+        public virtual bool IsLeftConnected => IsLeftWired || IsLeftWireless;
 
         public bool IsRightWired => GetRightControllerStatus() == (byte)ControllerState.Wired;
         public bool IsRightWireless => GetRightControllerStatus() == (byte)ControllerState.Wireless;
-        public bool IsRightConnected => IsRightWired || IsRightWireless;
+        public virtual bool IsRightConnected => IsRightWired || IsRightWireless;
 
         public bool IsRightDetached => IsRightWireless || (Details != null && Details.isDongle) || IsRightConnected || GetRightControllerStatus() != (byte)ControllerState.Wired;
 
         public bool IsWired() => IsLeftWired || IsRightWired;
 
-        public override bool IsWireless() => IsLeftWireless || IsRightWireless;
+        public override bool IsWireless() => IsLeftWireless || IsRightWireless || IsDongle() || IsBluetooth();
+
+        public override bool IsReady => IsWireless() || IsWired() || IsConnected();
 
         /// <summary>
         /// Detects if the HID report is misaligned (borked state).
-        /// When byte 1 equals 0, the report is shifted by 2 bytes.
+        /// When byte 1 equals 0 while data is present, the report is shifted by 2 bytes.
         /// </summary>
-        public bool IsHidReportMisaligned() => Controller?.GetStatus(1) == 0;
+        public bool IsHidReportMisaligned()
+        {
+            if (isMisaligned) return true;
+            if (data != null && data.Length > 2 && data[1] == 0)
+            {
+                for (int i = 2; i < data.Length; i++)
+                {
+                    if (data[i] != 0)
+                    {
+                        ApplyMisalignmentShift();
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        public void ApplyMisalignmentShift()
+        {
+            if (isMisaligned) return;
+            isMisaligned = true;
+            LogManager.LogWarning("Legion Controller HID report misalignment detected. Adjusting offsets.");
+            LCONTROLLER_STATE_IDX = 10;
+            RCONTROLLER_STATE_IDX = 11;
+            TOUCH_IDX = 24;
+            FRONT_IDX = 16;
+            BACK_IDX = 18;
+            EXTRA_IDX = 19;
+            SCROLL_IDX = 23;
+            LCONTROLLER_ACCE_IDX = 33;
+            LCONTROLLER_GYRO_IDX = 39;
+            RCONTROLLER_ACCE_IDX = 46;
+            RCONTROLLER_GYRO_IDX = 52;
+        }
 
         public override bool IsExternal() => false;
 
@@ -234,17 +265,7 @@ namespace HandheldCompanion.Controllers.Lenovo
                     break;
             }
 
-            if (IsHidReportMisaligned())
-            {
-                LogManager.LogWarning("Legion Controller HID report misalignment detected. Device should be restarted.");
-
-                LCONTROLLER_STATE_IDX -= 2;
-                RCONTROLLER_STATE_IDX -= 2;
-                TOUCH_IDX -= 2;
-                FRONT_IDX -= 2;
-                BACK_IDX -= 2;
-                EXTRA_IDX -= 2;
-            }
+            IsHidReportMisaligned();
 
             // manage gamepad motion from both controllers (Left Joy-Con and Right Joy-Con IMU)
             gamepadMotions[0] = new($"{details.baseContainerDeviceInstanceId}\\{LegionGoTablet.LeftJoyconIndex}");

@@ -1,4 +1,4 @@
-﻿namespace controller_hidapi.net
+namespace controller_hidapi.net
 {
     public class LegionController : GenericController
     {
@@ -7,11 +7,10 @@
 
         public byte GetStatus(int idx)
         {
-            if (_hidDevice != null && IsDeviceValid)
+            lock (_lastBuffer)
             {
-                byte[] Data = _hidDevice.Read();
-                if (Data != null)
-                    return Data[idx];
+                if (idx >= 0 && idx < _lastBuffer.Length)
+                    return _lastBuffer[idx];
             }
 
             return 0;

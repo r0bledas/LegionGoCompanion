@@ -26,6 +26,13 @@ namespace HandheldCompanion.Controllers.Lenovo
             (joystickRight is not null && !joystickRight.IsDisposed) ||
             (Controller is not null && Controller.Reading);
 
+        public bool IsRightJoystickConnected => joystickRight is not null && !joystickRight.IsDisposed;
+        public bool IsLeftJoystickConnected => joystickLeft is not null && !joystickLeft.IsDisposed;
+
+        public override bool IsReady => IsRightJoystickConnected || IsLeftJoystickConnected || base.IsReady;
+        public override bool IsLeftConnected => isDualDInput ? base.IsLeftConnected : (base.IsLeftConnected || IsLeftJoystickConnected);
+        public override bool IsRightConnected => isDualDInput ? (base.IsRightConnected || (data == null && IsRightJoystickConnected)) : (base.IsRightConnected || IsRightJoystickConnected);
+
         public override void AttachDetails(PnPDetails details)
         {
             base.AttachDetails(details);
@@ -61,6 +68,15 @@ namespace HandheldCompanion.Controllers.Lenovo
                            devicePath.Contains("61ed")));
 
                     if (!isMatch)
+                    {
+                        candidate.Dispose();
+                        continue;
+                    }
+
+                    // Ignore non-gamepad sub-devices (such as touchpad col03, config col04, or vendor endpoints mi_01/02/03 without col01/02)
+                    if (devicePath.Contains("col04") || devicePath.Contains("col03") ||
+                        ((devicePath.Contains("mi_01") || devicePath.Contains("mi_02") || devicePath.Contains("mi_03")) &&
+                         !devicePath.Contains("col01") && !devicePath.Contains("col02")))
                     {
                         candidate.Dispose();
                         continue;
@@ -128,7 +144,7 @@ namespace HandheldCompanion.Controllers.Lenovo
             bool anyPolled = false;
 
             // 1. Poll Left / Combined Joystick
-            if (joystickLeft is not null && !joystickLeft.IsDisposed)
+            if (joystickLeft is not null && !joystickLeft.IsDisposed && (!isDualDInput || IsLeftConnected))
             {
                 try
                 {
@@ -168,15 +184,18 @@ namespace HandheldCompanion.Controllers.Lenovo
                 }
                 catch (SharpDX.SharpDXException ex)
                 {
-                    if (ex.ResultCode == ResultCode.NotAcquired && IsPlugged)
+                    if (IsPlugged)
                         try { joystickLeft.Acquire(); } catch { }
-                    else if (ex.ResultCode == ResultCode.InputLost && Details is not null)
-                        AttachDetails(Details);
                 }
+            }
+            else if (isDualDInput && !IsLeftConnected)
+            {
+                Inputs.AxisState[AxisFlags.LeftStickX] = 0;
+                Inputs.AxisState[AxisFlags.LeftStickY] = 0;
             }
 
             // 2. Poll Right Joystick (in dual_dinput wireless mode)
-            if (joystickRight is not null && !joystickRight.IsDisposed)
+            if (joystickRight is not null && !joystickRight.IsDisposed && (!isDualDInput || IsRightConnected))
             {
                 try
                 {
@@ -184,13 +203,9 @@ namespace HandheldCompanion.Controllers.Lenovo
                     anyPolled = true;
 
                     // On COL02 (Right Gamepad), the physical thumbstick is mounted sideways in single/detached mode:
-                    // Pushing physical UP decreases X (13336 vs neutral 32767).
-                    // Pushing physical DOWN increases X.
-                    // Pushing physical LEFT decreases Y.
-                    // Pushing physical RIGHT increases Y.
-                    // To restore natural upright orientation:
-                    // Physical X (Left -> Right) = MapRange(stateR.Y, ushort.MinValue, ushort.MaxValue, short.MinValue, short.MaxValue);
-                    // Physical Y (Down -> Up) = MapRange(stateR.X, ushort.MaxValue, ushort.MinValue, short.MinValue, short.MaxValue);
+                    // Pushing physical LEFT decreases Y, RIGHT increases Y -> mapped to RightStickX
+                    // Pushing physical UP decreases X (0), DOWN increases X (65535).
+                    // In standard gamepad convention, UP is positive (+32767) and DOWN is negative (-32768).
                     Inputs.AxisState[AxisFlags.RightStickX] = (short)InputUtils.MapRange(stateR.Y, ushort.MinValue, ushort.MaxValue, short.MinValue, short.MaxValue);
                     Inputs.AxisState[AxisFlags.RightStickY] = (short)InputUtils.MapRange(stateR.X, ushort.MaxValue, ushort.MinValue, short.MinValue, short.MaxValue);
 
@@ -206,11 +221,14 @@ namespace HandheldCompanion.Controllers.Lenovo
                 }
                 catch (SharpDX.SharpDXException ex)
                 {
-                    if (ex.ResultCode == ResultCode.NotAcquired && IsPlugged)
+                    if (IsPlugged)
                         try { joystickRight.Acquire(); } catch { }
-                    else if (ex.ResultCode == ResultCode.InputLost && Details is not null)
-                        AttachDetails(Details);
                 }
+            }
+            else if (isDualDInput && !IsRightConnected)
+            {
+                Inputs.AxisState[AxisFlags.RightStickX] = 0;
+                Inputs.AxisState[AxisFlags.RightStickY] = 0;
             }
 
             // 3. Triggers (L2 and R2 from 64-byte raw HID packet, respecting shift if misaligned)
@@ -220,15 +238,13 @@ namespace HandheldCompanion.Controllers.Lenovo
             byte rawL2 = (data != null && data.Length > ltIdx) ? data[ltIdx] : (byte)0;
             byte rawR2 = (data != null && data.Length > rtIdx) ? data[rtIdx] : (byte)0;
 
-            byte L2 = (byte)InputUtils.MapRange(rawL2, byte.MinValue, byte.MaxValue, ushort.MinValue, ushort.MaxValue);
-            byte R2 = (byte)InputUtils.MapRange(rawR2, byte.MinValue, byte.MaxValue, ushort.MinValue, ushort.MaxValue);
-            Inputs.AxisState[AxisFlags.L2] = L2;
-            Inputs.AxisState[AxisFlags.R2] = R2;
+            Inputs.AxisState[AxisFlags.L2] = rawL2;
+            Inputs.AxisState[AxisFlags.R2] = rawR2;
 
-            Inputs.ButtonState[ButtonFlags.L2Soft] |= L2 > TriggerThreshold;
-            Inputs.ButtonState[ButtonFlags.R2Soft] |= R2 > TriggerThreshold;
-            Inputs.ButtonState[ButtonFlags.L2Full] |= L2 > TriggerThreshold * 8;
-            Inputs.ButtonState[ButtonFlags.R2Full] |= R2 > TriggerThreshold * 8;
+            Inputs.ButtonState[ButtonFlags.L2Soft] |= rawL2 > TriggerThreshold;
+            Inputs.ButtonState[ButtonFlags.R2Soft] |= rawR2 > TriggerThreshold;
+            Inputs.ButtonState[ButtonFlags.L2Full] |= rawL2 > 240;
+            Inputs.ButtonState[ButtonFlags.R2Full] |= rawR2 > 240;
 
             return anyPolled || IsConnected() || (Controller is not null && Controller.Reading);
         }
