@@ -21,7 +21,8 @@ namespace HandheldCompanion.Managers
         M3 = 2,             // ButtonFlags.R4 (Side/Bottom Button)
         RightStickClick = 3,// ButtonFlags.RightStickClick
         RB = 4,              // ButtonFlags.R1
-        AlwaysActive = 5    // Always Active (no button required)
+        Y3 = 5,              // ButtonFlags.R5 (Lower Right Back Button)
+        AlwaysActive = 6    // Always Active (no button required)
     }
 
     public enum PointerActivationType
@@ -118,14 +119,19 @@ namespace HandheldCompanion.Managers
             }
             else if (buttonFlag != ButtonFlags.None)
             {
-                bool buttonDown = controllerState.ButtonState[buttonFlag];
+                bool buttonDown = controllerState.ButtonState[buttonFlag] || 
+                    (ActivationButton == PointerActivationButton.M1 && controllerState.ButtonState[ButtonFlags.B6]);
 
                 if (ActivationType == PointerActivationType.HoldToAim)
                 {
                     isAiming = buttonDown;
                     // Swallow activation button so it doesn't trigger desktop bindings
                     if (buttonDown)
+                    {
                         controllerState.ButtonState[buttonFlag] = false;
+                        if (ActivationButton == PointerActivationButton.M1)
+                            controllerState.ButtonState[ButtonFlags.B6] = false;
+                    }
                 }
                 else if (ActivationType == PointerActivationType.Toggle)
                 {
@@ -137,6 +143,8 @@ namespace HandheldCompanion.Managers
                     isAiming = _isToggledOn;
                     // Swallow activation button
                     controllerState.ButtonState[buttonFlag] = false;
+                    if (ActivationButton == PointerActivationButton.M1)
+                        controllerState.ButtonState[ButtonFlags.B6] = false;
                 }
             }
 
@@ -219,6 +227,7 @@ namespace HandheldCompanion.Managers
             PointerActivationButton.M3 => ButtonFlags.R4,
             PointerActivationButton.RightStickClick => ButtonFlags.RightStickClick,
             PointerActivationButton.RB => ButtonFlags.R1,
+            PointerActivationButton.Y3 => ButtonFlags.R5,
             _ => ButtonFlags.None
         };
 

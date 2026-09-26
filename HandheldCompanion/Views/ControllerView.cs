@@ -334,7 +334,7 @@ namespace HandheldCompanion.Views
             {
                 DropDownStyle = ComboBoxStyle.DropDownList,
                 Font = new Font("Segoe UI", 8.5F, FontStyle.Regular),
-                Width = 140,
+                Width = 155,
                 Margin = new Padding(3, 3, 10, 3)
             };
             cmbPointerButton.Items.AddRange(new object[]
@@ -344,6 +344,7 @@ namespace HandheldCompanion.Views
                 "M3 (Side/Bottom)",
                 "Right Stick Click (RS)",
                 "Right Bumper (RB)",
+                "Y3 (Lower Right Back)",
                 "Always Active"
             });
             cmbPointerButton.SelectedIndex = Math.Clamp((int)PointerModeService.Instance.ActivationButton, 0, cmbPointerButton.Items.Count - 1);
@@ -1157,7 +1158,7 @@ namespace HandheldCompanion.Views
                 if (cmbPointerButton != null)
                 {
                     cmbPointerButton.Font = new Font("Segoe UI", bodyFontSize, FontStyle.Regular);
-                    cmbPointerButton.Width = (int)Math.Round(140 * scale);
+                    cmbPointerButton.Width = (int)Math.Round(155 * scale);
                 }
                 if (cmbPointerType != null)
                 {

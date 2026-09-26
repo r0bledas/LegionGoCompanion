@@ -326,10 +326,8 @@ public static class ControllerManager
         if (controllerState is null)
             return;
 
-        // snapshot motions; bail if not ready
+        // snapshot motions
         Dictionary<byte, GamepadMotion>? motions = tc.gamepadMotions;
-        if (motions is null || motions.Count == 0)
-            return;
 
         // Process pointer mode air mouse (only active when in Pointer mode)
         PointerModeService.Instance.ProcessTick(tc, controllerState, motions, delta);
@@ -339,12 +337,16 @@ public static class ControllerManager
 
         // get main motion safely with fallback to index 1 (Right Joy-Con)
         byte gamepadIndex = tc.gamepadIndex;
-        if (!motions.TryGetValue(gamepadIndex, out GamepadMotion? gamepadMotion) || gamepadMotion is null)
+        GamepadMotion? gamepadMotion = null;
+        if (motions is not null && motions.Count > 0)
         {
-            if (motions.TryGetValue(1, out GamepadMotion? motion1) && motion1 is not null)
-                gamepadMotion = motion1;
-            else
-                gamepadMotion = motions.Values.FirstOrDefault(m => m is not null);
+            if (!motions.TryGetValue(gamepadIndex, out gamepadMotion) || gamepadMotion is null)
+            {
+                if (motions.TryGetValue(1, out GamepadMotion? motion1) && motion1 is not null)
+                    gamepadMotion = motion1;
+                else
+                    gamepadMotion = motions.Values.FirstOrDefault(m => m is not null);
+            }
         }
 
         bool isDS4 = VirtualManager.HIDmode == HIDmode.DualShock4Controller;
@@ -764,7 +766,7 @@ public static class ControllerManager
                                 {
                                     case 0x6184: // dual_dinput
                                     case 0x61ED: // dual_dinput (2025 FW)
-                                        if (details.GetMI() == 2 || details.isBluetooth || details.GetMI() == -1)
+                                        if (details.GetMI() == 0 || details.GetMI() == 2 || details.isBluetooth || details.GetMI() == -1)
                                         {
                                             details.isDongle = true;
                                             try { controller = new LegionControllerDInput(details); } catch { }
