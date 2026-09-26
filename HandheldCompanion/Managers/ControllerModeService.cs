@@ -14,7 +14,8 @@ namespace HandheldCompanion.Managers
         Desktop = 0,
         DS4 = 1,
         X360 = 2,
-        Native = 3
+        Native = 3,
+        Pointer = 4
     }
 
     public static class ControllerModeService
@@ -25,6 +26,9 @@ namespace HandheldCompanion.Managers
         {
             try
             {
+                if (PointerModeService.Instance.IsActive)
+                    return ControllerTargetMode.Pointer;
+
                 if (ManagerFactory.layoutManager?.GetCurrentMode() == LayoutModes.Desktop)
                     return ControllerTargetMode.Desktop;
 
@@ -47,6 +51,7 @@ namespace HandheldCompanion.Managers
             ControllerTargetMode.DS4 => "DualShock 4 (DS4)",
             ControllerTargetMode.X360 => "Xbox 360 (x360)",
             ControllerTargetMode.Native => "Native",
+            ControllerTargetMode.Pointer => "Pointer",
             _ => mode.ToString()
         };
 
@@ -56,7 +61,20 @@ namespace HandheldCompanion.Managers
             {
                 switch (mode)
                 {
+                    case ControllerTargetMode.Pointer:
+                        PointerModeService.Instance.SetActive(true);
+                        ManagerFactory.settingsManager.SetProperty("HIDcloakonconnect", true);
+                        ControllerManager.TargetController?.Hide(false);
+                        SetLegionPassthrough(false);
+                        await VirtualManager.SetControllerMode(HIDmode.NoController);
+                        await VirtualManager.SetControllerStatus(HIDstatus.Disconnected);
+                        ManagerFactory.layoutManager.SetLayoutMode(LayoutModes.Desktop);
+                        ManagerFactory.settingsManager.SetProperty("LayoutMode", (int)LayoutModes.Desktop);
+                        PlaySound();
+                        break;
+
                     case ControllerTargetMode.Desktop:
+                        PointerModeService.Instance.SetActive(false);
                         ManagerFactory.settingsManager.SetProperty("HIDcloakonconnect", true);
                         ControllerManager.TargetController?.Hide(false);
                         SetLegionPassthrough(false);
@@ -68,6 +86,7 @@ namespace HandheldCompanion.Managers
                         break;
 
                     case ControllerTargetMode.DS4:
+                        PointerModeService.Instance.SetActive(false);
                         ManagerFactory.settingsManager.SetProperty("HIDcloakonconnect", true);
                         ControllerManager.TargetController?.Hide(false);
                         SetLegionPassthrough(false);
@@ -80,6 +99,7 @@ namespace HandheldCompanion.Managers
                         break;
 
                     case ControllerTargetMode.X360:
+                        PointerModeService.Instance.SetActive(false);
                         ManagerFactory.settingsManager.SetProperty("HIDcloakonconnect", true);
                         ControllerManager.TargetController?.Hide(false);
                         SetLegionPassthrough(false);
@@ -92,6 +112,7 @@ namespace HandheldCompanion.Managers
                         break;
 
                     case ControllerTargetMode.Native:
+                        PointerModeService.Instance.SetActive(false);
                         await VirtualManager.SetControllerMode(HIDmode.NoController);
                         await VirtualManager.SetControllerStatus(HIDstatus.Disconnected);
                         ManagerFactory.settingsManager.SetProperty("HIDcloakonconnect", false);

@@ -22,8 +22,19 @@ namespace HandheldCompanion.Views
 
         // GroupBoxes for scaling
         private GroupBox? grpGyro;
+        private GroupBox? grpPointer;
         private GroupBox? grpHoldCycle;
         private GroupBox? grpRemap;
+
+        // Pointer Mode controls
+        private CheckBox? chkPointerDetachedOnly;
+        private CheckBox? chkPointerRightClickRB;
+        private ComboBox? cmbPointerButton;
+        private ComboBox? cmbPointerType;
+        private NumericUpDown? numPointerSens;
+        private CheckBox? chkPointerInvertX;
+        private CheckBox? chkPointerInvertY;
+        private Label? lblPointerStatus;
 
         // Hold to Cycle controls
         private CheckBox? chkHoldCycleEnabled;
@@ -33,6 +44,7 @@ namespace HandheldCompanion.Views
         private CheckBox? chkCycleX360;
         private CheckBox? chkCycleDS4;
         private CheckBox? chkCycleNative;
+        private CheckBox? chkCyclePointer;
         private Label? lblCycleSummary;
 
         // Controls references for live updates and reset
@@ -237,7 +249,208 @@ namespace HandheldCompanion.Views
             grpGyro.Controls.Add(lblGyroStatus);
 
             // ==========================================
-            // 2. Hold to Cycle Controller Modes GroupBox
+            // 2. Pointer Mode (Right Controller Gyro Air Mouse) GroupBox
+            // ==========================================
+            grpPointer = new GroupBox
+            {
+                Text = "Pointer Mode (Right Controller Gyro Air Mouse)",
+                Dock = DockStyle.Top,
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
+                Padding = new Padding(8, 6, 8, 8),
+                Margin = new Padding(0, 0, 0, 6)
+            };
+
+            lblPointerStatus = new Label
+            {
+                Dock = DockStyle.Top,
+                AutoSize = true,
+                Font = new Font("Segoe UI", 7.5F, FontStyle.Regular),
+                ForeColor = Color.FromArgb(80, 85, 95),
+                Text = "Pointer Mode uses the detached Right Controller as an air mouse. RT is primary click (Left Click), and RB is secondary click (Right Click).",
+                Padding = new Padding(4, 2, 4, 4)
+            };
+
+            FlowLayoutPanel flowPointerOptions = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Top,
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                WrapContents = true,
+                Padding = new Padding(2)
+            };
+
+            chkPointerDetachedOnly = new CheckBox
+            {
+                Text = "Only active when detached",
+                AutoSize = true,
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Regular),
+                Checked = PointerModeService.Instance.DetachedOnly,
+                Margin = new Padding(3, 4, 12, 3)
+            };
+            chkPointerDetachedOnly.CheckedChanged += (s, e) =>
+            {
+                PointerModeService.Instance.DetachedOnly = chkPointerDetachedOnly.Checked;
+                PointerModeService.Instance.SaveConfig();
+            };
+
+            chkPointerRightClickRB = new CheckBox
+            {
+                Text = "Right Click on RB",
+                AutoSize = true,
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Regular),
+                Checked = PointerModeService.Instance.RightClickOnRB,
+                Margin = new Padding(3, 4, 12, 3)
+            };
+            chkPointerRightClickRB.CheckedChanged += (s, e) =>
+            {
+                PointerModeService.Instance.RightClickOnRB = chkPointerRightClickRB.Checked;
+                PointerModeService.Instance.SaveConfig();
+            };
+
+            flowPointerOptions.Controls.Add(chkPointerDetachedOnly);
+            flowPointerOptions.Controls.Add(chkPointerRightClickRB);
+
+            FlowLayoutPanel flowPointerSettings = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Top,
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                WrapContents = true,
+                Padding = new Padding(2)
+            };
+
+            Label lblActivationBtn = new Label
+            {
+                Text = "Activation:",
+                AutoSize = true,
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Regular),
+                ForeColor = Color.FromArgb(40, 45, 55),
+                Margin = new Padding(3, 5, 4, 3)
+            };
+
+            cmbPointerButton = new ComboBox
+            {
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Regular),
+                Width = 140,
+                Margin = new Padding(3, 3, 10, 3)
+            };
+            cmbPointerButton.Items.AddRange(new object[]
+            {
+                "M1 (Upper Back)",
+                "M2 (Lower Back)",
+                "M3 (Side/Bottom)",
+                "Right Stick Click (RS)",
+                "Right Bumper (RB)",
+                "Always Active"
+            });
+            cmbPointerButton.SelectedIndex = Math.Clamp((int)PointerModeService.Instance.ActivationButton, 0, cmbPointerButton.Items.Count - 1);
+            cmbPointerButton.SelectedIndexChanged += (s, e) =>
+            {
+                PointerModeService.Instance.ActivationButton = (PointerActivationButton)cmbPointerButton.SelectedIndex;
+                PointerModeService.Instance.SaveConfig();
+            };
+
+            Label lblActivationType = new Label
+            {
+                Text = "Type:",
+                AutoSize = true,
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Regular),
+                ForeColor = Color.FromArgb(40, 45, 55),
+                Margin = new Padding(3, 5, 4, 3)
+            };
+
+            cmbPointerType = new ComboBox
+            {
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Regular),
+                Width = 110,
+                Margin = new Padding(3, 3, 10, 3)
+            };
+            cmbPointerType.Items.AddRange(new object[]
+            {
+                "Hold to Aim",
+                "Toggle On/Off",
+                "Always Active"
+            });
+            cmbPointerType.SelectedIndex = Math.Clamp((int)PointerModeService.Instance.ActivationType, 0, cmbPointerType.Items.Count - 1);
+            cmbPointerType.SelectedIndexChanged += (s, e) =>
+            {
+                PointerModeService.Instance.ActivationType = (PointerActivationType)cmbPointerType.SelectedIndex;
+                PointerModeService.Instance.SaveConfig();
+            };
+
+            Label lblSens = new Label
+            {
+                Text = "Speed:",
+                AutoSize = true,
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Regular),
+                ForeColor = Color.FromArgb(40, 45, 55),
+                Margin = new Padding(3, 5, 4, 3)
+            };
+
+            numPointerSens = new NumericUpDown
+            {
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Regular),
+                Width = 55,
+                DecimalPlaces = 1,
+                Minimum = 0.2M,
+                Maximum = 5.0M,
+                Increment = 0.1M,
+                Value = (decimal)Math.Clamp(PointerModeService.Instance.Sensitivity, 0.2f, 5.0f),
+                Margin = new Padding(3, 3, 10, 3)
+            };
+            numPointerSens.ValueChanged += (s, e) =>
+            {
+                PointerModeService.Instance.Sensitivity = (float)numPointerSens.Value;
+                PointerModeService.Instance.SaveConfig();
+            };
+
+            chkPointerInvertX = new CheckBox
+            {
+                Text = "Invert X",
+                AutoSize = true,
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Regular),
+                Checked = PointerModeService.Instance.InvertX,
+                Margin = new Padding(3, 4, 8, 3)
+            };
+            chkPointerInvertX.CheckedChanged += (s, e) =>
+            {
+                PointerModeService.Instance.InvertX = chkPointerInvertX.Checked;
+                PointerModeService.Instance.SaveConfig();
+            };
+
+            chkPointerInvertY = new CheckBox
+            {
+                Text = "Invert Y",
+                AutoSize = true,
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Regular),
+                Checked = PointerModeService.Instance.InvertY,
+                Margin = new Padding(3, 4, 8, 3)
+            };
+            chkPointerInvertY.CheckedChanged += (s, e) =>
+            {
+                PointerModeService.Instance.InvertY = chkPointerInvertY.Checked;
+                PointerModeService.Instance.SaveConfig();
+            };
+
+            flowPointerSettings.Controls.Add(lblActivationBtn);
+            flowPointerSettings.Controls.Add(cmbPointerButton);
+            flowPointerSettings.Controls.Add(lblActivationType);
+            flowPointerSettings.Controls.Add(cmbPointerType);
+            flowPointerSettings.Controls.Add(lblSens);
+            flowPointerSettings.Controls.Add(numPointerSens);
+            flowPointerSettings.Controls.Add(chkPointerInvertX);
+            flowPointerSettings.Controls.Add(chkPointerInvertY);
+
+            grpPointer.Controls.Add(flowPointerSettings);
+            grpPointer.Controls.Add(flowPointerOptions);
+            grpPointer.Controls.Add(lblPointerStatus);
+
+            // ==========================================
+            // 3. Hold to Cycle Controller Modes GroupBox
             // ==========================================
             grpHoldCycle = new GroupBox
             {
@@ -375,11 +588,20 @@ namespace HandheldCompanion.Views
                 Margin = new Padding(3, 4, 10, 3)
             };
 
+            chkCyclePointer = new CheckBox
+            {
+                Text = "Pointer",
+                AutoSize = true,
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Regular),
+                Margin = new Padding(3, 4, 10, 3)
+            };
+
             flowModes.Controls.Add(lblIncluded);
             flowModes.Controls.Add(chkCycleDesktop);
             flowModes.Controls.Add(chkCycleX360);
             flowModes.Controls.Add(chkCycleDS4);
             flowModes.Controls.Add(chkCycleNative);
+            flowModes.Controls.Add(chkCyclePointer);
 
             lblCycleSummary = new Label
             {
@@ -578,6 +800,7 @@ namespace HandheldCompanion.Views
             // Add groups to main scroll panel (dock top in reverse order)
             mainScrollPanel.Controls.Add(grpRemap);
             mainScrollPanel.Controls.Add(grpHoldCycle);
+            if (grpPointer != null) mainScrollPanel.Controls.Add(grpPointer);
             mainScrollPanel.Controls.Add(grpGyro);
 
             this.Controls.Add(mainScrollPanel);
@@ -755,6 +978,7 @@ namespace HandheldCompanion.Views
             chkCycleX360.Checked = svc.CycleX360;
             chkCycleDS4.Checked = svc.CycleDS4;
             chkCycleNative.Checked = svc.CycleNative;
+            if (chkCyclePointer != null) chkCyclePointer.Checked = svc.CyclePointer;
 
             if (svc.HoldCycleButton == ButtonFlags.None)
             {
@@ -783,7 +1007,8 @@ namespace HandheldCompanion.Views
                 int count = (chkCycleDesktop.Checked ? 1 : 0) +
                             (chkCycleX360.Checked ? 1 : 0) +
                             (chkCycleDS4.Checked ? 1 : 0) +
-                            (chkCycleNative.Checked ? 1 : 0);
+                            (chkCycleNative.Checked ? 1 : 0) +
+                            (chkCyclePointer?.Checked == true ? 1 : 0);
                 if (count < 2)
                 {
                     cb.Checked = true;
@@ -799,6 +1024,7 @@ namespace HandheldCompanion.Views
             chkCycleX360.CheckedChanged += (s, e) => onModeCheckChanged(chkCycleX360);
             chkCycleDS4.CheckedChanged += (s, e) => onModeCheckChanged(chkCycleDS4);
             chkCycleNative.CheckedChanged += (s, e) => onModeCheckChanged(chkCycleNative);
+            if (chkCyclePointer != null) chkCyclePointer.CheckedChanged += (s, e) => onModeCheckChanged(chkCyclePointer);
         }
 
         private void UpdateHoldCycleControlStates()
@@ -811,6 +1037,7 @@ namespace HandheldCompanion.Views
             if (chkCycleX360 != null) chkCycleX360.Enabled = enabled;
             if (chkCycleDS4 != null) chkCycleDS4.Enabled = enabled;
             if (chkCycleNative != null) chkCycleNative.Enabled = enabled;
+            if (chkCyclePointer != null) chkCyclePointer.Enabled = enabled;
         }
 
         private void UpdateCycleSummary()
@@ -823,6 +1050,7 @@ namespace HandheldCompanion.Views
             if (chkCycleDS4.Checked) modes.Add("DS4");
             if (chkCycleX360.Checked) modes.Add("x360");
             if (chkCycleNative.Checked) modes.Add("Native");
+            if (chkCyclePointer?.Checked == true) modes.Add("Pointer");
 
             if (modes.Count >= 2)
             {
@@ -855,7 +1083,8 @@ namespace HandheldCompanion.Views
                 chkCycleDesktop.Checked,
                 chkCycleX360.Checked,
                 chkCycleDS4.Checked,
-                chkCycleNative.Checked
+                chkCycleNative.Checked,
+                chkCyclePointer?.Checked ?? false
             );
         }
 
@@ -911,6 +1140,7 @@ namespace HandheldCompanion.Views
                 // Scale GroupBox headers
                 float headerFontSize = 8.5f * (1.0f + (scale - 1.0f) * 0.50f);
                 if (grpGyro != null) grpGyro.Font = new Font("Segoe UI", headerFontSize, FontStyle.Bold);
+                if (grpPointer != null) grpPointer.Font = new Font("Segoe UI", headerFontSize, FontStyle.Bold);
                 if (grpHoldCycle != null) grpHoldCycle.Font = new Font("Segoe UI", headerFontSize, FontStyle.Bold);
                 if (grpRemap != null) grpRemap.Font = new Font("Segoe UI", headerFontSize, FontStyle.Bold);
 
@@ -918,6 +1148,28 @@ namespace HandheldCompanion.Views
                 float smallFontSize = 8.0f * (1.0f + (scale - 1.0f) * 0.50f);
 
                 if (lblGyroStatus != null) lblGyroStatus.Font = new Font("Segoe UI", smallFontSize, FontStyle.Regular);
+
+                // Scale Pointer Mode controls
+                if (chkPointerDetachedOnly != null) chkPointerDetachedOnly.Font = new Font("Segoe UI", bodyFontSize, FontStyle.Regular);
+                if (chkPointerRightClickRB != null) chkPointerRightClickRB.Font = new Font("Segoe UI", bodyFontSize, FontStyle.Regular);
+                if (chkPointerInvertX != null) chkPointerInvertX.Font = new Font("Segoe UI", bodyFontSize, FontStyle.Regular);
+                if (chkPointerInvertY != null) chkPointerInvertY.Font = new Font("Segoe UI", bodyFontSize, FontStyle.Regular);
+                if (cmbPointerButton != null)
+                {
+                    cmbPointerButton.Font = new Font("Segoe UI", bodyFontSize, FontStyle.Regular);
+                    cmbPointerButton.Width = (int)Math.Round(140 * scale);
+                }
+                if (cmbPointerType != null)
+                {
+                    cmbPointerType.Font = new Font("Segoe UI", bodyFontSize, FontStyle.Regular);
+                    cmbPointerType.Width = (int)Math.Round(110 * scale);
+                }
+                if (numPointerSens != null)
+                {
+                    numPointerSens.Font = new Font("Segoe UI", bodyFontSize, FontStyle.Regular);
+                    numPointerSens.Width = (int)Math.Round(55 * scale);
+                }
+                if (lblPointerStatus != null) lblPointerStatus.Font = new Font("Segoe UI", smallFontSize, FontStyle.Regular);
 
                 // Scale Hold to Cycle controls
                 if (chkHoldCycleEnabled != null) chkHoldCycleEnabled.Font = new Font("Segoe UI", bodyFontSize, FontStyle.Regular);
@@ -935,6 +1187,7 @@ namespace HandheldCompanion.Views
                 if (chkCycleX360 != null) chkCycleX360.Font = new Font("Segoe UI", bodyFontSize, FontStyle.Regular);
                 if (chkCycleDS4 != null) chkCycleDS4.Font = new Font("Segoe UI", bodyFontSize, FontStyle.Regular);
                 if (chkCycleNative != null) chkCycleNative.Font = new Font("Segoe UI", bodyFontSize, FontStyle.Regular);
+                if (chkCyclePointer != null) chkCyclePointer.Font = new Font("Segoe UI", bodyFontSize, FontStyle.Regular);
                 if (lblCycleSummary != null) lblCycleSummary.Font = new Font("Segoe UI", smallFontSize, FontStyle.Bold);
 
                 // Scale Remapping dropdowns and steppers
@@ -950,6 +1203,7 @@ namespace HandheldCompanion.Views
                     }
                 }
 
+                ScaleChildLabels(grpPointer, scale);
                 ScaleChildLabels(grpHoldCycle, scale);
                 ScaleChildLabels(grpRemap, scale);
             }

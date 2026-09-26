@@ -11,7 +11,6 @@ namespace HandheldCompanion.Controllers.Lenovo
     public class LegionControllerDInput : LegionController
     {
         private Joystick? joystick;
-        private controller_hidapi.net.GenericController? dinputController;
 
         public LegionControllerDInput() : base()
         { }
@@ -36,6 +35,12 @@ namespace HandheldCompanion.Controllers.Lenovo
                     try
                     {
                         Joystick candidate = new(directInput, deviceInstance.InstanceGuid);
+                        try
+                        {
+                            candidate.SetCooperativeLevel(IntPtr.Zero, CooperativeLevel.NonExclusive | CooperativeLevel.Background);
+                        }
+                        catch { }
+
                         string devicePath = candidate.Properties.InterfacePath;
                         string symLink = DeviceManager.SymLinkToInstanceId(devicePath, DeviceInterfaceIds.HidDevice.ToString());
 
@@ -51,7 +56,6 @@ namespace HandheldCompanion.Controllers.Lenovo
                         }
 
                         joystick = candidate;
-                        dinputController = new(details.VendorID, details.ProductID, 64, -1);
                         UserIndex = (byte)joystick.Properties.JoystickId;
                         return;
                     }
@@ -69,7 +73,6 @@ namespace HandheldCompanion.Controllers.Lenovo
             try
             {
                 joystick?.Acquire();
-                dinputController?.Open(false);
             }
             catch { }
 
@@ -81,7 +84,6 @@ namespace HandheldCompanion.Controllers.Lenovo
             try
             {
                 joystick?.Unacquire();
-                dinputController?.Close();
             }
             catch { }
 
@@ -90,7 +92,7 @@ namespace HandheldCompanion.Controllers.Lenovo
 
         public override void Gone()
         {
-            try { dinputController?.EndRead(); } catch { }
+            try { joystick?.Dispose(); joystick = null; } catch { }
             base.Gone();
         }
 
@@ -104,9 +106,6 @@ namespace HandheldCompanion.Controllers.Lenovo
             try
             {
                 JoystickState state = joystick.GetCurrentState();
-
-                if (state.RotationX == 32767 && state.RotationY == 32767 && state.RotationZ == 32767)
-                    return false;
 
                 Inputs.ButtonState[ButtonFlags.B1] |= state.Buttons[0];
                 Inputs.ButtonState[ButtonFlags.B2] |= state.Buttons[1];

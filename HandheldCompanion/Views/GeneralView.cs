@@ -19,6 +19,7 @@ namespace HandheldCompanion.Views
         private Button btnX360;
         private Button btnNative;
         private Button btnDesktop;
+        private Button btnPointer;
 
         // TDP buttons
         private Button[] tdpButtons;
@@ -146,10 +147,16 @@ namespace HandheldCompanion.Views
                 await ControllerModeService.ApplyMode(ControllerTargetMode.Desktop);
             });
 
+            btnPointer = CreateCompactButton("Pointer", 80, 32, 9.0F, async () =>
+            {
+                await ControllerModeService.ApplyMode(ControllerTargetMode.Pointer);
+            });
+
             flowController.Controls.Add(btnDS4);
             flowController.Controls.Add(btnX360);
             flowController.Controls.Add(btnNative);
             flowController.Controls.Add(btnDesktop);
+            flowController.Controls.Add(btnPointer);
             grpController.Controls.Add(flowController);
 
             // ==========================================
@@ -490,12 +497,15 @@ namespace HandheldCompanion.Views
                 case ControllerTargetMode.Native:
                     HighlightControllerButton(btnNative);
                     break;
+                case ControllerTargetMode.Pointer:
+                    HighlightControllerButton(btnPointer);
+                    break;
             }
         }
 
         private void HighlightControllerButton(Button selected)
         {
-            Button[] all = new Button[] { btnDS4, btnX360, btnNative, btnDesktop };
+            Button[] all = new Button[] { btnDS4, btnX360, btnNative, btnDesktop, btnPointer };
             foreach (var b in all)
             {
                 SetButtonSelected(b, b == selected);

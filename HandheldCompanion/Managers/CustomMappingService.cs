@@ -44,6 +44,7 @@ namespace HandheldCompanion.Managers
         public bool CycleX360 { get; set; } = true;
         public bool CycleDS4 { get; set; } = false;
         public bool CycleNative { get; set; } = false;
+        public bool CyclePointer { get; set; } = false;
         public List<MappingItem> Mappings { get; set; } = new();
     }
 
@@ -102,6 +103,7 @@ namespace HandheldCompanion.Managers
         public bool CycleX360 { get; set; } = true;
         public bool CycleDS4 { get; set; } = false;
         public bool CycleNative { get; set; } = false;
+        public bool CyclePointer { get; set; } = false;
 
         public CustomMappingService()
         {
@@ -121,6 +123,7 @@ namespace HandheldCompanion.Managers
                 if (CycleDS4) list.Add(ControllerTargetMode.DS4);
                 if (CycleX360) list.Add(ControllerTargetMode.X360);
                 if (CycleNative) list.Add(ControllerTargetMode.Native);
+                if (CyclePointer) list.Add(ControllerTargetMode.Pointer);
                 if (list.Count == 0)
                 {
                     list.Add(ControllerTargetMode.Desktop);
@@ -130,7 +133,7 @@ namespace HandheldCompanion.Managers
             }
         }
 
-        public void SetHoldCycleConfig(bool enabled, ButtonFlags button, int durationMs, bool desktop, bool x360, bool ds4, bool @native)
+        public void SetHoldCycleConfig(bool enabled, ButtonFlags button, int durationMs, bool desktop, bool x360, bool ds4, bool @native, bool pointer = false)
         {
             lock (_lock)
             {
@@ -141,6 +144,7 @@ namespace HandheldCompanion.Managers
                 CycleX360 = x360;
                 CycleDS4 = ds4;
                 CycleNative = @native;
+                CyclePointer = pointer;
             }
             Save();
         }
@@ -198,6 +202,7 @@ namespace HandheldCompanion.Managers
                                 CycleX360 = config.CycleX360;
                                 CycleDS4 = config.CycleDS4;
                                 CycleNative = config.CycleNative;
+                                CyclePointer = config.CyclePointer;
 
                                 if (config.Mappings != null)
                                 {
@@ -237,6 +242,7 @@ namespace HandheldCompanion.Managers
                         CycleX360 = CycleX360,
                         CycleDS4 = CycleDS4,
                         CycleNative = CycleNative,
+                        CyclePointer = CyclePointer,
                         Mappings = _mappings.Values.ToList()
                     };
                     string json = JsonConvert.SerializeObject(config, Formatting.Indented);

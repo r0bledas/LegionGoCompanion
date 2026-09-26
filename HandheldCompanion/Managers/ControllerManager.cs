@@ -331,6 +331,9 @@ public static class ControllerManager
         if (motions is null || motions.Count == 0)
             return;
 
+        // Process pointer mode air mouse (only active when in Pointer mode)
+        PointerModeService.Instance.ProcessTick(tc, controllerState, motions, delta);
+
         // raise event, before layout mapping
         InputsUpdated?.Invoke(controllerState, false);
 
@@ -761,7 +764,7 @@ public static class ControllerManager
                                 {
                                     case 0x6184: // dual_dinput
                                     case 0x61ED: // dual_dinput (2025 FW)
-                                        if (details.GetMI() == 2 || details.isBluetooth)
+                                        if (details.GetMI() == 2 || details.isBluetooth || details.GetMI() == -1)
                                         {
                                             details.isDongle = true;
                                             try { controller = new LegionControllerDInput(details); } catch { }

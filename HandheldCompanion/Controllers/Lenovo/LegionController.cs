@@ -55,22 +55,22 @@ namespace HandheldCompanion.Controllers.Lenovo
             Y1 = 128,
         }
 
-        private enum ControllerState
+        public enum ControllerState : byte
         {
-            Unk0 = 0,
+            Disconnected = 0,
             Unk1 = 1,
             Wired = 2,
             Wireless = 3,
         }
 
-        private byte FRONT_IDX = 18;
-        private byte BACK_IDX = 20;
-        private byte EXTRA_IDX = 21;
-        private byte SCROLL_IDX = 25;
-        private byte TOUCH_IDX = 26;
+        protected byte FRONT_IDX = 18;
+        protected byte BACK_IDX = 20;
+        protected byte EXTRA_IDX = 21;
+        protected byte SCROLL_IDX = 25;
+        protected byte TOUCH_IDX = 26;
 
-        private byte LCONTROLLER_STATE_IDX = 12;
-        private byte RCONTROLLER_STATE_IDX = 13;
+        public byte LCONTROLLER_STATE_IDX { get; protected set; } = 12;
+        public byte RCONTROLLER_STATE_IDX { get; protected set; } = 13;
 
         private byte LCONTROLLER_TIMESTAMP = 32;
         private byte LCONTROLLER_ACCE_IDX = 35;
@@ -144,13 +144,43 @@ namespace HandheldCompanion.Controllers.Lenovo
             SourceAxis.Add(AxisLayoutFlags.Gyroscope);
         }
 
-        public bool IsWired() =>
-            Controller?.GetStatus(LCONTROLLER_STATE_IDX) == (byte)ControllerState.Wired ||
-            Controller?.GetStatus(RCONTROLLER_STATE_IDX) == (byte)ControllerState.Wired;
+        public byte GetLeftControllerStatus()
+        {
+            if (Controller != null)
+            {
+                byte status = Controller.GetStatus(LCONTROLLER_STATE_IDX);
+                if (status != 0) return status;
+            }
+            if (data != null && data.Length > LCONTROLLER_STATE_IDX)
+                return data[LCONTROLLER_STATE_IDX];
+            return 0;
+        }
 
-        public override bool IsWireless() =>
-            Controller?.GetStatus(LCONTROLLER_STATE_IDX) == (byte)ControllerState.Wireless ||
-            Controller?.GetStatus(RCONTROLLER_STATE_IDX) == (byte)ControllerState.Wireless;
+        public byte GetRightControllerStatus()
+        {
+            if (Controller != null)
+            {
+                byte status = Controller.GetStatus(RCONTROLLER_STATE_IDX);
+                if (status != 0) return status;
+            }
+            if (data != null && data.Length > RCONTROLLER_STATE_IDX)
+                return data[RCONTROLLER_STATE_IDX];
+            return 0;
+        }
+
+        public bool IsLeftWired => GetLeftControllerStatus() == (byte)ControllerState.Wired;
+        public bool IsLeftWireless => GetLeftControllerStatus() == (byte)ControllerState.Wireless;
+        public bool IsLeftConnected => IsLeftWired || IsLeftWireless;
+
+        public bool IsRightWired => GetRightControllerStatus() == (byte)ControllerState.Wired;
+        public bool IsRightWireless => GetRightControllerStatus() == (byte)ControllerState.Wireless;
+        public bool IsRightConnected => IsRightWired || IsRightWireless;
+
+        public bool IsRightDetached => IsRightWireless;
+
+        public bool IsWired() => IsLeftWired || IsRightWired;
+
+        public override bool IsWireless() => IsLeftWireless || IsRightWireless;
 
         /// <summary>
         /// Detects if the HID report is misaligned (borked state).
