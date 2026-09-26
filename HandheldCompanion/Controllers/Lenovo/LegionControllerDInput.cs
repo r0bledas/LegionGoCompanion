@@ -22,7 +22,8 @@ namespace HandheldCompanion.Controllers.Lenovo
 
         public override bool IsConnected() =>
             (joystickLeft is not null && !joystickLeft.IsDisposed) ||
-            (joystickRight is not null && !joystickRight.IsDisposed);
+            (joystickRight is not null && !joystickRight.IsDisposed) ||
+            (Controller is not null && Controller.Reading);
 
         public override void AttachDetails(PnPDetails details)
         {
@@ -33,9 +34,8 @@ namespace HandheldCompanion.Controllers.Lenovo
 
             using (DirectInput directInput = new())
             {
-                var devices = directInput.GetDevices(DeviceType.Gamepad, DeviceEnumerationFlags.AllDevices);
-                if (devices.Count == 0)
-                    devices = directInput.GetDevices(DeviceClass.GameControl, DeviceEnumerationFlags.AllDevices);
+                // Enumerate ALL device classes so Supplemental devices (such as COL02) are discovered
+                var devices = directInput.GetDevices(DeviceClass.All, DeviceEnumerationFlags.AllDevices);
 
                 foreach (DeviceInstance deviceInstance in devices)
                 {
@@ -178,18 +178,26 @@ namespace HandheldCompanion.Controllers.Lenovo
                     JoystickState stateR = joystickRight.GetCurrentState();
                     anyPolled = true;
 
-                    // On COL02 (Right Gamepad), the physical thumbstick is mapped to X & Y!
-                    Inputs.AxisState[AxisFlags.RightStickX] = (short)InputUtils.MapRange(stateR.X, ushort.MinValue, ushort.MaxValue, short.MinValue, short.MaxValue);
-                    Inputs.AxisState[AxisFlags.RightStickY] = (short)InputUtils.MapRange(stateR.Y, ushort.MaxValue, ushort.MinValue, short.MinValue, short.MaxValue);
+                    // On COL02 (Right Gamepad), the physical thumbstick is mounted sideways in single/detached mode:
+                    // Pushing physical UP decreases X (13336 vs neutral 32767).
+                    // Pushing physical DOWN increases X.
+                    // Pushing physical LEFT decreases Y.
+                    // Pushing physical RIGHT increases Y.
+                    // To restore natural upright orientation:
+                    // Physical X (Left -> Right) = MapRange(stateR.Y, ushort.MinValue, ushort.MaxValue, short.MinValue, short.MaxValue);
+                    // Physical Y (Down -> Up) = MapRange(stateR.X, ushort.MaxValue, ushort.MinValue, short.MinValue, short.MaxValue);
+                    Inputs.AxisState[AxisFlags.RightStickX] = (short)InputUtils.MapRange(stateR.Y, ushort.MinValue, ushort.MaxValue, short.MinValue, short.MaxValue);
+                    Inputs.AxisState[AxisFlags.RightStickY] = (short)InputUtils.MapRange(stateR.X, ushort.MaxValue, ushort.MinValue, short.MinValue, short.MaxValue);
 
                     // Right Buttons
-                    Inputs.ButtonState[ButtonFlags.B1] |= stateR.Buttons[0];
-                    Inputs.ButtonState[ButtonFlags.B2] |= stateR.Buttons[1];
-                    Inputs.ButtonState[ButtonFlags.B3] |= stateR.Buttons[2] || stateR.Buttons[3];
-                    Inputs.ButtonState[ButtonFlags.B4] |= stateR.Buttons[4];
-                    Inputs.ButtonState[ButtonFlags.R1] |= stateR.Buttons[7];
-                    Inputs.ButtonState[ButtonFlags.Start] |= stateR.Buttons[11];
-                    Inputs.ButtonState[ButtonFlags.RightStickClick] |= stateR.Buttons[9] || stateR.Buttons[14];
+                    Inputs.ButtonState[ButtonFlags.B1] |= stateR.Buttons[0]; // A
+                    Inputs.ButtonState[ButtonFlags.B2] |= stateR.Buttons[1]; // B
+                    Inputs.ButtonState[ButtonFlags.B3] |= stateR.Buttons[2] || stateR.Buttons[3]; // X
+                    Inputs.ButtonState[ButtonFlags.B4] |= stateR.Buttons[4]; // Y
+                    Inputs.ButtonState[ButtonFlags.B5] |= stateR.Buttons[6]; // M2 button
+                    Inputs.ButtonState[ButtonFlags.R1] |= stateR.Buttons[7]; // RB
+                    Inputs.ButtonState[ButtonFlags.Start] |= stateR.Buttons[11]; // Legion R / Start
+                    Inputs.ButtonState[ButtonFlags.RightStickClick] |= stateR.Buttons[8] || stateR.Buttons[9] || stateR.Buttons[10] || stateR.Buttons[14];
                 }
                 catch (SharpDX.SharpDXException ex)
                 {
@@ -200,9 +208,15 @@ namespace HandheldCompanion.Controllers.Lenovo
                 }
             }
 
-            // 3. Triggers (L2 and R2 from 64-byte raw HID packet)
-            byte L2 = (byte)InputUtils.MapRange(data[22], byte.MinValue, byte.MaxValue, ushort.MinValue, ushort.MaxValue);
-            byte R2 = (byte)InputUtils.MapRange(data[23], byte.MinValue, byte.MaxValue, ushort.MinValue, ushort.MaxValue);
+            // 3. Triggers (L2 and R2 from 64-byte raw HID packet, respecting shift if misaligned)
+            int ltIdx = IsHidReportMisaligned() ? 20 : 22;
+            int rtIdx = IsHidReportMisaligned() ? 21 : 23;
+
+            byte rawL2 = (data != null && data.Length > ltIdx) ? data[ltIdx] : (byte)0;
+            byte rawR2 = (data != null && data.Length > rtIdx) ? data[rtIdx] : (byte)0;
+
+            byte L2 = (byte)InputUtils.MapRange(rawL2, byte.MinValue, byte.MaxValue, ushort.MinValue, ushort.MaxValue);
+            byte R2 = (byte)InputUtils.MapRange(rawR2, byte.MinValue, byte.MaxValue, ushort.MinValue, ushort.MaxValue);
             Inputs.AxisState[AxisFlags.L2] = L2;
             Inputs.AxisState[AxisFlags.R2] = R2;
 
@@ -211,7 +225,7 @@ namespace HandheldCompanion.Controllers.Lenovo
             Inputs.ButtonState[ButtonFlags.L2Full] |= L2 > TriggerThreshold * 8;
             Inputs.ButtonState[ButtonFlags.R2Full] |= R2 > TriggerThreshold * 8;
 
-            return anyPolled || IsConnected();
+            return anyPolled || IsConnected() || (Controller is not null && Controller.Reading);
         }
     }
 }

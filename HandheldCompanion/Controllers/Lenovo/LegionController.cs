@@ -271,7 +271,7 @@ namespace HandheldCompanion.Controllers.Lenovo
             Inputs.ButtonState[ButtonFlags.R5] = backButton.HasFlag(BackEnum.Y3);
             Inputs.ButtonState[ButtonFlags.L4] = backButton.HasFlag(BackEnum.Y1);
             Inputs.ButtonState[ButtonFlags.L5] = backButton.HasFlag(BackEnum.Y2);
-            Inputs.ButtonState[ButtonFlags.B5] = backButton.HasFlag(BackEnum.M2);
+            Inputs.ButtonState[ButtonFlags.B5] |= backButton.HasFlag(BackEnum.M2);
             Inputs.ButtonState[ButtonFlags.B11] = backButton.HasFlag(BackEnum.M1);
 
             ExtraEnum extraButton = (ExtraEnum)data[EXTRA_IDX];

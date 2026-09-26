@@ -66,6 +66,10 @@ namespace HandheldCompanion.Managers
         private bool _isToggledOn = false;
         private bool _prevButtonPressed = false;
         private bool _prevRbPressed = false;
+        private bool _prevRtPressed = false;
+        private bool _prevPadClick = false;
+        private short _prevPadX = 0;
+        private short _prevPadY = 0;
         private float _subpixelX = 0f;
         private float _subpixelY = 0f;
 
@@ -120,7 +124,7 @@ namespace HandheldCompanion.Managers
             else if (buttonFlag != ButtonFlags.None)
             {
                 bool buttonDown = controllerState.ButtonState[buttonFlag] || 
-                    (ActivationButton == PointerActivationButton.M1 && controllerState.ButtonState[ButtonFlags.B6]);
+                    (ActivationButton == PointerActivationButton.M1 && (controllerState.ButtonState[ButtonFlags.B11] || controllerState.ButtonState[ButtonFlags.B6]));
 
                 if (ActivationType == PointerActivationType.HoldToAim)
                 {
@@ -130,7 +134,10 @@ namespace HandheldCompanion.Managers
                     {
                         controllerState.ButtonState[buttonFlag] = false;
                         if (ActivationButton == PointerActivationButton.M1)
+                        {
+                            controllerState.ButtonState[ButtonFlags.B11] = false;
                             controllerState.ButtonState[ButtonFlags.B6] = false;
+                        }
                     }
                 }
                 else if (ActivationType == PointerActivationType.Toggle)
@@ -144,7 +151,10 @@ namespace HandheldCompanion.Managers
                     // Swallow activation button
                     controllerState.ButtonState[buttonFlag] = false;
                     if (ActivationButton == PointerActivationButton.M1)
+                    {
+                        controllerState.ButtonState[ButtonFlags.B11] = false;
                         controllerState.ButtonState[ButtonFlags.B6] = false;
+                    }
                 }
             }
 
@@ -164,7 +174,91 @@ namespace HandheldCompanion.Managers
                 controllerState.ButtonState[ButtonFlags.R1] = false;
             }
 
-            // 4. Translate Gyro to Mouse
+            // 4. Right Trigger (RT) as Normal Left Mouse Click
+            short rtVal = controllerState.AxisState[AxisFlags.R2];
+            bool rtDown = rtVal > 80 || controllerState.ButtonState[ButtonFlags.R2Soft] || controllerState.ButtonState[ButtonFlags.R2Full];
+            if (rtDown != _prevRtPressed)
+            {
+                if (rtDown)
+                    MouseSimulator.MouseDown(MouseActionsType.LeftButton);
+                else
+                    MouseSimulator.MouseUp(MouseActionsType.LeftButton);
+                _prevRtPressed = rtDown;
+            }
+            // Swallow RT in pointer mode
+            controllerState.AxisState[AxisFlags.R2] = 0;
+            controllerState.ButtonState[ButtonFlags.R2Soft] = false;
+            controllerState.ButtonState[ButtonFlags.R2Full] = false;
+
+            // 5. Scroll Wheel support
+            if (controllerState.ButtonState[ButtonFlags.B7])
+            {
+                MouseSimulator.VerticalScroll(120);
+                controllerState.ButtonState[ButtonFlags.B7] = false;
+            }
+            else if (controllerState.ButtonState[ButtonFlags.B8])
+            {
+                MouseSimulator.VerticalScroll(-120);
+                controllerState.ButtonState[ButtonFlags.B8] = false;
+            }
+
+            // 6. Right Stick Mouse Movement (upright physical mapping with deadzone & smooth curve)
+            float stickDx = 0f;
+            float stickDy = 0f;
+            short rsX = controllerState.AxisState[AxisFlags.RightStickX];
+            short rsY = controllerState.AxisState[AxisFlags.RightStickY];
+
+            const short STICK_DEADZONE = 3200; // ~10% deadzone for hall effect sticks
+            float stickMag = MathF.Sqrt(rsX * rsX + rsY * rsY);
+            if (stickMag > STICK_DEADZONE)
+            {
+                float norm = Math.Min(1f, (stickMag - STICK_DEADZONE) / (32767f - STICK_DEADZONE));
+                float curve = norm * norm; // Quadratic acceleration curve for precision and reach
+                float dirX = rsX / stickMag;
+                float dirY = rsY / stickMag;
+
+                float stickSpeed = 1400.0f * Sensitivity * curve * delta;
+                stickDx = dirX * stickSpeed;
+                stickDy = -dirY * stickSpeed; // Inverted Y: positive stick Y (UP) maps to negative screen Y (UP)
+
+                if (InvertX) stickDx = -stickDx;
+                if (InvertY) stickDy = -stickDy;
+            }
+
+            // 7. Trackpad Cursor Movement & Click (when trackpad is handled in software)
+            float padDx = 0f;
+            float padDy = 0f;
+            short padX = controllerState.AxisState[AxisFlags.RightPadX];
+            short padY = controllerState.AxisState[AxisFlags.RightPadY];
+            if (padX != 0 || padY != 0)
+            {
+                if (_prevPadX != 0 || _prevPadY != 0)
+                {
+                    padDx = (padX - _prevPadX) * 0.08f * Sensitivity;
+                    padDy = (padY - _prevPadY) * 0.08f * Sensitivity;
+                }
+                _prevPadX = padX;
+                _prevPadY = padY;
+            }
+            else
+            {
+                _prevPadX = 0;
+                _prevPadY = 0;
+            }
+
+            bool padClick = controllerState.ButtonState[ButtonFlags.RightPadClick];
+            if (padClick != _prevPadClick)
+            {
+                if (padClick)
+                    MouseSimulator.MouseDown(MouseActionsType.LeftButton);
+                else
+                    MouseSimulator.MouseUp(MouseActionsType.LeftButton);
+                _prevPadClick = padClick;
+            }
+
+            // 8. Translate Gyro to Mouse (when aiming is active)
+            float gyroDx = 0f;
+            float gyroDy = 0f;
             if (isAiming && motions != null && delta > 0.00001f)
             {
                 // Prefer Right Joy-Con IMU (index 1)
@@ -192,31 +286,27 @@ namespace HandheldCompanion.Managers
                     const float BASE_SPEED = 28.0f;
                     float speedScale = BASE_SPEED * Sensitivity * delta;
 
-                    float rawDx = playerX * speedScale;
-                    float rawDy = -playerY * speedScale; // pitch up (-dy) moves cursor up
+                    gyroDx = playerX * speedScale;
+                    gyroDy = -playerY * speedScale; // pitch up (-dy) moves cursor up
 
-                    if (InvertX) rawDx = -rawDx;
-                    if (InvertY) rawDy = -rawDy;
-
-                    _subpixelX += rawDx;
-                    _subpixelY += rawDy;
-
-                    int moveX = (int)_subpixelX;
-                    int moveY = (int)_subpixelY;
-
-                    _subpixelX -= moveX;
-                    _subpixelY -= moveY;
-
-                    if (moveX != 0 || moveY != 0)
-                    {
-                        MouseSimulator.MoveBy(moveX, moveY);
-                    }
+                    if (InvertX) gyroDx = -gyroDx;
+                    if (InvertY) gyroDy = -gyroDy;
                 }
             }
-            else
+
+            // 9. Combine all cursor movements (Stick + Gyro + Trackpad)
+            _subpixelX += stickDx + gyroDx + padDx;
+            _subpixelY += stickDy + gyroDy + padDy;
+
+            int moveX = (int)_subpixelX;
+            int moveY = (int)_subpixelY;
+
+            _subpixelX -= moveX;
+            _subpixelY -= moveY;
+
+            if (moveX != 0 || moveY != 0)
             {
-                _subpixelX = 0f;
-                _subpixelY = 0f;
+                MouseSimulator.MoveBy(moveX, moveY);
             }
         }
 
@@ -237,6 +327,16 @@ namespace HandheldCompanion.Managers
             {
                 MouseSimulator.MouseUp(MouseActionsType.RightButton);
                 _prevRbPressed = false;
+            }
+            if (_prevRtPressed)
+            {
+                MouseSimulator.MouseUp(MouseActionsType.LeftButton);
+                _prevRtPressed = false;
+            }
+            if (_prevPadClick)
+            {
+                MouseSimulator.MouseUp(MouseActionsType.LeftButton);
+                _prevPadClick = false;
             }
         }
 
