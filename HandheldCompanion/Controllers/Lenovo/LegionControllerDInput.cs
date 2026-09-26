@@ -10,6 +10,7 @@ namespace HandheldCompanion.Controllers.Lenovo
 {
     public class LegionControllerDInput : LegionController
     {
+        private DirectInput? directInput;
         private Joystick? joystickLeft;
         private Joystick? joystickRight;
         private bool isDualDInput;
@@ -29,60 +30,70 @@ namespace HandheldCompanion.Controllers.Lenovo
         {
             base.AttachDetails(details);
 
-            try { joystickLeft?.Dispose(); joystickLeft = null; } catch { }
-            try { joystickRight?.Dispose(); joystickRight = null; } catch { }
+            try { joystickLeft?.Unacquire(); joystickLeft?.Dispose(); joystickLeft = null; } catch { }
+            try { joystickRight?.Unacquire(); joystickRight?.Dispose(); joystickRight = null; } catch { }
+            try { directInput?.Dispose(); directInput = null; } catch { }
 
-            using (DirectInput directInput = new())
+            directInput = new DirectInput();
+
+            // Enumerate ALL device classes so Supplemental devices (such as COL02) are discovered
+            var devices = directInput.GetDevices(DeviceClass.All, DeviceEnumerationFlags.AllDevices);
+
+            foreach (DeviceInstance deviceInstance in devices)
             {
-                // Enumerate ALL device classes so Supplemental devices (such as COL02) are discovered
-                var devices = directInput.GetDevices(DeviceClass.All, DeviceEnumerationFlags.AllDevices);
-
-                foreach (DeviceInstance deviceInstance in devices)
+                try
                 {
+                    Joystick candidate = new(directInput, deviceInstance.InstanceGuid);
                     try
                     {
-                        Joystick candidate = new(directInput, deviceInstance.InstanceGuid);
-                        try
-                        {
-                            candidate.SetCooperativeLevel(IntPtr.Zero, CooperativeLevel.NonExclusive | CooperativeLevel.Background);
-                        }
-                        catch { }
+                        candidate.SetCooperativeLevel(IntPtr.Zero, CooperativeLevel.NonExclusive | CooperativeLevel.Background);
+                    }
+                    catch { }
 
-                        string devicePath = candidate.Properties.InterfacePath;
-                        string symLink = DeviceManager.SymLinkToInstanceId(devicePath, DeviceInterfaceIds.HidDevice.ToString());
+                    string devicePath = candidate.Properties.InterfacePath.ToLower();
+                    string symLink = DeviceManager.SymLinkToInstanceId(devicePath, DeviceInterfaceIds.HidDevice.ToString());
 
-                        bool isMatch = symLink.Equals(details.SymLink, StringComparison.InvariantCultureIgnoreCase) ||
-                            (devicePath.Contains("17EF", StringComparison.OrdinalIgnoreCase) &&
-                              (devicePath.Contains("6183", StringComparison.OrdinalIgnoreCase) ||
-                               devicePath.Contains("6184", StringComparison.OrdinalIgnoreCase) ||
-                               devicePath.Contains("61EC", StringComparison.OrdinalIgnoreCase) ||
-                               devicePath.Contains("61ED", StringComparison.OrdinalIgnoreCase)));
+                    bool isMatch = symLink.Equals(details.SymLink, StringComparison.InvariantCultureIgnoreCase) ||
+                        (devicePath.Contains("17ef") &&
+                          (devicePath.Contains("6183") ||
+                           devicePath.Contains("6184") ||
+                           devicePath.Contains("61ec") ||
+                           devicePath.Contains("61ed")));
 
-                        if (!isMatch)
-                        {
-                            candidate.Dispose();
-                            continue;
-                        }
+                    if (!isMatch)
+                    {
+                        candidate.Dispose();
+                        continue;
+                    }
 
-                        if (devicePath.Contains("col02", StringComparison.OrdinalIgnoreCase))
+                    candidate.Properties.BufferSize = 128;
+                    try { candidate.Acquire(); } catch { }
+
+                    if (devicePath.Contains("col02"))
+                    {
+                        joystickRight = candidate;
+                        isDualDInput = true;
+                    }
+                    else if (devicePath.Contains("col01"))
+                    {
+                        joystickLeft = candidate;
+                        isDualDInput = true;
+                    }
+                    else
+                    {
+                        if (joystickRight == null)
                         {
                             joystickRight = candidate;
                             isDualDInput = true;
                         }
-                        else if (devicePath.Contains("col01", StringComparison.OrdinalIgnoreCase))
-                        {
-                            joystickLeft = candidate;
-                            isDualDInput = true;
-                        }
                         else
                         {
-                            // Single combined gamepad (Wired DInput)
-                            joystickLeft = candidate;
-                            isDualDInput = false;
+                            candidate.Unacquire();
+                            candidate.Dispose();
                         }
                     }
-                    catch { }
                 }
+                catch { }
             }
 
             var primaryJs = joystickRight ?? joystickLeft;
@@ -111,8 +122,9 @@ namespace HandheldCompanion.Controllers.Lenovo
 
         public override void Gone()
         {
-            try { joystickLeft?.Dispose(); joystickLeft = null; } catch { }
-            try { joystickRight?.Dispose(); joystickRight = null; } catch { }
+            try { joystickLeft?.Unacquire(); joystickLeft?.Dispose(); joystickLeft = null; } catch { }
+            try { joystickRight?.Unacquire(); joystickRight?.Dispose(); joystickRight = null; } catch { }
+            try { directInput?.Dispose(); directInput = null; } catch { }
             base.Gone();
         }
 
