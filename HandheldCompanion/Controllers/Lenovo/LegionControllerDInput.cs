@@ -69,28 +69,21 @@ namespace HandheldCompanion.Controllers.Lenovo
                     candidate.Properties.BufferSize = 128;
                     try { candidate.Acquire(); } catch { }
 
-                    if (devicePath.Contains("col02"))
+                    if (devicePath.Contains("col02", StringComparison.OrdinalIgnoreCase))
                     {
                         joystickRight = candidate;
                         isDualDInput = true;
                     }
-                    else if (devicePath.Contains("col01"))
+                    else if (devicePath.Contains("col01", StringComparison.OrdinalIgnoreCase))
                     {
                         joystickLeft = candidate;
                         isDualDInput = true;
                     }
                     else
                     {
-                        if (joystickRight == null)
-                        {
-                            joystickRight = candidate;
-                            isDualDInput = true;
-                        }
-                        else
-                        {
-                            candidate.Unacquire();
-                            candidate.Dispose();
-                        }
+                        // Single combined gamepad (Wired DInput)
+                        joystickLeft = candidate;
+                        isDualDInput = false;
                     }
                 }
                 catch { }
