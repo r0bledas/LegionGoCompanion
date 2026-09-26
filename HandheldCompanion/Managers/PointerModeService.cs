@@ -35,7 +35,7 @@ namespace HandheldCompanion.Managers
     public class PointerModeConfig
     {
         public bool DetachedOnly { get; set; } = true;
-        public PointerActivationButton ActivationButton { get; set; } = PointerActivationButton.M1;
+        public PointerActivationButton ActivationButton { get; set; } = PointerActivationButton.RB;
         public PointerActivationType ActivationType { get; set; } = PointerActivationType.HoldToAim;
         public float Sensitivity { get; set; } = 1.5f;
         public bool InvertX { get; set; } = false;
@@ -55,7 +55,7 @@ namespace HandheldCompanion.Managers
 
         // Settings
         public bool DetachedOnly { get; set; } = true;
-        public PointerActivationButton ActivationButton { get; set; } = PointerActivationButton.M1;
+        public PointerActivationButton ActivationButton { get; set; } = PointerActivationButton.RB;
         public PointerActivationType ActivationType { get; set; } = PointerActivationType.HoldToAim;
         public float Sensitivity { get; set; } = 1.5f;
         public bool InvertX { get; set; } = false;
@@ -120,7 +120,8 @@ namespace HandheldCompanion.Managers
             else if (buttonFlag != ButtonFlags.None)
             {
                 bool buttonDown = controllerState.ButtonState[buttonFlag] || 
-                    (ActivationButton == PointerActivationButton.M1 && (controllerState.ButtonState[ButtonFlags.B11] || controllerState.ButtonState[ButtonFlags.B6]));
+                    (ActivationButton == PointerActivationButton.M1 && (controllerState.ButtonState[ButtonFlags.B11] || controllerState.ButtonState[ButtonFlags.B6])) ||
+                    (controllerState.ButtonState[ButtonFlags.R1] && (ActivationButton == PointerActivationButton.RB || ActivationButton == PointerActivationButton.M1));
 
                 if (ActivationType == PointerActivationType.HoldToAim)
                 {
@@ -129,6 +130,7 @@ namespace HandheldCompanion.Managers
                     if (buttonDown)
                     {
                         controllerState.ButtonState[buttonFlag] = false;
+                        controllerState.ButtonState[ButtonFlags.R1] = false;
                         if (ActivationButton == PointerActivationButton.M1)
                         {
                             controllerState.ButtonState[ButtonFlags.B11] = false;
@@ -146,6 +148,7 @@ namespace HandheldCompanion.Managers
                     isAiming = _isToggledOn;
                     // Swallow activation button
                     controllerState.ButtonState[buttonFlag] = false;
+                    controllerState.ButtonState[ButtonFlags.R1] = false;
                     if (ActivationButton == PointerActivationButton.M1)
                     {
                         controllerState.ButtonState[ButtonFlags.B11] = false;
@@ -198,8 +201,8 @@ namespace HandheldCompanion.Managers
                     const float BASE_SPEED = 28.0f;
                     float speedScale = BASE_SPEED * Sensitivity * delta;
 
-                    float gyroDx = playerX * speedScale;
-                    float gyroDy = -playerY * speedScale; // pitch up (-dy) moves cursor up
+                    float gyroDx = -playerY * speedScale;
+                    float gyroDy = -playerX * speedScale; // pitch up (-dy) moves cursor up
 
                     if (InvertX) gyroDx = -gyroDx;
                     if (InvertY) gyroDy = -gyroDy;
