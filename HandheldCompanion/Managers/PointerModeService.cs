@@ -99,7 +99,7 @@ namespace HandheldCompanion.Managers
             // 1. Detached Only check
             if (DetachedOnly && tc is LegionController lego)
             {
-                if (!lego.IsRightDetached)
+                if (!lego.IsRightDetached && !lego.IsWireless() && !lego.IsRightConnected)
                 {
                     // Controller is attached/docked; release any held mouse buttons and remain dormant
                     ReleaseHeldButtons();

@@ -172,7 +172,7 @@ namespace HandheldCompanion.Controllers.Lenovo
         public bool IsRightWireless => GetRightControllerStatus() == (byte)ControllerState.Wireless;
         public virtual bool IsRightConnected => IsRightWired || IsRightWireless;
 
-        public bool IsRightDetached => IsRightWireless || (Details != null && Details.isDongle) || IsRightConnected || GetRightControllerStatus() != (byte)ControllerState.Wired;
+        public virtual bool IsRightDetached => IsRightWireless || (Details != null && Details.isDongle) || IsRightConnected || GetRightControllerStatus() != (byte)ControllerState.Wired;
 
         public bool IsWired() => IsLeftWired || IsRightWired;
 

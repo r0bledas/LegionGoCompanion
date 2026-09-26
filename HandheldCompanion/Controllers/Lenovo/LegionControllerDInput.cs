@@ -31,7 +31,8 @@ namespace HandheldCompanion.Controllers.Lenovo
 
         public override bool IsReady => IsRightJoystickConnected || IsLeftJoystickConnected || base.IsReady;
         public override bool IsLeftConnected => isDualDInput ? base.IsLeftConnected : (base.IsLeftConnected || IsLeftJoystickConnected);
-        public override bool IsRightConnected => isDualDInput ? (base.IsRightConnected || (data == null && IsRightJoystickConnected)) : (base.IsRightConnected || IsRightJoystickConnected);
+        public override bool IsRightConnected => IsRightJoystickConnected || base.IsRightConnected;
+        public override bool IsRightDetached => true;
 
         public override void AttachDetails(PnPDetails details)
         {
@@ -195,7 +196,7 @@ namespace HandheldCompanion.Controllers.Lenovo
             }
 
             // 2. Poll Right Joystick (in dual_dinput wireless mode)
-            if (joystickRight is not null && !joystickRight.IsDisposed && (!isDualDInput || IsRightConnected))
+            if (joystickRight is not null && !joystickRight.IsDisposed)
             {
                 try
                 {
@@ -224,11 +225,6 @@ namespace HandheldCompanion.Controllers.Lenovo
                     if (IsPlugged)
                         try { joystickRight.Acquire(); } catch { }
                 }
-            }
-            else if (isDualDInput && !IsRightConnected)
-            {
-                Inputs.AxisState[AxisFlags.RightStickX] = 0;
-                Inputs.AxisState[AxisFlags.RightStickY] = 0;
             }
 
             // 3. Triggers (L2 and R2 from 64-byte raw HID packet, respecting shift if misaligned)
