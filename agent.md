@@ -27,3 +27,16 @@
   - `Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);`
   - `AutoScaleMode = AutoScaleMode.Dpi;`
   - High contrast clean dark theme with bold, high-contrast headings and large legible labels (no clipped text, no tiny unreadable fonts).
+  - Absolutely **ZERO emojis** anywhere in the UI, labels, buttons, or dialogs.
+
+---
+
+## 4. Environment & Process Hygiene
+- **Downloads Folder Maintenance**:
+  - The Downloads directory (`C:\Users\LLG\Downloads`) must strictly contain only:
+    1. The latest installer executable (e.g. `LegionGoCompanion-Setup-v<LatestVersion>.exe`)
+    2. `github-keys.txt`
+    3. `HandheldCompanion-main` folder
+  - Older installers must be automatically removed upon compiling and placing the new version.
+- **No Rogue Background Processes**:
+  - Never leave stray or unwanted GUI processes running in the background. Always ensure tasks terminate cleanly.

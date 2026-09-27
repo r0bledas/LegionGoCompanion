@@ -35,8 +35,8 @@ namespace HandheldCompanion.Managers
     public class PointerModeConfig
     {
         public bool DetachedOnly { get; set; } = false;
-        public PointerActivationButton ActivationButton { get; set; } = PointerActivationButton.RB;
-        public PointerActivationType ActivationType { get; set; } = PointerActivationType.HoldToAim;
+        public PointerActivationButton ActivationButton { get; set; } = PointerActivationButton.AlwaysActive;
+        public PointerActivationType ActivationType { get; set; } = PointerActivationType.AlwaysActive;
         public float Sensitivity { get; set; } = 1.5f;
         public bool InvertX { get; set; } = false;
         public bool InvertY { get; set; } = false;
@@ -55,8 +55,8 @@ namespace HandheldCompanion.Managers
 
         // Settings
         public bool DetachedOnly { get; set; } = false;
-        public PointerActivationButton ActivationButton { get; set; } = PointerActivationButton.RB;
-        public PointerActivationType ActivationType { get; set; } = PointerActivationType.HoldToAim;
+        public PointerActivationButton ActivationButton { get; set; } = PointerActivationButton.AlwaysActive;
+        public PointerActivationType ActivationType { get; set; } = PointerActivationType.AlwaysActive;
         public float Sensitivity { get; set; } = 1.5f;
         public bool InvertX { get; set; } = false;
         public bool InvertY { get; set; } = false;
@@ -66,6 +66,17 @@ namespace HandheldCompanion.Managers
         private bool _isToggledOn = false;
         private bool _prevButtonPressed = false;
         private bool _prevRbPressed = false;
+        private bool _prevRtPressed = false;
+        private bool _prevAPressed = false;
+        private bool _prevBPressed = false;
+        private bool _prevR3Pressed = false;
+
+        private bool _isLeftMousePressedByRt = false;
+        private bool _isLeftMousePressedByA = false;
+        private bool _isRightMousePressedByRb = false;
+        private bool _isRightMousePressedByB = false;
+        private bool _isMiddleMousePressedByR3 = false;
+
         private float _subpixelX = 0f;
         private float _subpixelY = 0f;
 
@@ -109,7 +120,7 @@ namespace HandheldCompanion.Managers
                 }
             }
 
-            // 2. Determine if aiming should be active based on activation button and type
+            // 2. Determine if gyro aiming should be active based on activation button and type
             bool isAiming = false;
             ButtonFlags buttonFlag = GetActivationButtonFlag(ActivationButton);
 
@@ -151,23 +162,150 @@ namespace HandheldCompanion.Managers
                 }
             }
 
-            // 3. Right Click on RB (if enabled and RB is not the activation button)
+            // 3. Mouse Clicks from Right Controller Inputs
+            // Left Click via RT (Right Trigger)
+            bool rtDown = controllerState.ButtonState[ButtonFlags.R2Soft] ||
+                          controllerState.ButtonState[ButtonFlags.R2Full] ||
+                          (controllerState.AxisState[AxisFlags.R2] > 60);
+
+            if (rtDown != _prevRtPressed)
+            {
+                if (rtDown)
+                {
+                    _isLeftMousePressedByRt = true;
+                    MouseSimulator.MouseDown(MouseActionsType.LeftButton);
+                }
+                else
+                {
+                    _isLeftMousePressedByRt = false;
+                    if (!_isLeftMousePressedByA)
+                        MouseSimulator.MouseUp(MouseActionsType.LeftButton);
+                }
+                _prevRtPressed = rtDown;
+            }
+            if (rtDown)
+            {
+                controllerState.ButtonState[ButtonFlags.R2Soft] = false;
+                controllerState.ButtonState[ButtonFlags.R2Full] = false;
+            }
+
+            // Left Click via Physical Button A (B1)
+            bool aDown = controllerState.ButtonState[ButtonFlags.B1];
+            if (aDown != _prevAPressed)
+            {
+                if (aDown)
+                {
+                    _isLeftMousePressedByA = true;
+                    MouseSimulator.MouseDown(MouseActionsType.LeftButton);
+                }
+                else
+                {
+                    _isLeftMousePressedByA = false;
+                    if (!_isLeftMousePressedByRt)
+                        MouseSimulator.MouseUp(MouseActionsType.LeftButton);
+                }
+                _prevAPressed = aDown;
+            }
+            if (aDown)
+                controllerState.ButtonState[ButtonFlags.B1] = false;
+
+            // Right Click via Physical Button B (B2)
+            bool bDown = controllerState.ButtonState[ButtonFlags.B2];
+            if (bDown != _prevBPressed)
+            {
+                if (bDown)
+                {
+                    _isRightMousePressedByB = true;
+                    MouseSimulator.MouseDown(MouseActionsType.RightButton);
+                }
+                else
+                {
+                    _isRightMousePressedByB = false;
+                    if (!_isRightMousePressedByRb)
+                        MouseSimulator.MouseUp(MouseActionsType.RightButton);
+                }
+                _prevBPressed = bDown;
+            }
+            if (bDown)
+                controllerState.ButtonState[ButtonFlags.B2] = false;
+
+            // Right Click on RB (if enabled and RB is not used for aiming activation)
             if (RightClickOnRB && ActivationButton != PointerActivationButton.RB)
             {
                 bool rbDown = controllerState.ButtonState[ButtonFlags.R1];
                 if (rbDown != _prevRbPressed)
                 {
                     if (rbDown)
+                    {
+                        _isRightMousePressedByRb = true;
                         MouseSimulator.MouseDown(MouseActionsType.RightButton);
+                    }
                     else
-                        MouseSimulator.MouseUp(MouseActionsType.RightButton);
+                    {
+                        _isRightMousePressedByRb = false;
+                        if (!_isRightMousePressedByB)
+                            MouseSimulator.MouseUp(MouseActionsType.RightButton);
+                    }
                     _prevRbPressed = rbDown;
                 }
-                // Swallow RB so it doesn't trigger default desktop binding (e.g. Space)
-                controllerState.ButtonState[ButtonFlags.R1] = false;
+                if (rbDown)
+                    controllerState.ButtonState[ButtonFlags.R1] = false;
             }
 
-            // 4. Translate Gyro to Mouse (when aiming is active)
+            // Middle Click via Right Stick Click (R3)
+            bool r3Down = controllerState.ButtonState[ButtonFlags.RightStickClick];
+            if (r3Down != _prevR3Pressed)
+            {
+                if (r3Down)
+                {
+                    _isMiddleMousePressedByR3 = true;
+                    MouseSimulator.MouseDown(MouseActionsType.MiddleButton);
+                }
+                else
+                {
+                    _isMiddleMousePressedByR3 = false;
+                    MouseSimulator.MouseUp(MouseActionsType.MiddleButton);
+                }
+                _prevR3Pressed = r3Down;
+            }
+            if (r3Down)
+                controllerState.ButtonState[ButtonFlags.RightStickClick] = false;
+
+            // 4. Translate Right Stick to Mouse Cursor
+            short rawStickX = controllerState.AxisState[AxisFlags.RightStickX];
+            short rawStickY = controllerState.AxisState[AxisFlags.RightStickY];
+
+            float stickDx = 0f;
+            float stickDy = 0f;
+
+            float stickMag = MathF.Sqrt((float)rawStickX * rawStickX + (float)rawStickY * rawStickY);
+            const float STICK_DEADZONE = 3200f; // ~10% of 32767
+            if (stickMag > STICK_DEADZONE)
+            {
+                float norm = Math.Clamp((stickMag - STICK_DEADZONE) / (32767f - STICK_DEADZONE), 0f, 1f);
+                float curvedNorm = norm * (0.6f + 1.4f * norm);
+
+                float dirX = rawStickX / stickMag;
+                float dirY = rawStickY / stickMag;
+
+                const float BASE_STICK_SPEED = 1400f;
+                float stickSpeed = BASE_STICK_SPEED * Sensitivity * curvedNorm * delta;
+
+                stickDx = dirX * stickSpeed;
+                stickDy = -dirY * stickSpeed; // Positive stick Y is UP, which is negative Y on Windows screen coordinates
+
+                if (InvertX) stickDx = -stickDx;
+                if (InvertY) stickDy = -stickDy;
+            }
+
+            // Swallow Right Stick so it doesn't double-trigger layout actions
+            controllerState.AxisState[AxisFlags.RightStickX] = 0;
+            controllerState.AxisState[AxisFlags.RightStickY] = 0;
+
+            // 5. Translate Gyro to Mouse (when aiming is active)
+            float gyroDx = 0f;
+            float gyroDy = 0f;
+
             if (isAiming && motions != null && delta > 0.00001f)
             {
                 // Prefer Right Joy-Con IMU (index 1)
@@ -185,39 +323,37 @@ namespace HandheldCompanion.Managers
                     // Deadzone to prevent hand tremor / sensor drift
                     const float DEADZONE = 0.20f;
                     float mag = MathF.Sqrt(playerX * playerX + playerY * playerY);
-                    if (mag < DEADZONE)
+                    if (mag >= DEADZONE)
                     {
-                        playerX = 0f;
-                        playerY = 0f;
-                    }
+                        // Base multiplier calibrated for natural pointer speed at 60-144 Hz
+                        const float BASE_SPEED = 28.0f;
+                        float speedScale = BASE_SPEED * Sensitivity * delta;
 
-                    // Base multiplier calibrated for natural pointer speed at 60-144 Hz
-                    const float BASE_SPEED = 28.0f;
-                    float speedScale = BASE_SPEED * Sensitivity * delta;
+                        // JoyShock player-space gyro: playerY is yaw (horizontal aim), playerX is pitch (vertical aim)
+                        gyroDx = -playerY * speedScale;
+                        gyroDy = -playerX * speedScale; // pitch up (-dy in Windows screen coords) moves cursor up
 
-                    // JoyShock player-space gyro: playerY is yaw (horizontal aim), playerX is pitch (vertical aim)
-                    float gyroDx = -playerY * speedScale;
-                    float gyroDy = -playerX * speedScale; // pitch up (-dy in Windows screen coords) moves cursor up
-
-                    if (InvertX) gyroDx = -gyroDx;
-                    if (InvertY) gyroDy = -gyroDy;
-
-                    _subpixelX += gyroDx;
-                    _subpixelY += gyroDy;
-
-                    int moveX = (int)_subpixelX;
-                    int moveY = (int)_subpixelY;
-
-                    _subpixelX -= moveX;
-                    _subpixelY -= moveY;
-
-                    if (moveX != 0 || moveY != 0)
-                    {
-                        MouseSimulator.MoveBy(moveX, moveY);
+                        if (InvertX) gyroDx = -gyroDx;
+                        if (InvertY) gyroDy = -gyroDy;
                     }
                 }
             }
-            else
+
+            // 6. Blend Stick and Gyro Movement into Subpixel Accumulator
+            _subpixelX += gyroDx + stickDx;
+            _subpixelY += gyroDy + stickDy;
+
+            int moveX = (int)_subpixelX;
+            int moveY = (int)_subpixelY;
+
+            _subpixelX -= moveX;
+            _subpixelY -= moveY;
+
+            if (moveX != 0 || moveY != 0)
+            {
+                MouseSimulator.MoveBy(moveX, moveY);
+            }
+            else if (stickMag <= STICK_DEADZONE && !isAiming)
             {
                 _subpixelX = 0f;
                 _subpixelY = 0f;
@@ -237,11 +373,28 @@ namespace HandheldCompanion.Managers
 
         private void ReleaseHeldButtons()
         {
-            if (_prevRbPressed)
+            if (_isLeftMousePressedByRt || _isLeftMousePressedByA)
+            {
+                MouseSimulator.MouseUp(MouseActionsType.LeftButton);
+                _isLeftMousePressedByRt = false;
+                _isLeftMousePressedByA = false;
+            }
+            if (_isRightMousePressedByRb || _isRightMousePressedByB)
             {
                 MouseSimulator.MouseUp(MouseActionsType.RightButton);
-                _prevRbPressed = false;
+                _isRightMousePressedByRb = false;
+                _isRightMousePressedByB = false;
             }
+            if (_isMiddleMousePressedByR3)
+            {
+                MouseSimulator.MouseUp(MouseActionsType.MiddleButton);
+                _isMiddleMousePressedByR3 = false;
+            }
+            _prevRtPressed = false;
+            _prevAPressed = false;
+            _prevBPressed = false;
+            _prevRbPressed = false;
+            _prevR3Pressed = false;
         }
 
         public void SaveConfig()

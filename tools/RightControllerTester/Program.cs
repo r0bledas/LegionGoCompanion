@@ -185,7 +185,7 @@ namespace RightControllerTester
             steps.Add(new StepDefinition { Id = 9, TargetInputName = "ButtonY", Title = "Face Button: Y", Instruction = "Press face button Y on the right controller.", ExpectedType = "Button" });
             steps.Add(new StepDefinition { Id = 10, TargetInputName = "ButtonY3", Title = "Back Button: Y3", Instruction = "Press rear back button Y3 (lowest rear paddle/grip button).", ExpectedType = "Button" });
             steps.Add(new StepDefinition { Id = 11, TargetInputName = "ButtonM3", Title = "Back Button: M3", Instruction = "Press side/bottom button M3 (bottom side paddle).", ExpectedType = "Button" });
-            steps.Add(new StepDefinition { Id = 12, TargetInputName = "ButtonM1", Title = "Back Button: M1", Instruction = "Press upper rear button M1 (top rear grip button).", ExpectedType = "Button" });
+            steps.Add(new StepDefinition { Id = 12, TargetInputName = "ButtonM1", Title = "Top Shoulder Button: M1", Instruction = "Press top shoulder button M1 (located on the top edge right next to the RB bumper).", ExpectedType = "Button" });
             steps.Add(new StepDefinition { Id = 13, TargetInputName = "ButtonM2", Title = "Back Button: M2", Instruction = "Press lower rear button M2 (middle rear grip button).", ExpectedType = "Button" });
             steps.Add(new StepDefinition { Id = 14, TargetInputName = "RightTrigger", Title = "Right Trigger: RT", Instruction = "Pull the Right Trigger (RT / R2) all the way in.", ExpectedType = "Trigger" });
         }
@@ -813,16 +813,7 @@ namespace RightControllerTester
 
         private void CheckStickClickInput(StepDefinition def)
         {
-            // For Stick Click (R3), ensure the stick is NOT deflected (must be near neutral center)
-            int dx = Math.Abs(curX - baselineX);
-            int dy = Math.Abs(curY - baselineY);
-            if (dx > 8000 || dy > 8000 || Math.Abs(curXinputRX) > 8000 || Math.Abs(curXinputRY) > 8000)
-            {
-                // Stick is deflected; ignore until centered to avoid confusing deflection with stick click
-                return;
-            }
-
-            // 1. DirectInput Buttons
+            // 1. DirectInput Buttons (switches trigger only on actual physical click)
             for (int i = 0; i < curButtons.Length; i++)
             {
                 if (curButtons[i] && !prevButtons[i])

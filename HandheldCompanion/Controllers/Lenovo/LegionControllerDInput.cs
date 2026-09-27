@@ -294,17 +294,16 @@ namespace HandheldCompanion.Controllers.Lenovo
                     anyPolled = true;
 
                     // On COL02 (Right Gamepad), the physical thumbstick is mounted sideways in single/detached mode:
-                    // Pushing physical LEFT decreases Y, RIGHT increases Y -> mapped to RightStickX
-                    // Pushing physical UP decreases X (0), DOWN increases X (65535).
-                    // In standard gamepad convention, UP is positive (+32767) and DOWN is negative (-32768).
+                    // Physical LEFT decreases Y, RIGHT increases Y -> mapped to RightStickX
+                    // Physical UP increases X, DOWN decreases X -> mapped to RightStickY (+32767 UP, -32768 DOWN)
                     Inputs.AxisState[AxisFlags.RightStickX] = (short)InputUtils.MapRange(stateR.Y, ushort.MinValue, ushort.MaxValue, short.MinValue, short.MaxValue);
-                    Inputs.AxisState[AxisFlags.RightStickY] = (short)InputUtils.MapRange(stateR.X, ushort.MaxValue, ushort.MinValue, short.MinValue, short.MaxValue);
+                    Inputs.AxisState[AxisFlags.RightStickY] = (short)InputUtils.MapRange(stateR.X, ushort.MinValue, ushort.MaxValue, short.MinValue, short.MaxValue);
 
-                    // Right Buttons
-                    Inputs.ButtonState[ButtonFlags.B1] |= stateR.Buttons[0]; // A
-                    Inputs.ButtonState[ButtonFlags.B2] |= stateR.Buttons[1]; // B
-                    Inputs.ButtonState[ButtonFlags.B3] |= stateR.Buttons[2] || stateR.Buttons[3]; // X
-                    Inputs.ButtonState[ButtonFlags.B4] |= stateR.Buttons[4]; // Y
+                    // Right Buttons (mapped from hardware diagnostic verification on COL02)
+                    Inputs.ButtonState[ButtonFlags.B1] |= stateR.Buttons[2]; // Physical A -> B1
+                    Inputs.ButtonState[ButtonFlags.B2] |= stateR.Buttons[0]; // Physical B -> B2
+                    Inputs.ButtonState[ButtonFlags.B3] |= stateR.Buttons[3]; // Physical X -> B3
+                    Inputs.ButtonState[ButtonFlags.B4] |= stateR.Buttons[1]; // Physical Y -> B4
                     Inputs.ButtonState[ButtonFlags.B5] |= stateR.Buttons[6]; // M2 button
                     Inputs.ButtonState[ButtonFlags.R1] |= stateR.Buttons[7]; // RB
                     Inputs.ButtonState[ButtonFlags.Start] |= stateR.Buttons[11]; // Legion R / Start
