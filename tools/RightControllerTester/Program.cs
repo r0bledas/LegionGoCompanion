@@ -80,7 +80,6 @@ namespace RightControllerTester
         // Devices
         private DirectInput? directInput;
         private Joystick? jsRight;
-        private Joystick? jsLeft;
         private controller_hidapi.net.LegionController? rawController;
         private Controller? xinputController;
 
@@ -109,11 +108,30 @@ namespace RightControllerTester
         private byte prevFrontByte = 0;
         private byte prevBackByte = 0;
 
+        private string rightDevicePath = "";
+        private string rightDeviceName = "";
+        private DateTime lastAcquireRetry = DateTime.MinValue;
+        private Point lastMousePos = Cursor.Position;
+        private int curRawStickRX = 128;
+        private int curRawStickRY = 128;
+
+        // XInput state
+        private int curXinputRX = 0;
+        private int curXinputRY = 0;
+        private byte curXinputRT = 0;
+        private bool curXinputRightThumbBtn = false;
+        private bool prevXinputRightThumbBtn = false;
+        private bool curXinputA = false, prevXinputA = false;
+        private bool curXinputB = false, prevXinputB = false;
+        private bool curXinputX = false, prevXinputX = false;
+        private bool curXinputY = false, prevXinputY = false;
+
         // Steps
         private readonly List<StepDefinition> steps = new();
         private int currentStepIndex = 0;
         private readonly Dictionary<int, StepResult> stepResults = new();
         private bool stepCompleted = false;
+        private DateTime stepActivatedAt = DateTime.MinValue;
 
         // UI Controls
         private Label lblStepHeader = null!;
@@ -411,122 +429,163 @@ namespace RightControllerTester
 
         private void InitHardware()
         {
+            EnsureDirectInputAcquired();
+            EnsureRawHidAcquired();
+            EnsureXInputAcquired();
+        }
+
+        private void EnsureDirectInputAcquired()
+        {
+            if (directInput == null)
+            {
+                try { directInput = new DirectInput(); } catch { return; }
+            }
+
+            if (jsRight != null && !jsRight.IsDisposed)
+            {
+                try
+                {
+                    jsRight.GetCurrentState();
+                    return; // Currently acquired and responding
+                }
+                catch
+                {
+                    try { jsRight.Acquire(); return; } catch { }
+                    try { jsRight.Unacquire(); jsRight.Dispose(); } catch { }
+                    jsRight = null;
+                }
+            }
+
             try
             {
-                directInput = new DirectInput();
                 var devices = directInput.GetDevices(DeviceClass.All, DeviceEnumerationFlags.AllDevices);
 
+                // Pass 1: Look specifically for COL02 (Right Controller Gamepad)
                 foreach (var dev in devices)
                 {
                     try
                     {
                         var js = new Joystick(directInput, dev.InstanceGuid);
-                        js.SetCooperativeLevel(Handle, CooperativeLevel.NonExclusive | CooperativeLevel.Background);
+                        try { js.SetCooperativeLevel(Handle, CooperativeLevel.NonExclusive | CooperativeLevel.Background); } catch { }
                         string path = js.Properties.InterfacePath.ToLower();
 
                         if (path.Contains("17ef") && (path.Contains("6184") || path.Contains("61ed") || path.Contains("6183") || path.Contains("61ec")))
                         {
-                            js.Properties.BufferSize = 128;
-                            try { js.Acquire(); } catch { }
-
                             if (path.Contains("col02"))
                             {
+                                js.Properties.BufferSize = 128;
+                                try { js.Acquire(); } catch { }
                                 jsRight = js;
-                            }
-                            else if (path.Contains("col01"))
-                            {
-                                jsLeft = js;
+                                rightDevicePath = path;
+                                rightDeviceName = dev.InstanceName;
+
+                                var st = js.GetCurrentState();
+                                baselineX = st.X;
+                                baselineY = st.Y;
+                                baselineZ = st.Z;
+                                baselineRotationZ = st.RotationZ;
+                                return;
                             }
                         }
+                        js.Dispose();
                     }
                     catch { }
                 }
 
-                // If COL02 wasn't found specifically, check any game controller
-                if (jsRight == null)
-                {
-                    foreach (var dev in devices)
-                    {
-                        if (dev.Type == SharpDX.DirectInput.DeviceType.Gamepad || dev.Type == SharpDX.DirectInput.DeviceType.Joystick || dev.Type == SharpDX.DirectInput.DeviceType.Supplemental)
-                        {
-                            try
-                            {
-                                var js = new Joystick(directInput, dev.InstanceGuid);
-                                js.SetCooperativeLevel(Handle, CooperativeLevel.NonExclusive | CooperativeLevel.Background);
-                                string path = js.Properties.InterfacePath.ToLower();
-                                if (!path.Contains("col04") && !path.Contains("col03"))
-                                {
-                                    js.Properties.BufferSize = 128;
-                                    try { js.Acquire(); } catch { }
-                                    jsRight = js;
-                                    break;
-                                }
-                            }
-                            catch { }
-                        }
-                    }
-                }
-
-                // Initial baseline read
-                if (jsRight != null)
+                // Pass 2: If COL02 not found, try COL01 (Left or single/combined controller)
+                foreach (var dev in devices)
                 {
                     try
                     {
-                        var state = jsRight.GetCurrentState();
-                        baselineX = state.X;
-                        baselineY = state.Y;
-                        baselineZ = state.Z;
-                        baselineRotationZ = state.RotationZ;
+                        var js = new Joystick(directInput, dev.InstanceGuid);
+                        try { js.SetCooperativeLevel(Handle, CooperativeLevel.NonExclusive | CooperativeLevel.Background); } catch { }
+                        string path = js.Properties.InterfacePath.ToLower();
+
+                        if (path.Contains("17ef") && (path.Contains("6184") || path.Contains("61ed") || path.Contains("6183") || path.Contains("61ec")))
+                        {
+                            if (path.Contains("col01"))
+                            {
+                                js.Properties.BufferSize = 128;
+                                try { js.Acquire(); } catch { }
+                                jsRight = js;
+                                rightDevicePath = path;
+                                rightDeviceName = dev.InstanceName;
+
+                                var st = js.GetCurrentState();
+                                baselineX = st.X;
+                                baselineY = st.Y;
+                                baselineZ = st.Z;
+                                baselineRotationZ = st.RotationZ;
+                                return;
+                            }
+                        }
+                        js.Dispose();
                     }
                     catch { }
-                }
-
-                // Open raw HID controller
-                try
-                {
-                    int[] pids = { 0x61ED, 0x6184, 0x6183, 0x61EB };
-                    foreach (int pid in pids)
-                    {
-                        try
-                        {
-                            var c = new controller_hidapi.net.LegionController(0x17EF, (ushort)pid);
-                            c.OnControllerInputReceived += (data) =>
-                            {
-                                if (data != null && data.Length >= 64)
-                                {
-                                    lock (rawLock)
-                                    {
-                                        Buffer.BlockCopy(data, 0, rawHidData, 0, 64);
-                                        if (rawHidData[1] == 0)
-                                            rawMisaligned = true;
-                                    }
-                                }
-                            };
-                            c.Open();
-                            rawController = c;
-                            break;
-                        }
-                        catch { }
-                    }
-                }
-                catch { }
-
-                // Check XInput
-                for (int i = 0; i < 4; i++)
-                {
-                    var xCtrl = new Controller((UserIndex)i);
-                    if (xCtrl.IsConnected)
-                    {
-                        xinputController = xCtrl;
-                        break;
-                    }
                 }
             }
             catch { }
         }
 
+        private void EnsureRawHidAcquired()
+        {
+            if (rawController != null && rawController.Reading) return;
+
+            try { rawController?.Close(); } catch { }
+            rawController = null;
+
+            int[] pids = { 0x61ED, 0x6184, 0x6183, 0x61EB };
+            foreach (int pid in pids)
+            {
+                try
+                {
+                    // Open Interface 2 (MI_02) specifically: 64-byte vendor report with back buttons, gyro, triggers
+                    var c = new controller_hidapi.net.LegionController(0x17EF, (ushort)pid, 64, 2);
+                    c.OnControllerInputReceived += (data) =>
+                    {
+                        if (data != null && data.Length >= 64)
+                        {
+                            lock (rawLock)
+                            {
+                                Buffer.BlockCopy(data, 0, rawHidData, 0, 64);
+                                rawMisaligned = (rawHidData[1] == 0 && rawHidData.Skip(2).Any(b => b != 0));
+                            }
+                        }
+                    };
+                    c.Open();
+                    rawController = c;
+                    break;
+                }
+                catch { }
+            }
+        }
+
+        private void EnsureXInputAcquired()
+        {
+            if (xinputController != null && xinputController.IsConnected) return;
+
+            for (int i = 0; i < 4; i++)
+            {
+                var ctrl = new Controller((UserIndex)i);
+                if (ctrl.IsConnected)
+                {
+                    xinputController = ctrl;
+                    break;
+                }
+            }
+        }
+
         private void PollTimer_Tick(object? sender, EventArgs e)
         {
+            // Dynamic re-acquisition check every 1 second
+            if ((DateTime.UtcNow - lastAcquireRetry).TotalSeconds >= 1.0)
+            {
+                lastAcquireRetry = DateTime.UtcNow;
+                EnsureDirectInputAcquired();
+                EnsureRawHidAcquired();
+                EnsureXInputAcquired();
+            }
+
             // 1. Read DirectInput
             if (jsRight != null)
             {
@@ -548,35 +607,69 @@ namespace RightControllerTester
                 }
             }
 
-            // 2. Read Raw HID
+            // 2. Read Raw HID MI_02
             lock (rawLock)
             {
                 prevFrontByte = curFrontByte;
                 prevBackByte = curBackByte;
 
-                int frontIdx = rawMisaligned ? 16 : 14;
-                int backIdx = rawMisaligned ? 18 : 16;
-                int rtIdx = rawMisaligned ? 23 : 21;
+                int frontIdx = rawMisaligned ? 16 : 18;
+                int backIdx = rawMisaligned ? 18 : 20;
+                int rtIdx = rawMisaligned ? 21 : 23;
 
                 curFrontByte = rawHidData.Length > frontIdx ? rawHidData[frontIdx] : (byte)0;
                 curBackByte = rawHidData.Length > backIdx ? rawHidData[backIdx] : (byte)0;
                 curRtByte = rawHidData.Length > rtIdx ? rawHidData[rtIdx] : (byte)0;
+
+                if (rawHidData.Length > 17)
+                {
+                    curRawStickRX = rawHidData[16];
+                    curRawStickRY = rawHidData[17];
+                }
             }
 
-            // 3. Update Live Monitor String
-            UpdateLiveMonitorDisplay();
+            // 3. Read XInput
+            if (xinputController != null && xinputController.IsConnected)
+            {
+                try
+                {
+                    var xState = xinputController.GetState().Gamepad;
+                    curXinputRX = xState.RightThumbX;
+                    curXinputRY = xState.RightThumbY;
+                    curXinputRT = xState.RightTrigger;
 
-            // 4. Test Step Logic
+                    prevXinputRightThumbBtn = curXinputRightThumbBtn;
+                    curXinputRightThumbBtn = xState.Buttons.HasFlag(GamepadButtonFlags.RightThumb);
+
+                    prevXinputA = curXinputA; curXinputA = xState.Buttons.HasFlag(GamepadButtonFlags.A);
+                    prevXinputB = curXinputB; curXinputB = xState.Buttons.HasFlag(GamepadButtonFlags.B);
+                    prevXinputX = curXinputX; curXinputX = xState.Buttons.HasFlag(GamepadButtonFlags.X);
+                    prevXinputY = curXinputY; curXinputY = xState.Buttons.HasFlag(GamepadButtonFlags.Y);
+                }
+                catch { }
+            }
+
+            // 4. Read Mouse Delta (for pointer mode awareness)
+            Point mousePos = Cursor.Position;
+            int mouseDeltaX = mousePos.X - lastMousePos.X;
+            int mouseDeltaY = mousePos.Y - lastMousePos.Y;
+            lastMousePos = mousePos;
+
+            // 5. Update Live Monitor String
+            UpdateLiveMonitorDisplay(mouseDeltaX, mouseDeltaY);
+
+            // 6. Test Step Logic
             if (currentStepIndex < steps.Count && !stepCompleted)
             {
                 CheckCurrentStepInput();
             }
         }
 
-        private void UpdateLiveMonitorDisplay()
+        private void UpdateLiveMonitorDisplay(int mouseDeltaX, int mouseDeltaY)
         {
             var sb = new StringBuilder();
-            sb.Append($"[DirectInput COL02] X: {curX,5} (Delta {curX - baselineX,6}) | Y: {curY,5} (Delta {curY - baselineY,6}) | Z: {curZ,5} | Rz: {curRotationZ,5}\n");
+            string diDev = jsRight != null ? (rightDevicePath.Contains("col02") ? "COL02 (Right Gamepad)" : "COL01") : "Disconnected (Searching...)";
+            sb.Append($"[DirectInput {diDev}] X: {curX,5} (Delta {curX - baselineX,6}) | Y: {curY,5} (Delta {curY - baselineY,6}) | Z: {curZ,5} | Rz: {curRotationZ,5}\n");
 
             var pressedBtns = new List<int>();
             for (int i = 0; i < curButtons.Length; i++)
@@ -586,13 +679,26 @@ namespace RightControllerTester
             string btnsStr = pressedBtns.Count > 0 ? string.Join(", ", pressedBtns) : "None";
             sb.Append($"[DirectInput Buttons] Active: {btnsStr}\n");
 
-            sb.Append($"[Raw HID 0x17EF] BackButtons: 0x{curBackByte:X2} (M1:{(curBackByte & 1) != 0} M2:{(curBackByte & 2) != 0} M3:{(curBackByte & 4) != 0} Y3:{(curBackByte & 0x20) != 0}) | RT Trigger: {curRtByte} | Front: 0x{curFrontByte:X2} (LegionR:{(curFrontByte & 1) != 0})");
+            bool m1 = (curBackByte & 0x10) != 0;
+            bool m2 = (curBackByte & 0x08) != 0;
+            bool m3 = (curBackByte & 0x04) != 0;
+            bool y3 = (curBackByte & 0x20) != 0;
+            bool legR = (curFrontByte & 0x01) != 0;
+
+            string hidStatus = rawController != null && rawController.Reading ? "Connected" : "Disconnected";
+            sb.Append($"[Raw HID MI_02 ({hidStatus})] Back: 0x{curBackByte:X2} (M1:{m1}, M2:{m2}, M3:{m3}, Y3:{y3}) | Front: 0x{curFrontByte:X2} (LegionR:{legR}) | RT: {curRtByte}\n");
+
+            string xinputStr = (xinputController != null && xinputController.IsConnected) ? $"RX={curXinputRX}, RY={curXinputRY}" : "Off";
+            sb.Append($"[XInput / Mouse] XInput: {xinputStr} | Mouse Cursor Delta: ({mouseDeltaX}, {mouseDeltaY})");
 
             lblLiveMonitor.Text = sb.ToString();
         }
 
         private void CheckCurrentStepInput()
         {
+            if ((DateTime.UtcNow - stepActivatedAt).TotalMilliseconds < 400)
+                return; // Grace period so previous release/transition doesn't immediately trigger new step
+
             var def = steps[currentStepIndex];
 
             switch (def.ExpectedType)
@@ -616,6 +722,7 @@ namespace RightControllerTester
         {
             const int DEFLECTION_THRESHOLD = 12000;
 
+            // 1. DirectInput
             int dx = curX - baselineX;
             int dy = curY - baselineY;
             int dz = curZ - baselineZ;
@@ -649,6 +756,58 @@ namespace RightControllerTester
                 };
 
                 OnStepDetected(res, requireStickNeutralNotice: true);
+                return;
+            }
+
+            // 2. XInput Fallback
+            if (xinputController != null && xinputController.IsConnected)
+            {
+                int xDelta = Math.Abs(curXinputRX) > Math.Abs(curXinputRY) ? curXinputRX : curXinputRY;
+                string xName = Math.Abs(curXinputRX) > Math.Abs(curXinputRY) ? "RightStickX" : "RightStickY";
+                if (Math.Abs(xDelta) >= DEFLECTION_THRESHOLD)
+                {
+                    string dir = xDelta > 0 ? "INCREASED (+)" : "DECREASED (-)";
+                    var res = new StepResult
+                    {
+                        StepId = def.Id,
+                        StepName = def.TargetInputName,
+                        Success = true,
+                        Skipped = false,
+                        DetectedSource = "XInput",
+                        DetectedIdentifier = xName,
+                        RawValue = xDelta,
+                        BaselineValue = 0,
+                        Delta = xDelta,
+                        Details = $"XInput {xName} {dir} to {xDelta}"
+                    };
+                    OnStepDetected(res, requireStickNeutralNotice: true);
+                    return;
+                }
+            }
+
+            // 3. Raw HID Stick Fallback (Bytes 16 and 17 on MI_02, centered at ~128)
+            int rawDeltaX = curRawStickRX - 128;
+            int rawDeltaY = curRawStickRY - 128;
+            int rawMax = Math.Abs(rawDeltaX) > Math.Abs(rawDeltaY) ? rawDeltaX : rawDeltaY;
+            string rawName = Math.Abs(rawDeltaX) > Math.Abs(rawDeltaY) ? "RawStickByte16" : "RawStickByte17";
+            if (Math.Abs(rawMax) >= 35)
+            {
+                string dir = rawMax > 0 ? "INCREASED (+)" : "DECREASED (-)";
+                var res = new StepResult
+                {
+                    StepId = def.Id,
+                    StepName = def.TargetInputName,
+                    Success = true,
+                    Skipped = false,
+                    DetectedSource = "RawHID",
+                    DetectedIdentifier = rawName,
+                    RawValue = rawMax + 128,
+                    BaselineValue = 128,
+                    Delta = rawMax,
+                    Details = $"Raw HID {rawName} {dir} to {rawMax + 128}"
+                };
+                OnStepDetected(res, requireStickNeutralNotice: true);
+                return;
             }
         }
 
@@ -657,13 +816,13 @@ namespace RightControllerTester
             // For Stick Click (R3), ensure the stick is NOT deflected (must be near neutral center)
             int dx = Math.Abs(curX - baselineX);
             int dy = Math.Abs(curY - baselineY);
-            if (dx > 8000 || dy > 8000)
+            if (dx > 8000 || dy > 8000 || Math.Abs(curXinputRX) > 8000 || Math.Abs(curXinputRY) > 8000)
             {
                 // Stick is deflected; ignore until centered to avoid confusing deflection with stick click
                 return;
             }
 
-            // Check for button press (DirectInput Button 8, 9, 10, 14 or any other newly pressed button)
+            // 1. DirectInput Buttons
             for (int i = 0; i < curButtons.Length; i++)
             {
                 if (curButtons[i] && !prevButtons[i])
@@ -686,9 +845,8 @@ namespace RightControllerTester
                 }
             }
 
-            // Fallback: check Raw HID back buttons
-            byte diffBack = (byte)(curBackByte & ~prevBackByte);
-            if (diffBack != 0)
+            // 2. XInput RightThumb Click
+            if (curXinputRightThumbBtn && !prevXinputRightThumbBtn)
             {
                 var res = new StepResult
                 {
@@ -696,12 +854,12 @@ namespace RightControllerTester
                     StepName = def.TargetInputName,
                     Success = true,
                     Skipped = false,
-                    DetectedSource = "RawHID",
-                    DetectedIdentifier = $"BackButton bit 0x{diffBack:X2}",
-                    RawValue = curBackByte,
-                    BaselineValue = prevBackByte,
-                    Delta = diffBack,
-                    Details = $"Stick Click detected on Raw HID BackButtons bit 0x{diffBack:X2}"
+                    DetectedSource = "XInput",
+                    DetectedIdentifier = "RightThumbClick",
+                    RawValue = 1,
+                    BaselineValue = 0,
+                    Delta = 1,
+                    Details = "Stick Click detected on XInput RightThumb"
                 };
                 OnStepDetected(res, requireStickNeutralNotice: false);
                 return;
@@ -710,85 +868,92 @@ namespace RightControllerTester
 
         private void CheckButtonInput(StepDefinition def)
         {
-            // 1. DirectInput Buttons
+            // 1. Target-Specific Raw HID Back Buttons (MI_02)
+            if (def.TargetInputName == "ButtonM1" && (curBackByte & 0x10) != 0)
+            {
+                TriggerButtonDetected(def, "RawHID", "Back Button M1 (0x10)", curBackByte);
+                return;
+            }
+            if (def.TargetInputName == "ButtonM2" && (curBackByte & 0x08) != 0)
+            {
+                TriggerButtonDetected(def, "RawHID", "Back Button M2 (0x08)", curBackByte);
+                return;
+            }
+            if (def.TargetInputName == "ButtonM3" && (curBackByte & 0x04) != 0)
+            {
+                TriggerButtonDetected(def, "RawHID", "Back Button M3 (0x04)", curBackByte);
+                return;
+            }
+            if (def.TargetInputName == "ButtonY3" && (curBackByte & 0x20) != 0)
+            {
+                TriggerButtonDetected(def, "RawHID", "Back Button Y3 (0x20)", curBackByte);
+                return;
+            }
+
+            // 2. DirectInput Buttons
             for (int i = 0; i < curButtons.Length; i++)
             {
                 if (curButtons[i] && !prevButtons[i])
                 {
-                    var res = new StepResult
-                    {
-                        StepId = def.Id,
-                        StepName = def.TargetInputName,
-                        Success = true,
-                        Skipped = false,
-                        DetectedSource = "DirectInput",
-                        DetectedIdentifier = $"Button {i}",
-                        RawValue = 1,
-                        BaselineValue = 0,
-                        Delta = 1,
-                        Details = $"DirectInput Button {i} pressed"
-                    };
-                    OnStepDetected(res, requireStickNeutralNotice: false);
+                    TriggerButtonDetected(def, "DirectInput", $"Button {i}", 1);
                     return;
                 }
             }
 
-            // 2. Raw HID Back Buttons
+            // 3. Generic Raw HID Back Buttons change
             byte diffBack = (byte)(curBackByte & ~prevBackByte);
             if (diffBack != 0)
             {
-                string btnName = (diffBack & 1) != 0 ? "M1 (0x01)" :
-                                 (diffBack & 2) != 0 ? "M2 (0x02)" :
-                                 (diffBack & 4) != 0 ? "M3 (0x04)" :
-                                 (diffBack & 8) != 0 ? "Y1 (0x08)" :
-                                 (diffBack & 0x10) != 0 ? "Y2 (0x10)" :
-                                 (diffBack & 0x20) != 0 ? "Y3 (0x20)" : $"0x{diffBack:X2}";
+                string btnName = (diffBack & 0x10) != 0 ? "M1 (0x10)" :
+                                 (diffBack & 0x08) != 0 ? "M2 (0x08)" :
+                                 (diffBack & 0x04) != 0 ? "M3 (0x04)" :
+                                 (diffBack & 0x20) != 0 ? "Y3 (0x20)" :
+                                 (diffBack & 0x40) != 0 ? "Y2 (0x40)" :
+                                 (diffBack & 0x80) != 0 ? "Y1 (0x80)" : $"0x{diffBack:X2}";
 
-                var res = new StepResult
-                {
-                    StepId = def.Id,
-                    StepName = def.TargetInputName,
-                    Success = true,
-                    Skipped = false,
-                    DetectedSource = "RawHID",
-                    DetectedIdentifier = $"BackButton Byte bit {btnName}",
-                    RawValue = curBackByte,
-                    BaselineValue = prevBackByte,
-                    Delta = diffBack,
-                    Details = $"Raw HID Back Buttons byte bit {btnName} pressed"
-                };
-                OnStepDetected(res, requireStickNeutralNotice: false);
+                TriggerButtonDetected(def, "RawHID", $"BackButton {btnName}", curBackByte);
                 return;
             }
 
-            // 3. Raw HID Front Buttons
+            // 4. Raw HID Front Buttons (LegionR / LegionL)
             byte diffFront = (byte)(curFrontByte & ~prevFrontByte);
             if (diffFront != 0)
             {
-                string btnName = (diffFront & 1) != 0 ? "LegionR (0x01)" :
-                                 (diffFront & 2) != 0 ? "LegionL (0x02)" : $"0x{diffFront:X2}";
+                string btnName = (diffFront & 0x01) != 0 ? "LegionR (0x01)" :
+                                 (diffFront & 0x02) != 0 ? "LegionL (0x02)" : $"0x{diffFront:X2}";
 
-                var res = new StepResult
-                {
-                    StepId = def.Id,
-                    StepName = def.TargetInputName,
-                    Success = true,
-                    Skipped = false,
-                    DetectedSource = "RawHID",
-                    DetectedIdentifier = $"FrontButton Byte bit {btnName}",
-                    RawValue = curFrontByte,
-                    BaselineValue = prevFrontByte,
-                    Delta = diffFront,
-                    Details = $"Raw HID Front Buttons byte bit {btnName} pressed"
-                };
-                OnStepDetected(res, requireStickNeutralNotice: false);
+                TriggerButtonDetected(def, "RawHID", $"FrontButton {btnName}", curFrontByte);
                 return;
             }
+
+            // 5. XInput Face Buttons
+            if (curXinputA && !prevXinputA) { TriggerButtonDetected(def, "XInput", "Button A", 1); return; }
+            if (curXinputB && !prevXinputB) { TriggerButtonDetected(def, "XInput", "Button B", 1); return; }
+            if (curXinputX && !prevXinputX) { TriggerButtonDetected(def, "XInput", "Button X", 1); return; }
+            if (curXinputY && !prevXinputY) { TriggerButtonDetected(def, "XInput", "Button Y", 1); return; }
+        }
+
+        private void TriggerButtonDetected(StepDefinition def, string source, string identifier, int val)
+        {
+            var res = new StepResult
+            {
+                StepId = def.Id,
+                StepName = def.TargetInputName,
+                Success = true,
+                Skipped = false,
+                DetectedSource = source,
+                DetectedIdentifier = identifier,
+                RawValue = val,
+                BaselineValue = 0,
+                Delta = 1,
+                Details = $"{source} {identifier} detected"
+            };
+            OnStepDetected(res, requireStickNeutralNotice: false);
         }
 
         private void CheckTriggerInput(StepDefinition def)
         {
-            // Raw HID Right Trigger
+            // 1. Raw HID Right Trigger (byte 23 on MI_02)
             if (curRtByte > 100)
             {
                 var res = new StepResult
@@ -798,7 +963,7 @@ namespace RightControllerTester
                     Success = true,
                     Skipped = false,
                     DetectedSource = "RawHID",
-                    DetectedIdentifier = "RightTriggerByte",
+                    DetectedIdentifier = "RightTriggerByte (RT)",
                     RawValue = curRtByte,
                     BaselineValue = 0,
                     Delta = curRtByte,
@@ -808,7 +973,7 @@ namespace RightControllerTester
                 return;
             }
 
-            // DirectInput axis check for trigger (Z axis deflection)
+            // 2. DirectInput Trigger (Z axis deflection)
             if (Math.Abs(curZ - baselineZ) > 15000)
             {
                 var res = new StepResult
@@ -823,6 +988,26 @@ namespace RightControllerTester
                     BaselineValue = baselineZ,
                     Delta = curZ - baselineZ,
                     Details = $"DirectInput Axis Z deflected to {curZ} (Delta: {curZ - baselineZ})"
+                };
+                OnStepDetected(res, requireStickNeutralNotice: false);
+                return;
+            }
+
+            // 3. XInput Right Trigger
+            if (curXinputRT > 100)
+            {
+                var res = new StepResult
+                {
+                    StepId = def.Id,
+                    StepName = def.TargetInputName,
+                    Success = true,
+                    Skipped = false,
+                    DetectedSource = "XInput",
+                    DetectedIdentifier = "RightTrigger (RT)",
+                    RawValue = curXinputRT,
+                    BaselineValue = 0,
+                    Delta = curXinputRT,
+                    Details = $"XInput Right Trigger value {curXinputRT} (>100)"
                 };
                 OnStepDetected(res, requireStickNeutralNotice: false);
                 return;
@@ -873,7 +1058,11 @@ namespace RightControllerTester
                 {
                     int dx = Math.Abs(curX - baselineX);
                     int dy = Math.Abs(curY - baselineY);
-                    if (dx > 8000 || dy > 8000)
+                    int rawDx = Math.Abs(curRawStickRX - 128);
+                    int rawDy = Math.Abs(curRawStickRY - 128);
+                    int xix = Math.Abs(curXinputRX);
+                    int xiy = Math.Abs(curXinputRY);
+                    if (dx > 8000 || dy > 8000 || rawDx > 25 || rawDy > 25 || xix > 8000 || xiy > 8000)
                     {
                         lblDetectionStatus.Text = "Please let go of the thumbstick so it returns to center before clicking Next Step >.";
                         lblDetectionStatus.ForeColor = Color.FromArgb(255, 183, 3);
@@ -909,6 +1098,8 @@ namespace RightControllerTester
         {
             if (currentStepIndex >= steps.Count) return;
 
+            stepActivatedAt = DateTime.UtcNow;
+
             var def = steps[currentStepIndex];
             progressBar.Value = currentStepIndex + 1;
             lblStepHeader.Text = $"Step {currentStepIndex + 1} of {steps.Count}: {def.Title}";
@@ -918,6 +1109,11 @@ namespace RightControllerTester
             Array.Copy(curButtons, prevButtons, curButtons.Length);
             prevFrontByte = curFrontByte;
             prevBackByte = curBackByte;
+            prevXinputRightThumbBtn = curXinputRightThumbBtn;
+            prevXinputA = curXinputA;
+            prevXinputB = curXinputB;
+            prevXinputX = curXinputX;
+            prevXinputY = curXinputY;
 
             if (stepResults.TryGetValue(currentStepIndex, out var prevRes))
             {

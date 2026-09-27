@@ -253,11 +253,15 @@ namespace HandheldCompanion.Controllers.Lenovo
             bool WasPlugged = Controller?.Reading == true && Controller?.IsDeviceValid == true;
             if (WasPlugged) Close();
 
-            // create controller
-            Controller = new(details.VendorID, details.ProductID);
-
-            // open controller as we need to check if it's ready by polling the hiddevice
+            // create controller targeting Interface 2 (vendor feature report interface FFA0 for back buttons and triggers)
+            Controller = new(details.VendorID, details.ProductID, 64, 2);
             Open();
+
+            if (Controller is null || !Controller.IsDeviceValid)
+            {
+                Controller = new(details.VendorID, details.ProductID);
+                Open();
+            }
 
             switch (Controller.DeviceVersion)
             {
