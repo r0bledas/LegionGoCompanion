@@ -2,10 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
-using System.Drawing.Drawing2D;
 using System.IO;
 using System.Linq;
-using System.Runtime.InteropServices;
 using System.Text;
 using System.Windows.Forms;
 using Newtonsoft.Json;
@@ -48,7 +46,7 @@ namespace RightControllerTester
         public int Id { get; set; }
         public string Title { get; set; } = "";
         public string Instruction { get; set; } = "";
-        public string ExpectedType { get; set; } = "Stick"; // Stick, Button, Trigger
+        public string ExpectedType { get; set; } = "Stick"; // Stick, StickClick, Button, Trigger
         public string TargetInputName { get; set; } = "";
     }
 
@@ -116,7 +114,6 @@ namespace RightControllerTester
         private int currentStepIndex = 0;
         private readonly Dictionary<int, StepResult> stepResults = new();
         private bool stepCompleted = false;
-        private int autoAdvanceCountdown = 0;
 
         // UI Controls
         private Label lblStepHeader = null!;
@@ -126,6 +123,7 @@ namespace RightControllerTester
         private Button btnSkip = null!;
         private Button btnNext = null!;
         private Button btnPrevious = null!;
+        private Button btnExportNow = null!;
         private Label lblLiveMonitor = null!;
         private TextBox txtFinalReport = null!;
         private Button btnSaveAndClose = null!;
@@ -137,9 +135,9 @@ namespace RightControllerTester
         {
             AutoScaleMode = AutoScaleMode.Dpi;
             DoubleBuffered = true;
-            Text = "Legion Go - Internal Right Controller Diagnostic & Axis Tester";
-            Size = new Size(1150, 850);
-            MinimumSize = new Size(1000, 750);
+            Text = "Legion Go - Right Controller Diagnostic and Input Tester";
+            FormBorderStyle = FormBorderStyle.Sizable;
+            WindowState = FormWindowState.Maximized;
             BackColor = Color.FromArgb(18, 18, 26);
             ForeColor = Color.White;
             Font = new Font("Segoe UI", 10F, FontStyle.Regular, GraphicsUnit.Point);
@@ -158,11 +156,11 @@ namespace RightControllerTester
 
         private void InitializeStepDefinitions()
         {
-            steps.Add(new StepDefinition { Id = 1, TargetInputName = "StickUp", Title = "Right Stick: Push UP", Instruction = "Push the Right Thumbstick directly UP and hold it.", ExpectedType = "Stick" });
-            steps.Add(new StepDefinition { Id = 2, TargetInputName = "StickDown", Title = "Right Stick: Push DOWN", Instruction = "Push the Right Thumbstick directly DOWN and hold it.", ExpectedType = "Stick" });
-            steps.Add(new StepDefinition { Id = 3, TargetInputName = "StickLeft", Title = "Right Stick: Push LEFT", Instruction = "Push the Right Thumbstick directly LEFT and hold it.", ExpectedType = "Stick" });
-            steps.Add(new StepDefinition { Id = 4, TargetInputName = "StickRight", Title = "Right Stick: Push RIGHT", Instruction = "Push the Right Thumbstick directly RIGHT and hold it.", ExpectedType = "Stick" });
-            steps.Add(new StepDefinition { Id = 5, TargetInputName = "StickClick", Title = "Right Stick: CLICK (R3)", Instruction = "Press down firmly on the Right Thumbstick until it clicks.", ExpectedType = "Button" });
+            steps.Add(new StepDefinition { Id = 1, TargetInputName = "StickUp", Title = "Right Stick: Push UP", Instruction = "Push the Right Thumbstick directly UP.", ExpectedType = "Stick" });
+            steps.Add(new StepDefinition { Id = 2, TargetInputName = "StickDown", Title = "Right Stick: Push DOWN", Instruction = "Push the Right Thumbstick directly DOWN.", ExpectedType = "Stick" });
+            steps.Add(new StepDefinition { Id = 3, TargetInputName = "StickLeft", Title = "Right Stick: Push LEFT", Instruction = "Push the Right Thumbstick directly LEFT.", ExpectedType = "Stick" });
+            steps.Add(new StepDefinition { Id = 4, TargetInputName = "StickRight", Title = "Right Stick: Push RIGHT", Instruction = "Push the Right Thumbstick directly RIGHT.", ExpectedType = "Stick" });
+            steps.Add(new StepDefinition { Id = 5, TargetInputName = "StickClick", Title = "Right Stick: CLICK (R3)", Instruction = "Keep the stick centered and press straight down on it until it clicks.", ExpectedType = "StickClick" });
             steps.Add(new StepDefinition { Id = 6, TargetInputName = "ButtonA", Title = "Face Button: A", Instruction = "Press face button A on the right controller.", ExpectedType = "Button" });
             steps.Add(new StepDefinition { Id = 7, TargetInputName = "ButtonB", Title = "Face Button: B", Instruction = "Press face button B on the right controller.", ExpectedType = "Button" });
             steps.Add(new StepDefinition { Id = 8, TargetInputName = "ButtonX", Title = "Face Button: X", Instruction = "Press face button X on the right controller.", ExpectedType = "Button" });
@@ -181,115 +179,133 @@ namespace RightControllerTester
                 Dock = DockStyle.Fill,
                 RowCount = 3,
                 ColumnCount = 1,
-                Padding = new Padding(16),
+                Padding = new Padding(20),
                 BackColor = Color.FromArgb(18, 18, 26)
             };
-            rootLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 70F));
+            rootLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 80F));
             rootLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
-            rootLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 160F));
+            rootLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 180F));
 
             // Top Header Panel
-            var pnlTop = new Panel { Dock = DockStyle.Fill, BackColor = Color.FromArgb(26, 26, 38), Padding = new Padding(12) };
+            var pnlTop = new Panel { Dock = DockStyle.Fill, BackColor = Color.FromArgb(26, 26, 38), Padding = new Padding(16) };
             var lblTitle = new Label
             {
-                Text = "🎮 Right Controller Input & Calibration Tester",
-                Font = new Font("Segoe UI", 15F, FontStyle.Bold),
+                Text = "Right Controller Input and Diagnostic Tester",
+                Font = new Font("Segoe UI", 16F, FontStyle.Bold),
                 ForeColor = Color.FromArgb(0, 180, 216),
                 AutoSize = true,
-                Location = new Point(12, 10)
+                Location = new Point(16, 12)
             };
+
+            btnExportNow = new Button
+            {
+                Text = "Export Results to File Now",
+                Size = new Size(240, 36),
+                BackColor = Color.FromArgb(40, 167, 69),
+                ForeColor = Color.White,
+                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+                FlatStyle = FlatStyle.Flat,
+                Cursor = Cursors.Hand,
+                Anchor = AnchorStyles.Top | AnchorStyles.Right
+            };
+            btnExportNow.Location = new Point(pnlTop.Width - 260, 12);
+            btnExportNow.FlatAppearance.BorderSize = 0;
+            btnExportNow.Click += (s, e) => ExportCurrentResults(showMessage: true);
+
             progressBar = new ProgressBar
             {
-                Location = new Point(12, 44),
-                Size = new Size(1080, 12),
+                Location = new Point(16, 52),
+                Size = new Size(1100, 14),
+                Anchor = AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Top,
                 Maximum = steps.Count,
                 Value = 1
             };
             pnlTop.Controls.Add(lblTitle);
+            pnlTop.Controls.Add(btnExportNow);
             pnlTop.Controls.Add(progressBar);
             rootLayout.Controls.Add(pnlTop, 0, 0);
 
             // Middle: Content Container
-            var middleContainer = new Panel { Dock = DockStyle.Fill, Padding = new Padding(0, 10, 0, 10) };
+            var middleContainer = new Panel { Dock = DockStyle.Fill, Padding = new Padding(0, 12, 0, 12) };
 
             // Step Content Panel
             pnlStepContent = new Panel
             {
                 Dock = DockStyle.Fill,
                 BackColor = Color.FromArgb(28, 28, 42),
-                Padding = new Padding(24)
+                Padding = new Padding(30)
             };
 
             lblStepHeader = new Label
             {
-                Text = "Step 1 of 14: Push Right Stick UP",
-                Font = new Font("Segoe UI", 16F, FontStyle.Bold),
+                Text = "Step 1 of 14: Right Stick: Push UP",
+                Font = new Font("Segoe UI", 18F, FontStyle.Bold),
                 ForeColor = Color.FromArgb(255, 214, 10),
                 AutoSize = true,
-                Location = new Point(24, 20)
+                Location = new Point(30, 25)
             };
 
             lblStepInstruction = new Label
             {
-                Text = "Push the Right Thumbstick directly UP and hold it.",
-                Font = new Font("Segoe UI", 13F, FontStyle.Regular),
-                ForeColor = Color.FromArgb(230, 230, 245),
+                Text = "Push the Right Thumbstick directly UP.",
+                Font = new Font("Segoe UI", 14F, FontStyle.Regular),
+                ForeColor = Color.FromArgb(235, 235, 245),
                 AutoSize = true,
-                Location = new Point(24, 65)
+                Location = new Point(30, 75)
             };
 
             lblDetectionStatus = new Label
             {
                 Text = "Waiting for input...",
-                Font = new Font("Segoe UI", 13.5F, FontStyle.Bold),
+                Font = new Font("Segoe UI", 14F, FontStyle.Bold),
                 ForeColor = Color.FromArgb(160, 160, 180),
                 AutoSize = true,
-                Location = new Point(24, 125)
+                Location = new Point(30, 145)
             };
 
             var btnPanel = new FlowLayoutPanel
             {
-                Location = new Point(24, 200),
-                Size = new Size(1050, 60),
+                Location = new Point(30, 230),
+                Size = new Size(1100, 70),
                 FlowDirection = FlowDirection.LeftToRight
             };
 
             btnSkip = new Button
             {
-                Text = "⏭ Skip Step (Input Not Registered)",
-                Size = new Size(300, 48),
-                BackColor = Color.FromArgb(220, 53, 69),
+                Text = "Skip Step (Input Not Registered)",
+                Size = new Size(320, 52),
+                BackColor = Color.FromArgb(180, 40, 50),
                 ForeColor = Color.White,
                 Font = new Font("Segoe UI", 11F, FontStyle.Bold),
                 FlatStyle = FlatStyle.Flat,
                 Cursor = Cursors.Hand,
-                Margin = new Padding(0, 0, 20, 0)
+                Margin = new Padding(0, 0, 25, 0)
             };
             btnSkip.FlatAppearance.BorderSize = 0;
             btnSkip.Click += (s, e) => SkipCurrentStep();
 
             btnNext = new Button
             {
-                Text = "Next Step ➔",
-                Size = new Size(180, 48),
+                Text = "Next Step >",
+                Size = new Size(200, 52),
                 BackColor = Color.FromArgb(0, 180, 216),
                 ForeColor = Color.Black,
-                Font = new Font("Segoe UI", 11F, FontStyle.Bold),
+                Font = new Font("Segoe UI", 11.5F, FontStyle.Bold),
                 FlatStyle = FlatStyle.Flat,
                 Cursor = Cursors.Hand,
                 Enabled = false,
-                Margin = new Padding(0, 0, 20, 0)
+                Margin = new Padding(0, 0, 25, 0)
             };
             btnNext.FlatAppearance.BorderSize = 0;
             btnNext.Click += (s, e) => AdvanceToNextStep();
 
             btnPrevious = new Button
             {
-                Text = "⬅ Previous",
-                Size = new Size(140, 48),
+                Text = "< Previous",
+                Size = new Size(160, 52),
                 BackColor = Color.FromArgb(60, 60, 80),
                 ForeColor = Color.White,
-                Font = new Font("Segoe UI", 10.5F, FontStyle.Regular),
+                Font = new Font("Segoe UI", 11F, FontStyle.Regular),
                 FlatStyle = FlatStyle.Flat,
                 Cursor = Cursors.Hand
             };
@@ -310,39 +326,41 @@ namespace RightControllerTester
             {
                 Dock = DockStyle.Fill,
                 BackColor = Color.FromArgb(28, 28, 42),
-                Padding = new Padding(24),
+                Padding = new Padding(30),
                 Visible = false
             };
 
             var lblReportTitle = new Label
             {
-                Text = "📋 Test Completed - Diagnostic Summary & Recorded Results",
-                Font = new Font("Segoe UI", 14F, FontStyle.Bold),
+                Text = "Test Completed - Diagnostic Summary and Results",
+                Font = new Font("Segoe UI", 15F, FontStyle.Bold),
                 ForeColor = Color.FromArgb(0, 180, 216),
                 AutoSize = true,
-                Location = new Point(24, 15)
+                Location = new Point(30, 15)
             };
 
             txtFinalReport = new TextBox
             {
-                Location = new Point(24, 55),
-                Size = new Size(1050, 280),
+                Location = new Point(30, 60),
+                Size = new Size(1100, 320),
+                Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right,
                 Multiline = true,
                 ReadOnly = true,
                 ScrollBars = ScrollBars.Vertical,
                 BackColor = Color.FromArgb(16, 16, 24),
                 ForeColor = Color.FromArgb(0, 255, 200),
-                Font = new Font("Consolas", 10F, FontStyle.Regular)
+                Font = new Font("Consolas", 10.5F, FontStyle.Regular)
             };
 
             btnSaveAndClose = new Button
             {
-                Text = "💾 Save Report & Close",
-                Location = new Point(24, 350),
-                Size = new Size(240, 44),
+                Text = "Save Report and Close",
+                Anchor = AnchorStyles.Bottom | AnchorStyles.Left,
+                Location = new Point(30, 400),
+                Size = new Size(260, 48),
                 BackColor = Color.FromArgb(40, 167, 69),
                 ForeColor = Color.White,
-                Font = new Font("Segoe UI", 11F, FontStyle.Bold),
+                Font = new Font("Segoe UI", 11.5F, FontStyle.Bold),
                 FlatStyle = FlatStyle.Flat,
                 Cursor = Cursors.Hand
             };
@@ -362,23 +380,24 @@ namespace RightControllerTester
             {
                 Dock = DockStyle.Fill,
                 BackColor = Color.FromArgb(22, 22, 32),
-                Padding = new Padding(12)
+                Padding = new Padding(16)
             };
 
             var lblBottomTitle = new Label
             {
-                Text = "🔍 Live Hardware Monitor (Real-Time Raw Sensor Readings)",
-                Font = new Font("Segoe UI", 10.5F, FontStyle.Bold),
+                Text = "Live Hardware Monitor (Real-Time Raw Sensor Readings)",
+                Font = new Font("Segoe UI", 11F, FontStyle.Bold),
                 ForeColor = Color.FromArgb(180, 180, 200),
                 AutoSize = true,
-                Location = new Point(12, 8)
+                Location = new Point(16, 8)
             };
 
             lblLiveMonitor = new Label
             {
-                Location = new Point(12, 34),
-                Size = new Size(1080, 110),
-                Font = new Font("Consolas", 9.5F, FontStyle.Regular),
+                Location = new Point(16, 38),
+                Size = new Size(1100, 120),
+                Anchor = AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Top | AnchorStyles.Bottom,
+                Font = new Font("Consolas", 10F, FontStyle.Regular),
                 ForeColor = Color.FromArgb(210, 210, 230),
                 Text = "Initializing monitor..."
             };
@@ -552,20 +571,12 @@ namespace RightControllerTester
             {
                 CheckCurrentStepInput();
             }
-            else if (stepCompleted)
-            {
-                autoAdvanceCountdown--;
-                if (autoAdvanceCountdown <= 0)
-                {
-                    AdvanceToNextStep();
-                }
-            }
         }
 
         private void UpdateLiveMonitorDisplay()
         {
             var sb = new StringBuilder();
-            sb.Append($"[DirectInput COL02] X: {curX,5} (Δ {curX - baselineX,6}) | Y: {curY,5} (Δ {curY - baselineY,6}) | Z: {curZ,5} | Rz: {curRotationZ,5}\n");
+            sb.Append($"[DirectInput COL02] X: {curX,5} (Delta {curX - baselineX,6}) | Y: {curY,5} (Delta {curY - baselineY,6}) | Z: {curZ,5} | Rz: {curRotationZ,5}\n");
 
             var pressedBtns = new List<int>();
             for (int i = 0; i < curButtons.Length; i++)
@@ -575,7 +586,7 @@ namespace RightControllerTester
             string btnsStr = pressedBtns.Count > 0 ? string.Join(", ", pressedBtns) : "None";
             sb.Append($"[DirectInput Buttons] Active: {btnsStr}\n");
 
-            sb.Append($"[Raw HID 0x17EF] BackButtons Byte: 0x{curBackByte:X2} (M1:{(curBackByte & 1) != 0} M2:{(curBackByte & 2) != 0} M3:{(curBackByte & 4) != 0} Y3:{(curBackByte & 0x20) != 0}) | RT Trigger: {curRtByte} | Front Byte: 0x{curFrontByte:X2} (LegionR:{(curFrontByte & 1) != 0})");
+            sb.Append($"[Raw HID 0x17EF] BackButtons: 0x{curBackByte:X2} (M1:{(curBackByte & 1) != 0} M2:{(curBackByte & 2) != 0} M3:{(curBackByte & 4) != 0} Y3:{(curBackByte & 0x20) != 0}) | RT Trigger: {curRtByte} | Front: 0x{curFrontByte:X2} (LegionR:{(curFrontByte & 1) != 0})");
 
             lblLiveMonitor.Text = sb.ToString();
         }
@@ -588,6 +599,9 @@ namespace RightControllerTester
             {
                 case "Stick":
                     CheckStickInput(def);
+                    break;
+                case "StickClick":
+                    CheckStickClickInput(def);
                     break;
                 case "Button":
                     CheckButtonInput(def);
@@ -634,7 +648,63 @@ namespace RightControllerTester
                     Details = $"Axis {bestAxis} {dir} to {rawVal} (Delta: {maxDelta})"
                 };
 
-                OnStepDetected(res);
+                OnStepDetected(res, requireStickNeutralNotice: true);
+            }
+        }
+
+        private void CheckStickClickInput(StepDefinition def)
+        {
+            // For Stick Click (R3), ensure the stick is NOT deflected (must be near neutral center)
+            int dx = Math.Abs(curX - baselineX);
+            int dy = Math.Abs(curY - baselineY);
+            if (dx > 8000 || dy > 8000)
+            {
+                // Stick is deflected; ignore until centered to avoid confusing deflection with stick click
+                return;
+            }
+
+            // Check for button press (DirectInput Button 8, 9, 10, 14 or any other newly pressed button)
+            for (int i = 0; i < curButtons.Length; i++)
+            {
+                if (curButtons[i] && !prevButtons[i])
+                {
+                    var res = new StepResult
+                    {
+                        StepId = def.Id,
+                        StepName = def.TargetInputName,
+                        Success = true,
+                        Skipped = false,
+                        DetectedSource = "DirectInput",
+                        DetectedIdentifier = $"Button {i}",
+                        RawValue = 1,
+                        BaselineValue = 0,
+                        Delta = 1,
+                        Details = $"Stick Click detected on DirectInput Button {i}"
+                    };
+                    OnStepDetected(res, requireStickNeutralNotice: false);
+                    return;
+                }
+            }
+
+            // Fallback: check Raw HID back buttons
+            byte diffBack = (byte)(curBackByte & ~prevBackByte);
+            if (diffBack != 0)
+            {
+                var res = new StepResult
+                {
+                    StepId = def.Id,
+                    StepName = def.TargetInputName,
+                    Success = true,
+                    Skipped = false,
+                    DetectedSource = "RawHID",
+                    DetectedIdentifier = $"BackButton bit 0x{diffBack:X2}",
+                    RawValue = curBackByte,
+                    BaselineValue = prevBackByte,
+                    Delta = diffBack,
+                    Details = $"Stick Click detected on Raw HID BackButtons bit 0x{diffBack:X2}"
+                };
+                OnStepDetected(res, requireStickNeutralNotice: false);
+                return;
             }
         }
 
@@ -658,7 +728,7 @@ namespace RightControllerTester
                         Delta = 1,
                         Details = $"DirectInput Button {i} pressed"
                     };
-                    OnStepDetected(res);
+                    OnStepDetected(res, requireStickNeutralNotice: false);
                     return;
                 }
             }
@@ -687,7 +757,7 @@ namespace RightControllerTester
                     Delta = diffBack,
                     Details = $"Raw HID Back Buttons byte bit {btnName} pressed"
                 };
-                OnStepDetected(res);
+                OnStepDetected(res, requireStickNeutralNotice: false);
                 return;
             }
 
@@ -711,7 +781,7 @@ namespace RightControllerTester
                     Delta = diffFront,
                     Details = $"Raw HID Front Buttons byte bit {btnName} pressed"
                 };
-                OnStepDetected(res);
+                OnStepDetected(res, requireStickNeutralNotice: false);
                 return;
             }
         }
@@ -734,7 +804,7 @@ namespace RightControllerTester
                     Delta = curRtByte,
                     Details = $"Raw HID Right Trigger value {curRtByte} (>100)"
                 };
-                OnStepDetected(res);
+                OnStepDetected(res, requireStickNeutralNotice: false);
                 return;
             }
 
@@ -754,20 +824,23 @@ namespace RightControllerTester
                     Delta = curZ - baselineZ,
                     Details = $"DirectInput Axis Z deflected to {curZ} (Delta: {curZ - baselineZ})"
                 };
-                OnStepDetected(res);
+                OnStepDetected(res, requireStickNeutralNotice: false);
                 return;
             }
         }
 
-        private void OnStepDetected(StepResult res)
+        private void OnStepDetected(StepResult res, bool requireStickNeutralNotice)
         {
             stepResults[currentStepIndex] = res;
             stepCompleted = true;
-            autoAdvanceCountdown = 45; // ~0.75 seconds
 
-            lblDetectionStatus.Text = $"✅ SUCCESS: {res.Details}";
+            string suffix = requireStickNeutralNotice ? " - Release stick, then click Next Step >." : " - Click Next Step > to proceed.";
+            lblDetectionStatus.Text = "SUCCESS: " + res.Details + suffix;
             lblDetectionStatus.ForeColor = Color.FromArgb(76, 201, 240);
             btnNext.Enabled = true;
+
+            // Automatically export on every successful detection
+            ExportCurrentResults(showMessage: false);
         }
 
         private void SkipCurrentStep()
@@ -784,13 +857,32 @@ namespace RightControllerTester
                 Details = "User skipped this input (not registered or not present)"
             };
 
+            // Automatically export on every skip
+            ExportCurrentResults(showMessage: false);
+
             AdvanceToNextStep();
         }
 
         private void AdvanceToNextStep()
         {
+            // If currently on a stick step, ensure the user has actually released the stick before advancing
+            if (currentStepIndex < steps.Count)
+            {
+                var def = steps[currentStepIndex];
+                if (def.ExpectedType == "Stick")
+                {
+                    int dx = Math.Abs(curX - baselineX);
+                    int dy = Math.Abs(curY - baselineY);
+                    if (dx > 8000 || dy > 8000)
+                    {
+                        lblDetectionStatus.Text = "Please let go of the thumbstick so it returns to center before clicking Next Step >.";
+                        lblDetectionStatus.ForeColor = Color.FromArgb(255, 183, 3);
+                        return;
+                    }
+                }
+            }
+
             stepCompleted = false;
-            autoAdvanceCountdown = 0;
             currentStepIndex++;
 
             if (currentStepIndex >= steps.Count)
@@ -808,7 +900,6 @@ namespace RightControllerTester
             if (currentStepIndex > 0)
             {
                 stepCompleted = false;
-                autoAdvanceCountdown = 0;
                 currentStepIndex--;
                 UpdateStepUI();
             }
@@ -823,16 +914,21 @@ namespace RightControllerTester
             lblStepHeader.Text = $"Step {currentStepIndex + 1} of {steps.Count}: {def.Title}";
             lblStepInstruction.Text = def.Instruction;
 
+            // Synchronize button states to prevent any held buttons from immediately triggering the new step
+            Array.Copy(curButtons, prevButtons, curButtons.Length);
+            prevFrontByte = curFrontByte;
+            prevBackByte = curBackByte;
+
             if (stepResults.TryGetValue(currentStepIndex, out var prevRes))
             {
                 if (prevRes.Skipped)
                 {
-                    lblDetectionStatus.Text = "⏭ Previously Skipped. Provide input again or click Next.";
+                    lblDetectionStatus.Text = "Previously Skipped. Provide input again or click Next Step >.";
                     lblDetectionStatus.ForeColor = Color.FromArgb(255, 183, 3);
                 }
                 else
                 {
-                    lblDetectionStatus.Text = $"✅ Previously Detected: {prevRes.Details}";
+                    lblDetectionStatus.Text = $"Previously Detected: {prevRes.Details}";
                     lblDetectionStatus.ForeColor = Color.FromArgb(76, 201, 240);
                 }
                 btnNext.Enabled = true;
@@ -853,20 +949,9 @@ namespace RightControllerTester
             pnlStepContent.Visible = false;
             pnlReportContent.Visible = true;
 
+            ExportCurrentResults(showMessage: false);
+
             var summary = GenerateDiagnosisSummary();
-            string json = JsonConvert.SerializeObject(summary, Formatting.Indented);
-
-            // Write files to local tools directory and project root
-            try
-            {
-                string localFile = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "input_test_results.json");
-                File.WriteAllText(localFile, json);
-
-                string toolsDirFile = Path.Combine(Directory.GetCurrentDirectory(), "tools", "input_test_results.json");
-                File.WriteAllText(toolsDirFile, json);
-            }
-            catch { }
-
             var sb = new StringBuilder();
             sb.AppendLine("================================================================================");
             sb.AppendLine("               LEGION GO RIGHT CONTROLLER INPUT DIAGNOSTIC REPORT               ");
@@ -879,20 +964,56 @@ namespace RightControllerTester
             {
                 var r = kvp.Value;
                 string status = r.Skipped ? "[SKIPPED]" : $"[OK] -> {r.DetectedSource} {r.DetectedIdentifier} (val={r.RawValue}, delta={r.Delta})";
-                sb.AppendLine($"  • {r.StepName,-16}: {status}");
+                sb.AppendLine($"  - {r.StepName,-16}: {status}");
             }
             sb.AppendLine();
-            sb.AppendLine("JSON report saved to: tools/input_test_results.json");
+            sb.AppendLine("Report automatically exported to: tools/input_test_results.json");
             sb.AppendLine("================================================================================");
 
             txtFinalReport.Text = sb.ToString();
+        }
 
+        private void ExportCurrentResults(bool showMessage)
+        {
             try
             {
-                string summaryFile = Path.Combine(Directory.GetCurrentDirectory(), "tools", "input_test_summary.txt");
-                File.WriteAllText(summaryFile, sb.ToString());
+                var summary = GenerateDiagnosisSummary();
+                string json = JsonConvert.SerializeObject(summary, Formatting.Indented);
+
+                // Write to known paths
+                string[] paths = new string[]
+                {
+                    Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "input_test_results.json"),
+                    Path.Combine(Directory.GetCurrentDirectory(), "tools", "input_test_results.json"),
+                    Path.Combine(Directory.GetCurrentDirectory(), "input_test_results.json"),
+                    Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Documents", "LegionGoCompanionWorkspace", "LegionGoCompanion-main", "tools", "input_test_results.json")
+                };
+
+                foreach (var p in paths)
+                {
+                    try
+                    {
+                        string dir = Path.GetDirectoryName(p) ?? "";
+                        if (!string.IsNullOrEmpty(dir) && Directory.Exists(dir))
+                        {
+                            File.WriteAllText(p, json);
+                        }
+                    }
+                    catch { }
+                }
+
+                if (showMessage)
+                {
+                    MessageBox.Show($"Results exported successfully to:\n{paths[1]}\n\nThe agent can now inspect the file directly.", "Export Successful", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                if (showMessage)
+                {
+                    MessageBox.Show("Export error: " + ex.Message, "Export Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+            }
         }
 
         private DiagnosticSummary GenerateDiagnosisSummary()
@@ -924,7 +1045,7 @@ namespace RightControllerTester
 
                 if (upAxis.Contains("X") && rightAxis.Contains("Y"))
                 {
-                    summary.StickOrientationDiagnosis = "CONFIRMED 90° CCW SHIFT: Physical Vertical (Up/Down) drives DirectInput Axis X, and Physical Horizontal (Left/Right) drives DirectInput Axis Y.";
+                    summary.StickOrientationDiagnosis = "CONFIRMED 90 DEGREE CCW SHIFT: Physical Vertical (Up/Down) drives DirectInput Axis X, and Physical Horizontal (Left/Right) drives DirectInput Axis Y.";
                 }
                 else if (upAxis.Contains("Y") && rightAxis.Contains("X"))
                 {
@@ -945,12 +1066,13 @@ namespace RightControllerTester
 
         private void SaveReportAndExit()
         {
+            ExportCurrentResults(showMessage: false);
             try
             {
                 Clipboard.SetText(txtFinalReport.Text);
             }
             catch { }
-            MessageBox.Show("Report copied to clipboard and saved to tools/input_test_results.json.\n\nThe application will now close.", "Test Finished", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show("Report saved to tools/input_test_results.json and copied to clipboard.\n\nThe application will now close.", "Test Finished", MessageBoxButtons.OK, MessageBoxIcon.Information);
             Close();
         }
     }
