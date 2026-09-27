@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Media;
 using System.Threading.Tasks;
 using HandheldCompanion.Devices;
@@ -63,9 +64,10 @@ namespace HandheldCompanion.Managers
                 {
                     case ControllerTargetMode.Pointer:
                         PointerModeService.Instance.SetActive(true);
-                        ManagerFactory.settingsManager.SetProperty("HIDcloakonconnect", true);
-                        ControllerManager.TargetController?.Hide(false);
-                        SetLegionPassthrough(false);
+                        ManagerFactory.settingsManager.SetProperty("HIDcloakonconnect", false);
+                        ControllerManager.TargetController?.Unhide(false);
+                        SetLegionPassthrough(true);
+                        UnhideLegionControllers();
                         await VirtualManager.SetControllerMode(HIDmode.NoController);
                         await VirtualManager.SetControllerStatus(HIDstatus.Disconnected);
                         ManagerFactory.layoutManager.SetLayoutMode(LayoutModes.Desktop);
@@ -164,6 +166,24 @@ namespace HandheldCompanion.Managers
         private static void PlaySound()
         {
             try { SystemSounds.Exclamation.Play(); } catch { }
+        }
+
+        private static void UnhideLegionControllers()
+        {
+            try
+            {
+                if (ManagerFactory.deviceManager?.PnPDevices != null)
+                {
+                    foreach (var dev in ManagerFactory.deviceManager.PnPDevices.Values.Where(d => d.VendorID == 0x17EF && (d.ProductID == 0x6184 || d.ProductID == 0x61ED || d.ProductID == 0x6183 || d.ProductID == 0x61EC || d.ProductID == 0x61EB)))
+                    {
+                        if (!string.IsNullOrEmpty(dev.deviceInstanceId))
+                            HidHide.UnhidePath(dev.deviceInstanceId);
+                        if (!string.IsNullOrEmpty(dev.baseContainerDeviceInstanceId))
+                            HidHide.UnhidePath(dev.baseContainerDeviceInstanceId);
+                    }
+                }
+            }
+            catch { }
         }
     }
 }

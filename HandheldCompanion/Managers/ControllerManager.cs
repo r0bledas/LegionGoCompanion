@@ -1084,6 +1084,14 @@ public static class ControllerManager
                         if (isPhysical && HIDuncloakondisconnect)
                             controller.Unhide(false);
 
+                        // If a Legion XInput controller detached, immediately attempt to discover/hydrate
+                        // any connected Legion DInput controller (e.g. detached right controller COL02)
+                        // so targetController smoothly transitions to the remaining physical controller.
+                        if (controller is LegionControllerXInput)
+                        {
+                            TryHydrateLegionDInput();
+                        }
+
                         // Atomically check-and-clear under targetLock to avoid clearing a
                         // controller that SetTargetController just switched to on another thread.
                         if (isPhysical && ClearTargetIfMatch(controller.GetInstanceId()))
@@ -1411,6 +1419,31 @@ public static class ControllerManager
         ManagerFactory.deviceManager.RefreshXInput();
 
         ReopenSDLGamepads();
+    }
+
+    public static void TryHydrateLegionDInput()
+    {
+        try
+        {
+            if (Controllers.Values.Any(c => c is LegionControllerDInput))
+                return;
+
+            var dinputDetails = ManagerFactory.deviceManager.PnPDevices.Values
+                .FirstOrDefault(d => d.isGaming && d.VendorID == 0x17EF && (d.ProductID == 0x6184 || d.ProductID == 0x61ED || d.ProductID == 0x6183 || d.ProductID == 0x61EC));
+
+            if (dinputDetails is not null)
+            {
+                HidDeviceArrived(dinputDetails, dinputDetails.InterfaceGuid);
+            }
+            else
+            {
+                ManagerFactory.deviceManager.RefreshDInput();
+            }
+        }
+        catch (Exception ex)
+        {
+            LogManager.LogWarning("TryHydrateLegionDInput failed: {0}", ex.Message);
+        }
     }
 
     private static void ReopenSDLGamepads()
@@ -2202,6 +2235,16 @@ public static class ControllerManager
             {
                 deviceInstanceId = internalController.GetContainerInstanceId();
             }
+            else if (latestExternalController is not null)
+            {
+                deviceInstanceId = latestExternalController.GetContainerInstanceId();
+            }
+            else
+            {
+                var any = controllers.FirstOrDefault();
+                if (any is not null)
+                    deviceInstanceId = any.GetContainerInstanceId();
+            }
         }
         // Auto-connect to the most recently arrived external/wireless controller.
         else if (latestExternalController is not null)
@@ -2217,6 +2260,12 @@ public static class ControllerManager
         else if (internalController is not null)
         {
             deviceInstanceId = internalController.GetContainerInstanceId();
+        }
+        else
+        {
+            var any = controllers.FirstOrDefault();
+            if (any is not null)
+                deviceInstanceId = any.GetContainerInstanceId();
         }
 
         // Check if the chosen controller is power cycling

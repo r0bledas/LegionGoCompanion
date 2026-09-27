@@ -1,4 +1,4 @@
-﻿using HandheldCompanion.Controllers;
+using HandheldCompanion.Controllers;
 using HandheldCompanion.Helpers;
 using HandheldCompanion.Managers.Hid;
 using HandheldCompanion.Sensors;
@@ -435,32 +435,18 @@ public class DeviceManager : IManager
 
     public string GetManufacturerString(string path)
     {
-        using var handle = Kernel32.CreateFile(path,
-            Kernel32.ACCESS_MASK.GenericRight.GENERIC_READ |
-            Kernel32.ACCESS_MASK.GenericRight.GENERIC_WRITE,
-            Kernel32.FileShare.FILE_SHARE_READ | Kernel32.FileShare.FILE_SHARE_WRITE,
-            IntPtr.Zero, Kernel32.CreationDisposition.OPEN_EXISTING,
-            Kernel32.CreateFileFlags.FILE_ATTRIBUTE_NORMAL
-            | Kernel32.CreateFileFlags.FILE_FLAG_NO_BUFFERING
-            | Kernel32.CreateFileFlags.FILE_FLAG_WRITE_THROUGH,
-            Kernel32.SafeObjectHandle.Null
-        );
+        using var handle = OpenHidDeviceHandle(path);
+        if (handle.IsInvalid)
+            return string.Empty;
 
         return GetString(handle.DangerousGetHandle(), HidD_GetManufacturerString);
     }
 
     public string GetProductString(string path)
     {
-        using var handle = Kernel32.CreateFile(path,
-            Kernel32.ACCESS_MASK.GenericRight.GENERIC_READ |
-            Kernel32.ACCESS_MASK.GenericRight.GENERIC_WRITE,
-            Kernel32.FileShare.FILE_SHARE_READ | Kernel32.FileShare.FILE_SHARE_WRITE,
-            IntPtr.Zero, Kernel32.CreationDisposition.OPEN_EXISTING,
-            Kernel32.CreateFileFlags.FILE_ATTRIBUTE_NORMAL
-            | Kernel32.CreateFileFlags.FILE_FLAG_NO_BUFFERING
-            | Kernel32.CreateFileFlags.FILE_FLAG_WRITE_THROUGH,
-            Kernel32.SafeObjectHandle.Null
-        );
+        using var handle = OpenHidDeviceHandle(path);
+        if (handle.IsInvalid)
+            return string.Empty;
 
         return GetString(handle.DangerousGetHandle(), HidD_GetProductString);
     }
@@ -507,7 +493,7 @@ public class DeviceManager : IManager
 
     private static Kernel32.SafeObjectHandle OpenHidDeviceHandle(string path)
     {
-        return Kernel32.CreateFile(path,
+        var handle = Kernel32.CreateFile(path,
             Kernel32.ACCESS_MASK.GenericRight.GENERIC_READ | Kernel32.ACCESS_MASK.GenericRight.GENERIC_WRITE,
             Kernel32.FileShare.FILE_SHARE_READ | Kernel32.FileShare.FILE_SHARE_WRITE,
             IntPtr.Zero,
@@ -515,6 +501,21 @@ public class DeviceManager : IManager
             Kernel32.CreateFileFlags.FILE_ATTRIBUTE_NORMAL,
             Kernel32.SafeObjectHandle.Null
         );
+
+        if (handle.IsInvalid)
+        {
+            // Fallback to query-only access (0) so HID capabilities and attributes can still be read even if exclusive access is held or cloaked
+            handle = Kernel32.CreateFile(path,
+                0,
+                Kernel32.FileShare.FILE_SHARE_READ | Kernel32.FileShare.FILE_SHARE_WRITE,
+                IntPtr.Zero,
+                Kernel32.CreationDisposition.OPEN_EXISTING,
+                Kernel32.CreateFileFlags.FILE_ATTRIBUTE_NORMAL,
+                Kernel32.SafeObjectHandle.Null
+            );
+        }
+
+        return handle;
     }
 
     private bool IsGaming(Attributes attributes, Capabilities capabilities)
