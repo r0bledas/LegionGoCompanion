@@ -30,13 +30,101 @@ namespace HandheldCompanion.Controllers.Lenovo
         public bool IsLeftJoystickConnected => joystickLeft is not null && !joystickLeft.IsDisposed;
 
         public override bool IsReady => IsRightJoystickConnected || IsLeftJoystickConnected || base.IsReady;
-        public override bool IsLeftConnected => isDualDInput ? base.IsLeftConnected : (base.IsLeftConnected || IsLeftJoystickConnected);
+        public override bool IsLeftConnected => IsLeftJoystickConnected || base.IsLeftConnected;
         public override bool IsRightConnected => IsRightJoystickConnected || base.IsRightConnected;
         public override bool IsRightDetached => true;
+
+        private DateTime lastAcquireAttempt = DateTime.MinValue;
+
+        private void EnsureJoysticksAcquired()
+        {
+            if (joystickRight is not null && !joystickRight.IsDisposed && (joystickLeft is not null && !joystickLeft.IsDisposed || !isDualDInput))
+                return;
+
+            if ((DateTime.UtcNow - lastAcquireAttempt).TotalSeconds < 2.0)
+                return;
+
+            lastAcquireAttempt = DateTime.UtcNow;
+
+            try
+            {
+                directInput ??= new DirectInput();
+                var devices = directInput.GetDevices(DeviceClass.All, DeviceEnumerationFlags.AllDevices);
+                foreach (DeviceInstance dev in devices)
+                {
+                    try
+                    {
+                        var candidate = new Joystick(directInput, dev.InstanceGuid);
+                        try { candidate.SetCooperativeLevel(IntPtr.Zero, CooperativeLevel.NonExclusive | CooperativeLevel.Background); } catch { }
+                        string path = candidate.Properties.InterfacePath.ToLower();
+                        if (!path.Contains("17ef") || !(path.Contains("6183") || path.Contains("6184") || path.Contains("61ec") || path.Contains("61ed")))
+                        {
+                            candidate.Dispose();
+                            continue;
+                        }
+
+                        if (path.Contains("col04") || path.Contains("col03") ||
+                            ((path.Contains("mi_01") || path.Contains("mi_02") || path.Contains("mi_03")) &&
+                             !path.Contains("col01") && !path.Contains("col02")))
+                        {
+                            candidate.Dispose();
+                            continue;
+                        }
+
+                        candidate.Properties.BufferSize = 128;
+                        try { candidate.Acquire(); } catch { }
+
+                        if (path.Contains("col02", StringComparison.OrdinalIgnoreCase))
+                        {
+                            if (joystickRight is null || joystickRight.IsDisposed)
+                            {
+                                joystickRight = candidate;
+                                isDualDInput = true;
+                                LogManager.LogInformation("LegionControllerDInput: Acquired Right Joystick (COL02)");
+                            }
+                            else
+                            {
+                                candidate.Dispose();
+                            }
+                        }
+                        else if (path.Contains("col01", StringComparison.OrdinalIgnoreCase))
+                        {
+                            if (joystickLeft is null || joystickLeft.IsDisposed)
+                            {
+                                joystickLeft = candidate;
+                                isDualDInput = true;
+                                LogManager.LogInformation("LegionControllerDInput: Acquired Left Joystick (COL01)");
+                            }
+                            else
+                            {
+                                candidate.Dispose();
+                            }
+                        }
+                        else
+                        {
+                            if (!isDualDInput && (joystickLeft is null || joystickLeft.IsDisposed))
+                            {
+                                joystickLeft = candidate;
+                                LogManager.LogInformation("LegionControllerDInput: Acquired Combined Joystick");
+                            }
+                            else
+                            {
+                                candidate.Dispose();
+                            }
+                        }
+                    }
+                    catch { }
+                }
+            }
+            catch { }
+        }
 
         public override void AttachDetails(PnPDetails details)
         {
             base.AttachDetails(details);
+
+            if (details.ProductID == 0x6184 || details.ProductID == 0x61ED || details.isDongle)
+                isDualDInput = true;
 
             try { joystickLeft?.Unacquire(); joystickLeft?.Dispose(); joystickLeft = null; } catch { }
             try { joystickRight?.Unacquire(); joystickRight?.Dispose(); joystickRight = null; } catch { }
@@ -140,12 +228,14 @@ namespace HandheldCompanion.Controllers.Lenovo
 
         protected override bool UpdateState()
         {
+            EnsureJoysticksAcquired();
+
             ButtonState.Overwrite(InjectedButtons, Inputs.ButtonState);
 
             bool anyPolled = false;
 
             // 1. Poll Left / Combined Joystick
-            if (joystickLeft is not null && !joystickLeft.IsDisposed && (!isDualDInput || IsLeftConnected))
+            if (joystickLeft is not null && !joystickLeft.IsDisposed)
             {
                 try
                 {
