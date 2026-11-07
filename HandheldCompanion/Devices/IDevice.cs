@@ -474,10 +474,17 @@ public abstract class IDevice
     public int NumberOfCores = 0;
     public string DeviceType = "Handheld";
 
+    private static readonly object _deviceInitLock = new();
+
     public static IDevice GetCurrent()
     {
         if (device is not null)
             return device;
+
+        lock (_deviceInitLock)
+        {
+            if (device is not null)
+                return device;
 
         var ManufacturerName = MotherboardInfo.Manufacturer.ToUpper();
         var ProductName = MotherboardInfo.Product;
@@ -518,16 +525,17 @@ public abstract class IDevice
             LogManager.LogWarning("Device not yet supported. The behavior of the application will be unpredictable");
         }
 
-        // update device details
-        device.ManufacturerName = ManufacturerName;
-        device.ProductName = ProductName;
-        device.SystemName = SystemName;
-        device.SystemModel = SystemModel;
-        device.Version = Version;
-        device.Processor = Processor;
-        device.NumberOfCores = NumberOfCores;
+            // update device details
+            device.ManufacturerName = ManufacturerName;
+            device.ProductName = ProductName;
+            device.SystemName = SystemName;
+            device.SystemModel = SystemModel;
+            device.Version = Version;
+            device.Processor = Processor;
+            device.NumberOfCores = NumberOfCores;
 
-        return device;
+            return device;
+        }
     }
 
     public bool HasMotionSensor()

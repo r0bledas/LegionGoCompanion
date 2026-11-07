@@ -72,6 +72,7 @@ namespace HandheldCompanion.Views
             this.SuspendLayout();
 
             // Form properties & High-DPI Scaling for Legion Go 2K display
+            this.DoubleBuffered = true;
             this.AutoScaleMode = AutoScaleMode.Dpi;
             this.AutoScaleDimensions = new SizeF(96F, 96F);
             this.Text = "Legion Go Companion";
@@ -221,20 +222,7 @@ namespace HandheldCompanion.Views
         {
             try
             {
-                try
-                {
-                    var security = new System.Security.AccessControl.EventWaitHandleSecurity();
-                    security.AddAccessRule(new System.Security.AccessControl.EventWaitHandleAccessRule(
-                        new System.Security.Principal.SecurityIdentifier(System.Security.Principal.WellKnownSidType.WorldSid, null),
-                        System.Security.AccessControl.EventWaitHandleRights.FullControl,
-                        System.Security.AccessControl.AccessControlType.Allow));
-
-                    showWindowEvent = EventWaitHandleAcl.Create(false, EventResetMode.AutoReset, Program.ShowWindowEventName, out _, security);
-                }
-                catch
-                {
-                    showWindowEvent = new EventWaitHandle(false, EventResetMode.AutoReset, Program.ShowWindowEventName);
-                }
+                showWindowEvent = Program.EnsureShowWindowEventCreated();
 
                 showWindowThread = new Thread(() =>
                 {
@@ -387,6 +375,8 @@ namespace HandheldCompanion.Views
             base.WndProc(ref m);
         }
 
+        private float _lastAppliedScale = -1f;
+
         public void ApplyWindowScaling()
         {
             if (this.IsDisposed) return;
@@ -400,55 +390,67 @@ namespace HandheldCompanion.Views
             try
             {
                 float scale = GeneralView.GetUiScaleFactor();
-                int baseW = 570;
-                int baseH = 380;
-                int targetW = (int)Math.Round(baseW * scale);
-                int targetH = (int)Math.Round(baseH * (1.0f + (scale - 1.0f) * 0.90f));
+                if (Math.Abs(scale - _lastAppliedScale) < 0.001f)
+                    return;
 
-                var screen = Screen.FromControl(this) ?? Screen.PrimaryScreen;
-                if (screen != null)
+                _lastAppliedScale = scale;
+                this.SuspendLayout();
+                try
                 {
-                    var wa = screen.WorkingArea;
-                    targetW = Math.Min(targetW, wa.Width - 10);
-                    targetH = Math.Min(targetH, wa.Height - 10);
-                    this.Size = new Size(targetW, targetH);
+                    int baseW = 570;
+                    int baseH = 380;
+                    int targetW = (int)Math.Round(baseW * scale);
+                    int targetH = (int)Math.Round(baseH * (1.0f + (scale - 1.0f) * 0.90f));
 
-                    this.Location = new Point(
-                        wa.Left + Math.Max(0, (wa.Width - targetW) / 2),
-                        wa.Top + Math.Max(0, (wa.Height - targetH) / 2)
-                    );
+                    var screen = Screen.FromControl(this) ?? Screen.PrimaryScreen;
+                    if (screen != null)
+                    {
+                        var wa = screen.WorkingArea;
+                        targetW = Math.Min(targetW, wa.Width - 10);
+                        targetH = Math.Min(targetH, wa.Height - 10);
+                        this.Size = new Size(targetW, targetH);
+
+                        this.Location = new Point(
+                            wa.Left + Math.Max(0, (wa.Width - targetW) / 2),
+                            wa.Top + Math.Max(0, (wa.Height - targetH) / 2)
+                        );
+                    }
+                    else
+                    {
+                        this.Size = new Size(targetW, targetH);
+                    }
+
+                    this.mainTabControl.Font = new Font("Segoe UI", 9.0f * (1.0f + (scale - 1.0f) * 0.50f), FontStyle.Regular);
+                    this.mainTabControl.Padding = new Point((int)Math.Round(12 * scale), (int)Math.Round(4 * scale));
+
+                    if (this.bottomStatusPanel != null)
+                    {
+                        this.bottomStatusPanel.Height = (int)Math.Round(24 * (1.0f + (scale - 1.0f) * 0.50f));
+                        if (this.lblAdminStatus != null)
+                        {
+                            this.lblAdminStatus.Font = new Font("Segoe UI", 8.0f * (1.0f + (scale - 1.0f) * 0.50f), FontStyle.Bold);
+                            this.lblAdminStatus.Location = new Point((int)Math.Round(8 * scale), (int)Math.Round(4 * scale));
+                        }
+                        if (this.btnRestartAdmin != null)
+                        {
+                            this.btnRestartAdmin.Font = new Font("Segoe UI", 8.0f * (1.0f + (scale - 1.0f) * 0.50f), FontStyle.Regular);
+                            this.btnRestartAdmin.Size = new Size((int)Math.Round(120 * scale), (int)Math.Round(22 * (1.0f + (scale - 1.0f) * 0.50f)));
+                            this.btnRestartAdmin.Location = new Point((int)Math.Round(95 * scale), (int)Math.Round(2 * scale));
+                        }
+                        if (this.lblSystemHealth != null)
+                        {
+                            this.lblSystemHealth.Font = new Font("Segoe UI", 8.0f * (1.0f + (scale - 1.0f) * 0.50f), FontStyle.Regular);
+                        }
+                    }
+
+                    this.generalView?.RefreshControlSizes();
+                    this.controllerView?.RefreshControlSizes();
+                    this.settingsView?.RefreshControlSizes();
                 }
-                else
+                finally
                 {
-                    this.Size = new Size(targetW, targetH);
+                    this.ResumeLayout(true);
                 }
-
-                this.mainTabControl.Font = new Font("Segoe UI", 9.0f * (1.0f + (scale - 1.0f) * 0.50f), FontStyle.Regular);
-                this.mainTabControl.Padding = new Point((int)Math.Round(12 * scale), (int)Math.Round(4 * scale));
-
-                if (this.bottomStatusPanel != null)
-                {
-                    this.bottomStatusPanel.Height = (int)Math.Round(24 * (1.0f + (scale - 1.0f) * 0.50f));
-                    if (this.lblAdminStatus != null)
-                    {
-                        this.lblAdminStatus.Font = new Font("Segoe UI", 8.0f * (1.0f + (scale - 1.0f) * 0.50f), FontStyle.Bold);
-                        this.lblAdminStatus.Location = new Point((int)Math.Round(8 * scale), (int)Math.Round(4 * scale));
-                    }
-                    if (this.btnRestartAdmin != null)
-                    {
-                        this.btnRestartAdmin.Font = new Font("Segoe UI", 8.0f * (1.0f + (scale - 1.0f) * 0.50f), FontStyle.Regular);
-                        this.btnRestartAdmin.Size = new Size((int)Math.Round(120 * scale), (int)Math.Round(22 * (1.0f + (scale - 1.0f) * 0.50f)));
-                        this.btnRestartAdmin.Location = new Point((int)Math.Round(95 * scale), (int)Math.Round(2 * scale));
-                    }
-                    if (this.lblSystemHealth != null)
-                    {
-                        this.lblSystemHealth.Font = new Font("Segoe UI", 8.0f * (1.0f + (scale - 1.0f) * 0.50f), FontStyle.Regular);
-                    }
-                }
-
-                this.generalView?.RefreshControlSizes();
-                this.controllerView?.RefreshControlSizes();
-                this.settingsView?.RefreshControlSizes();
             }
             catch (Exception ex)
             {
@@ -460,15 +462,18 @@ namespace HandheldCompanion.Views
         {
             base.OnShown(e);
 
-            // Pre-create child controls and native window handles so switching tabs is instantaneous!
-            try
-            {
-                this.controllerView?.CreateControl();
-                this.settingsView?.CreateControl();
-            }
-            catch { }
-
             ApplyWindowScaling();
+
+            // Pre-create background tab handles asynchronously after initial paint so first frame is instant
+            this.BeginInvoke(new Action(() =>
+            {
+                try
+                {
+                    this.controllerView?.CreateControl();
+                    this.settingsView?.CreateControl();
+                }
+                catch { }
+            }));
 
             if (this.trayIcon != null)
             {
@@ -488,17 +493,29 @@ namespace HandheldCompanion.Views
                 this.CreateHandle();
             }
 
-            ApplyWindowScaling();
+            if (_lastAppliedScale < 0f)
+            {
+                ApplyWindowScaling();
+            }
 
-            this.WindowState = FormWindowState.Normal;
-            this.Show();
-            this.Visible = true;
+            if (this.WindowState == FormWindowState.Minimized)
+            {
+                this.WindowState = FormWindowState.Normal;
+            }
+
+            if (!this.Visible)
+            {
+                this.Show();
+                this.Visible = true;
+            }
+
             ShowWindow(this.Handle, SW_RESTORE);
 
-            if (this.trayIcon != null)
+            if (this.trayIcon != null && !this.trayIcon.Visible)
             {
                 this.trayIcon.Visible = true;
             }
+
             this.BringToFront();
             this.Activate();
             try
@@ -506,10 +523,6 @@ namespace HandheldCompanion.Views
                 SetForegroundWindow(this.Handle);
             }
             catch { }
-
-            this.Invalidate(true);
-            this.Update();
-            this.Refresh();
         }
 
         public static void ToggleOrShowWindow()
@@ -578,6 +591,7 @@ namespace HandheldCompanion.Views
             isListeningForShow = false;
             diagnosticsTimer?.Stop();
             try { showWindowEvent?.Set(); showWindowEvent?.Dispose(); } catch { }
+            try { Program.SingleInstanceMutex?.ReleaseMutex(); Program.SingleInstanceMutex?.Dispose(); } catch { }
 
             if (this.trayIcon != null)
             {
@@ -589,7 +603,19 @@ namespace HandheldCompanion.Views
 
             if (restart)
             {
-                Application.Restart();
+                try
+                {
+                    Process.Start(new ProcessStartInfo
+                    {
+                        FileName = Application.ExecutablePath,
+                        Arguments = "--restart",
+                        UseShellExecute = true
+                    });
+                }
+                catch
+                {
+                    Application.Restart();
+                }
             }
             else
             {

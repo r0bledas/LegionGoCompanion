@@ -85,10 +85,14 @@ namespace HandheldCompanion.Targets
                 data[18] = 1;
             }
 
-            if (gamepadMotion is not null)
+            if (gamepadMotion is not null || Managers.ControllerManager.GyroAimingEnabled)
             {
-                gamepadMotion.GetRawGyro(out float gx, out float gy, out float gz);
-                gamepadMotion.GetRawAcceleration(out float ax, out float ay, out float az);
+                float gx = 0f, gy = 0f, gz = 0f, ax = 0f, ay = 0f, az = 0f;
+                if (gamepadMotion is not null)
+                {
+                    gamepadMotion.GetRawGyro(out gx, out gy, out gz);
+                    gamepadMotion.GetRawAcceleration(out ax, out ay, out az);
+                }
 
                 // Fall back to inputs.GyroState if gamepadMotion produces all zeros
                 if (gx == 0f && gy == 0f && gz == 0f && ax == 0f && ay == 0f && az == 0f)
@@ -105,23 +109,6 @@ namespace HandheldCompanion.Targets
                 short axs = InputUtils.RoundClampToShort(InputUtils.Clamp(ax * 9.81f, -64.0f, 64.0f) * 512.0f);
                 short ays = InputUtils.RoundClampToShort(InputUtils.Clamp(ay * 9.81f, -64.0f, 64.0f) * 512.0f);
                 short azs = InputUtils.RoundClampToShort(InputUtils.Clamp(az * 9.81f, -64.0f, 64.0f) * 512.0f);
-                data[19] = (byte)(gxs & 0xFF); data[20] = (byte)((gxs >> 8) & 0xFF);
-                data[21] = (byte)(gys & 0xFF); data[22] = (byte)((gys >> 8) & 0xFF);
-                data[23] = (byte)(gzs & 0xFF); data[24] = (byte)((gzs >> 8) & 0xFF);
-                data[25] = (byte)(axs & 0xFF); data[26] = (byte)((axs >> 8) & 0xFF);
-                data[27] = (byte)(ays & 0xFF); data[28] = (byte)((ays >> 8) & 0xFF);
-                data[29] = (byte)(azs & 0xFF); data[30] = (byte)((azs >> 8) & 0xFF);
-            }
-            else
-            {
-                var gyro = inputs.GyroState.GetGyroscope(GyroState.SensorState.DSU);
-                var accel = inputs.GyroState.GetAccelerometer(GyroState.SensorState.DSU);
-                short gxs = InputUtils.RoundClampToShort(InputUtils.Clamp(gyro.X, -2048.0f, 2048.0f) * 16.0f);
-                short gys = InputUtils.RoundClampToShort(InputUtils.Clamp(gyro.Y, -2048.0f, 2048.0f) * 16.0f);
-                short gzs = InputUtils.RoundClampToShort(InputUtils.Clamp(gyro.Z, -2048.0f, 2048.0f) * 16.0f);
-                short axs = InputUtils.RoundClampToShort(InputUtils.Clamp(accel.X * 9.81f, -64.0f, 64.0f) * 512.0f);
-                short ays = InputUtils.RoundClampToShort(InputUtils.Clamp(accel.Y * 9.81f, -64.0f, 64.0f) * 512.0f);
-                short azs = InputUtils.RoundClampToShort(InputUtils.Clamp(accel.Z * 9.81f, -64.0f, 64.0f) * 512.0f);
                 data[19] = (byte)(gxs & 0xFF); data[20] = (byte)((gxs >> 8) & 0xFF);
                 data[21] = (byte)(gys & 0xFF); data[22] = (byte)((gys >> 8) & 0xFF);
                 data[23] = (byte)(gzs & 0xFF); data[24] = (byte)((gzs >> 8) & 0xFF);

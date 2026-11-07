@@ -99,6 +99,9 @@ namespace HandheldCompanion.Controllers.Lenovo
         public LegionController() : base()
         {
             gamepadIndex = 1;
+            Capabilities |= ControllerCapabilities.MotionSensor;
+            gamepadMotions[0] = new($"LEGION_GO\\{LegionGoTablet.LeftJoyconIndex}");
+            gamepadMotions[1] = new($"LEGION_GO\\{LegionGoTablet.RightJoyconIndex}");
         }
 
         public LegionController(PnPDetails details) : base(details)
@@ -276,6 +279,8 @@ namespace HandheldCompanion.Controllers.Lenovo
             gamepadMotions[1] = new($"{details.baseContainerDeviceInstanceId}\\{LegionGoTablet.RightJoyconIndex}");
         }
 
+        private DateTime _lastGyroWakeAttempt = DateTime.MinValue;
+
         public override void Tick(long ticks, float delta, bool commit)
         {
             if (IsBusy || !IsPlugged || _disposing || _disposed)
@@ -284,29 +289,45 @@ namespace HandheldCompanion.Controllers.Lenovo
             if (!UpdateState())
                 return;
 
+            ProcessVendorHidInput(delta);
+
+            base.Tick(ticks, delta, true);
+        }
+
+        protected void ProcessVendorHidInput(float delta)
+        {
+            if (data == null || data.Length < 60)
+                return;
+
+            IsHidReportMisaligned();
+
+            // Check if vendor HID report has arrived
+            if (data[0] == 0 && data[1] == 0 && data[2] == 0 && data[3] == 0)
+                return;
+
             FrontEnum frontButton = (FrontEnum)data[FRONT_IDX];
-            Inputs.ButtonState[ButtonFlags.OEM1] = frontButton.HasFlag(FrontEnum.LegionR);
-            Inputs.ButtonState[ButtonFlags.OEM2] = frontButton.HasFlag(FrontEnum.LegionL);
+            Inputs.ButtonState[ButtonFlags.OEM1] |= frontButton.HasFlag(FrontEnum.LegionR);
+            Inputs.ButtonState[ButtonFlags.OEM2] |= frontButton.HasFlag(FrontEnum.LegionL);
 
             if (IsControllerSwap)
                 ApplyControllerSwap();
 
             BackEnum backButton = (BackEnum)data[BACK_IDX];
-            Inputs.ButtonState[ButtonFlags.R4] = backButton.HasFlag(BackEnum.M3);
-            Inputs.ButtonState[ButtonFlags.R5] = backButton.HasFlag(BackEnum.Y3);
-            Inputs.ButtonState[ButtonFlags.L4] = backButton.HasFlag(BackEnum.Y1);
-            Inputs.ButtonState[ButtonFlags.L5] = backButton.HasFlag(BackEnum.Y2);
+            Inputs.ButtonState[ButtonFlags.R4] |= backButton.HasFlag(BackEnum.M3);
+            Inputs.ButtonState[ButtonFlags.R5] |= backButton.HasFlag(BackEnum.Y3);
+            Inputs.ButtonState[ButtonFlags.L4] |= backButton.HasFlag(BackEnum.Y1);
+            Inputs.ButtonState[ButtonFlags.L5] |= backButton.HasFlag(BackEnum.Y2);
             Inputs.ButtonState[ButtonFlags.B5] |= backButton.HasFlag(BackEnum.M2);
-            Inputs.ButtonState[ButtonFlags.B11] = backButton.HasFlag(BackEnum.M1);
+            Inputs.ButtonState[ButtonFlags.B11] |= backButton.HasFlag(BackEnum.M1);
 
             ExtraEnum extraButton = (ExtraEnum)data[EXTRA_IDX];
-            Inputs.ButtonState[ButtonFlags.B9] = extraButton.HasFlag(ExtraEnum.Page);
-            Inputs.ButtonState[ButtonFlags.B10] = extraButton.HasFlag(ExtraEnum.Desktop);
-            Inputs.ButtonState[ButtonFlags.B6] = extraButton.HasFlag(ExtraEnum.ScrollClick);
+            Inputs.ButtonState[ButtonFlags.B9] |= extraButton.HasFlag(ExtraEnum.Page);
+            Inputs.ButtonState[ButtonFlags.B10] |= extraButton.HasFlag(ExtraEnum.Desktop);
+            Inputs.ButtonState[ButtonFlags.B6] |= extraButton.HasFlag(ExtraEnum.ScrollClick);
 
             ScrollEnum scrollEnum = (ScrollEnum)data[SCROLL_IDX];
-            Inputs.ButtonState[ButtonFlags.B7] = scrollEnum.HasFlag(ScrollEnum.ScrollUp);
-            Inputs.ButtonState[ButtonFlags.B8] = scrollEnum.HasFlag(ScrollEnum.ScrollDown);
+            Inputs.ButtonState[ButtonFlags.B7] |= scrollEnum.HasFlag(ScrollEnum.ScrollUp);
+            Inputs.ButtonState[ButtonFlags.B8] |= scrollEnum.HasFlag(ScrollEnum.ScrollDown);
 
             // handle touchpad if passthrough is off
             if (!IsPassthrough)
@@ -319,35 +340,70 @@ namespace HandheldCompanion.Controllers.Lenovo
                 HandleTouchpadInput(touched, TouchpadX, TouchpadY);
             }
 
+            // LeftJoycon (Slot 0)
+            float aX0 = (short)(data[LCONTROLLER_ACCE_IDX] << 8 | data[LCONTROLLER_ACCE_IDX + 1]) * -(4.0f / short.MaxValue);
+            float aZ0 = (short)(data[LCONTROLLER_ACCE_IDX + 2] << 8 | data[LCONTROLLER_ACCE_IDX + 3]) * -(4.0f / short.MaxValue);
+            float aY0 = (short)(data[LCONTROLLER_ACCE_IDX + 4] << 8 | data[LCONTROLLER_ACCE_IDX + 5]) * -(4.0f / short.MaxValue);
+
+            float gX0 = (short)(data[LCONTROLLER_GYRO_IDX] << 8 | data[LCONTROLLER_GYRO_IDX + 1]) * -(2000.0f / short.MaxValue);
+            float gZ0 = (short)(data[LCONTROLLER_GYRO_IDX + 2] << 8 | data[LCONTROLLER_GYRO_IDX + 3]) * -(2000.0f / short.MaxValue);
+            float gY0 = (short)(data[LCONTROLLER_GYRO_IDX + 4] << 8 | data[LCONTROLLER_GYRO_IDX + 5]) * -(2000.0f / short.MaxValue);
+
+            // RightJoycon (Slot 1)
+            float aX1 = (short)(data[RCONTROLLER_ACCE_IDX + 2] << 8 | data[RCONTROLLER_ACCE_IDX + 3]) * -(4.0f / short.MaxValue);
+            float aZ1 = (short)(data[RCONTROLLER_ACCE_IDX] << 8 | data[RCONTROLLER_ACCE_IDX + 1]) * (4.0f / short.MaxValue);
+            float aY1 = (short)(data[RCONTROLLER_ACCE_IDX + 4] << 8 | data[RCONTROLLER_ACCE_IDX + 5]) * -(4.0f / short.MaxValue);
+
+            float gX1 = (short)(data[RCONTROLLER_GYRO_IDX + 2] << 8 | data[RCONTROLLER_GYRO_IDX + 3]) * -(2000.0f / short.MaxValue);
+            float gZ1 = (short)(data[RCONTROLLER_GYRO_IDX] << 8 | data[RCONTROLLER_GYRO_IDX + 1]) * (2000.0f / short.MaxValue);
+            float gY1 = (short)(data[RCONTROLLER_GYRO_IDX + 4] << 8 | data[RCONTROLLER_GYRO_IDX + 5]) * -(2000.0f / short.MaxValue);
+
+            bool slot0Active = (aX0 != 0f || aY0 != 0f || aZ0 != 0f || gX0 != 0f || gY0 != 0f || gZ0 != 0f);
+            bool slot1Active = (aX1 != 0f || aY1 != 0f || aZ1 != 0f || gX1 != 0f || gY1 != 0f || gZ1 != 0f);
+
+            // If either Joy-Con IMU is disabled/zeroed (e.g. after detaching/waking or factory reset), re-send EnableGyros
+            if ((!slot1Active || !slot0Active) && (DateTime.UtcNow - _lastGyroWakeAttempt).TotalSeconds > 3.0)
+            {
+                _lastGyroWakeAttempt = DateTime.UtcNow;
+                System.Threading.Tasks.Task.Run(() =>
+                {
+                    try
+                    {
+                        if (IDevice.GetCurrent() is LegionGoTablet tablet)
+                            tablet.EnableGyros();
+                    }
+                    catch { }
+                });
+            }
+
+            // Fallback: if one Joy-Con slot is all zeros while the other has live IMU readings, mirror the active slot
+            if (!slot1Active && slot0Active)
+            {
+                aX1 = aX0; aY1 = aY0; aZ1 = aZ0;
+                gX1 = gX0; gY1 = gY0; gZ1 = gZ0;
+            }
+            else if (!slot0Active && slot1Active)
+            {
+                aX0 = aX1; aY0 = aY1; aZ0 = aZ1;
+                gX0 = gX1; gY0 = gY1; gZ0 = gZ1;
+            }
+
+            if (!gamepadMotions.ContainsKey(0))
+                gamepadMotions[0] = new($"LEGION_GO\\{LegionGoTablet.LeftJoyconIndex}");
+            if (!gamepadMotions.ContainsKey(1))
+                gamepadMotions[1] = new($"LEGION_GO\\{LegionGoTablet.RightJoyconIndex}");
+
             for (byte idx = 0; idx <= 1; ++idx)
             {
-                switch (idx)
+                if (idx == 0)
                 {
-                    default:
-                    case 0: // LeftJoycon
-                        {
-                            aX = (short)(data[LCONTROLLER_ACCE_IDX] << 8 | data[LCONTROLLER_ACCE_IDX + 1]) * -(4.0f / short.MaxValue);
-                            aZ = (short)(data[LCONTROLLER_ACCE_IDX + 2] << 8 | data[LCONTROLLER_ACCE_IDX + 3]) * -(4.0f / short.MaxValue);
-                            aY = (short)(data[LCONTROLLER_ACCE_IDX + 4] << 8 | data[LCONTROLLER_ACCE_IDX + 5]) * -(4.0f / short.MaxValue);
-
-                            gX = (short)(data[LCONTROLLER_GYRO_IDX] << 8 | data[LCONTROLLER_GYRO_IDX + 1]) * -(2000.0f / short.MaxValue);
-                            // todo: invert gZ on LGO2
-                            gZ = (short)(data[LCONTROLLER_GYRO_IDX + 2] << 8 | data[LCONTROLLER_GYRO_IDX + 3]) * -(2000.0f / short.MaxValue);
-                            gY = (short)(data[LCONTROLLER_GYRO_IDX + 4] << 8 | data[LCONTROLLER_GYRO_IDX + 5]) * -(2000.0f / short.MaxValue);
-                        }
-                        break;
-
-                    case 1: // RightJoycon
-                        {
-                            aX = (short)(data[RCONTROLLER_ACCE_IDX + 2] << 8 | data[RCONTROLLER_ACCE_IDX + 3]) * -(4.0f / short.MaxValue);
-                            aZ = (short)(data[RCONTROLLER_ACCE_IDX] << 8 | data[RCONTROLLER_ACCE_IDX + 1]) * (4.0f / short.MaxValue);
-                            aY = (short)(data[RCONTROLLER_ACCE_IDX + 4] << 8 | data[RCONTROLLER_ACCE_IDX + 5]) * -(4.0f / short.MaxValue);
-
-                            gX = (short)(data[RCONTROLLER_GYRO_IDX + 2] << 8 | data[RCONTROLLER_GYRO_IDX + 3]) * -(2000.0f / short.MaxValue);
-                            gZ = (short)(data[RCONTROLLER_GYRO_IDX] << 8 | data[RCONTROLLER_GYRO_IDX + 1]) * (2000.0f / short.MaxValue);
-                            gY = (short)(data[RCONTROLLER_GYRO_IDX + 4] << 8 | data[RCONTROLLER_GYRO_IDX + 5]) * -(2000.0f / short.MaxValue);
-                        }
-                        break;
+                    aX = aX0; aY = aY0; aZ = aZ0;
+                    gX = gX0; gY = gY0; gZ = gZ0;
+                }
+                else
+                {
+                    aX = aX1; aY = aY1; aZ = aZ1;
+                    gX = gX1; gY = gY1; gZ = gZ1;
                 }
 
                 // store motion from user selected gyro (left, right)
@@ -361,8 +417,6 @@ namespace HandheldCompanion.Controllers.Lenovo
                 if (gamepadMotions.TryGetValue(idx, out GamepadMotion? gamepadMotion))
                     gamepadMotion.ProcessMotion(gX, gY, gZ, aX, aY, aZ, delta);
             }
-
-            base.Tick(ticks, delta, true);
         }
 
         public void HandleTouchpadInput(bool touched, ushort TouchpadX, ushort TouchpadY)

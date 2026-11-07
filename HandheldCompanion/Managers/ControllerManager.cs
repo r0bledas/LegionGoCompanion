@@ -315,8 +315,29 @@ public static class ControllerManager
     {
         // Snapshot to avoid races after HasTargetController check
         IController? tc = targetController;
-        if (!HasTargetController || tc is null)
-            return;
+        if (tc is null || tc.IsDummy())
+        {
+            tc = Controllers.Values.OfType<LegionControllerDInput>().FirstOrDefault() ??
+                 Controllers.Values.OfType<LegionController>().FirstOrDefault();
+
+            if (tc is not null)
+            {
+                targetController = tc;
+            }
+            else if (PointerModeService.Instance.IsActive)
+            {
+                TryHydrateLegionDInput();
+                tc = Controllers.Values.OfType<LegionControllerDInput>().FirstOrDefault();
+                if (tc is not null)
+                    targetController = tc;
+                else
+                    return;
+            }
+            else
+            {
+                return;
+            }
+        }
 
         // pull controller
         tc.Tick(ticks, delta);
@@ -523,6 +544,16 @@ public static class ControllerManager
                     if (details is null)
                     {
                         LogManager.LogError("Failed to retrieve PnPDetails for controller {0}", deviceIndex);
+                        try { SDL.CloseGamepad(gamepad); } catch { }
+                        return;
+                    }
+
+                    // Never open or hijack our own virtual VIIPER controller (e.g. DualShock 4 054C:05C4 or Xbox 360 045E:028E)
+                    if (details.isVirtual ||
+                        (details.VendorID == 0x054C && (details.ProductID == 0x05C4 || details.ProductID == 0x0CE6)) ||
+                        (details.VendorID == 0x045E && details.ProductID == 0x028E && !details.deviceInstanceId.Contains("17EF", StringComparison.OrdinalIgnoreCase)))
+                    {
+                        try { SDL.CloseGamepad(gamepad); } catch { }
                         return;
                     }
 
@@ -570,6 +601,7 @@ public static class ControllerManager
                                 case SDL.GamepadType.XboxOne:
                                     // XInput controllers are handled exclusively by the XInput pipeline (XUsbDeviceArrived).
                                     // SDL detection is expected; skip silently and let XInput manage it.
+                                    try { SDL.CloseGamepad(gamepad); } catch { }
                                     return;
 
                                 case SDL.GamepadType.PS3:
@@ -704,7 +736,7 @@ public static class ControllerManager
 
             try
             {
-                if (!details.isGaming) return;
+                if (!details.isGaming || details.isVirtual || details.VendorID == 0x054C) return;
 
                 try
                 {
@@ -1429,7 +1461,7 @@ public static class ControllerManager
                 return;
 
             var dinputDetails = ManagerFactory.deviceManager.PnPDevices.Values
-                .FirstOrDefault(d => d.isGaming && d.VendorID == 0x17EF && (d.ProductID == 0x6184 || d.ProductID == 0x61ED || d.ProductID == 0x6183 || d.ProductID == 0x61EC));
+                .FirstOrDefault(d => (d.isGaming || d.VendorID == 0x17EF) && d.VendorID == 0x17EF && (d.ProductID == 0x6184 || d.ProductID == 0x61ED || d.ProductID == 0x6183 || d.ProductID == 0x61EC));
 
             if (dinputDetails is not null)
             {
@@ -1437,7 +1469,13 @@ public static class ControllerManager
             }
             else
             {
-                ManagerFactory.deviceManager.RefreshDInput();
+                var directController = new LegionControllerDInput();
+                string containerId = "LEGION_DIRECTINPUT_CONTROLLER";
+                directController.IsBusy = false;
+                Controllers[containerId] = directController;
+                if (targetController == null || targetController.IsDummy())
+                    targetController = directController;
+                LogManager.LogInformation("Directly hydrated LegionControllerDInput for Pointer Mode");
             }
         }
         catch (Exception ex)

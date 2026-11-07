@@ -606,17 +606,16 @@ namespace HandheldCompanion.Controllers
 
         protected void HideHID()
         {
-            if (Details is null)
+            if (Details is null || Details.isVirtual)
                 return;
 
-            /*
-            PnPDevice? baseDevice = Details.GetBasePnPDevice();
-            if (baseDevice is not null)
-            {
-                foreach (string instanceId in EnumerateDeviceAndChildren(baseDevice))
-                    HidHide.HidePath(instanceId);
-            }
-            */
+            // Never hide Legion Go DInput / wireless controllers or virtual DS4/DualSense/Xbox360 controllers
+            if (Details.VendorID == 0x17EF && (Details.ProductID == 0x6184 || Details.ProductID == 0x61ED || Details.ProductID == 0x6183 || Details.ProductID == 0x61EC))
+                return;
+            if (Details.VendorID == 0x054C && (Details.ProductID == 0x05C4 || Details.ProductID == 0x0CE6))
+                return;
+            if (Details.VendorID == 0x045E && Details.ProductID == 0x028E && !Details.deviceInstanceId.Contains("17EF", StringComparison.OrdinalIgnoreCase))
+                return;
 
             HidHide.HidePath(Details.baseContainerDeviceInstanceId);
             HidHide.HidePath(Details.deviceInstanceId);

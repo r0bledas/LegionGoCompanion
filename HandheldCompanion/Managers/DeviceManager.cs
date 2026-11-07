@@ -337,11 +337,22 @@ public class DeviceManager : IManager
                 usbDevice = check;
             }
 
-            // get root
+            // get root and check if any ancestor in the PnP tree is a virtual root hub (e.g., USB/IP ROOT\SYSTEM or ViGEm)
             IPnPDevice? root = usbDevice;
             string rootId = root.InstanceId;
+            bool hasVirtualAncestor = rootId.StartsWith(@"ROOT\", StringComparison.InvariantCultureIgnoreCase) ||
+                                      rootId.Contains("USBIP", StringComparison.InvariantCultureIgnoreCase) ||
+                                      rootId.Contains("VIGEM", StringComparison.InvariantCultureIgnoreCase);
             while (root.Parent is not null)
             {
+                string ancestorId = root.Parent.InstanceId;
+                if (ancestorId.StartsWith(@"ROOT\", StringComparison.InvariantCultureIgnoreCase) ||
+                    ancestorId.Contains("USBIP", StringComparison.InvariantCultureIgnoreCase) ||
+                    ancestorId.Contains("VIGEM", StringComparison.InvariantCultureIgnoreCase))
+                {
+                    hasVirtualAncestor = true;
+                }
+
                 if (rootId.Contains(@"USB\ROOT", StringComparison.InvariantCultureIgnoreCase))
                     break;
 
@@ -364,6 +375,10 @@ public class DeviceManager : IManager
             bool IsDisableable = Device_DevNodeStatus.HasFlag(DeviceStatus.DN_DISABLEABLE);
             bool IsRemovable = Device_DevNodeStatus.HasFlag(DeviceStatus.DN_REMOVABLE);
 
+            bool isViiperVirtual = hasVirtualAncestor ||
+                (attributes.Value.VendorID == 0x054C && (attributes.Value.ProductID == 0x05C4 || attributes.Value.ProductID == 0x0CE6)) ||
+                (attributes.Value.VendorID == 0x045E && attributes.Value.ProductID == 0x028E && !hidDevice.InstanceId.Contains("17EF", StringComparison.InvariantCultureIgnoreCase));
+
             // get details
             PnPDetails details = new PnPDetails
             {
@@ -373,13 +388,13 @@ public class DeviceManager : IManager
                 EnumeratorName = usbDevice.GetProperty<string>(DevicePropertyKey.Device_EnumeratorName) ?? string.Empty,
                 deviceInstanceId = hidDevice.InstanceId.ToUpper(),
                 baseContainerDeviceInstanceId = usbDevice.InstanceId.ToUpper(),
-                isVirtual = (usbDevice.IsVirtual() || hidDevice.IsVirtual() || IsvJoy(attributes.Value)), // && !IsMoonlight(attributes.Value),
+                isVirtual = (usbDevice.IsVirtual() || hidDevice.IsVirtual() || IsvJoy(attributes.Value) || isViiperVirtual),
                 isGaming = IsGaming(attributes.Value, capabilities.Value),
                 ProductID = attributes.Value.ProductID,
                 VendorID = attributes.Value.VendorID,
                 isXInput = hidDevice.InstanceId.Contains("IG_", StringComparison.InvariantCultureIgnoreCase),
             };
-            details.isExternal = IsDisableable || IsRemovable || details.isBluetooth;
+            details.isExternal = !details.isVirtual && (IsDisableable || IsRemovable || details.isBluetooth);
 
             // get name
             string DeviceDesc = usbDevice.GetProperty<string>(DevicePropertyKey.Device_DeviceDesc) ?? string.Empty;
@@ -493,20 +508,20 @@ public class DeviceManager : IManager
 
     private static Kernel32.SafeObjectHandle OpenHidDeviceHandle(string path)
     {
+        // Try opening with 0 (query-only access) first to avoid sharing violations and access denials
         var handle = Kernel32.CreateFile(path,
-            Kernel32.ACCESS_MASK.GenericRight.GENERIC_READ | Kernel32.ACCESS_MASK.GenericRight.GENERIC_WRITE,
-            Kernel32.FileShare.FILE_SHARE_READ | Kernel32.FileShare.FILE_SHARE_WRITE,
+            0,
+            Kernel32.FileShare.FILE_SHARE_READ | Kernel32.FileShare.FILE_SHARE_WRITE | Kernel32.FileShare.FILE_SHARE_DELETE,
             IntPtr.Zero,
             Kernel32.CreationDisposition.OPEN_EXISTING,
-            Kernel32.CreateFileFlags.FILE_ATTRIBUTE_NORMAL,
+            0,
             Kernel32.SafeObjectHandle.Null
         );
 
         if (handle.IsInvalid)
         {
-            // Fallback to query-only access (0) so HID capabilities and attributes can still be read even if exclusive access is held or cloaked
             handle = Kernel32.CreateFile(path,
-                0,
+                Kernel32.ACCESS_MASK.GenericRight.GENERIC_READ | Kernel32.ACCESS_MASK.GenericRight.GENERIC_WRITE,
                 Kernel32.FileShare.FILE_SHARE_READ | Kernel32.FileShare.FILE_SHARE_WRITE,
                 IntPtr.Zero,
                 Kernel32.CreationDisposition.OPEN_EXISTING,
@@ -526,6 +541,7 @@ public class DeviceManager : IManager
             ((attributes.VendorID == 0x28DE) && (attributes.ProductID == 0x1142)) || // STEAM CONTROLLER WIRELESS
             ((attributes.VendorID == 0x28DE) && (attributes.ProductID == 0x1205)) || // STEAM DECK
             ((attributes.VendorID == 0x28DE) && (attributes.ProductID == 0x12f0)) || // STEAMOS HANDHELD
+            ((attributes.VendorID == 0x17EF) && (attributes.ProductID == 0x6184 || attributes.ProductID == 0x61ED || attributes.ProductID == 0x6183 || attributes.ProductID == 0x61EC)) || // LENOVO LEGION CONTROLLERS
             (0x05 == capabilities.UsagePage) || (0x01 == capabilities.UsagePage) && ((0x04 == capabilities.Usage) || (0x05 == capabilities.Usage)));
     }
 

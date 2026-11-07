@@ -398,10 +398,17 @@ namespace HandheldCompanion.Views
             this.ResumeLayout(false);
         }
 
+        private float _lastAppliedScale = -1f;
+
         public void RefreshControlSizes()
         {
             if (this.IsDisposed) return;
+            this.DoubleBuffered = true;
             float scale = GeneralView.GetUiScaleFactor();
+            if (Math.Abs(scale - _lastAppliedScale) < 0.001f)
+                return;
+
+            _lastAppliedScale = scale;
             this.SuspendLayout();
             try
             {

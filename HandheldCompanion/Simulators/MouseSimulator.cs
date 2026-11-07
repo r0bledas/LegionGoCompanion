@@ -29,6 +29,10 @@ public static class MouseSimulator
     [DllImport("user32.dll")]
     private static extern short GetAsyncKeyState(int vKey);
 
+    [DllImport("user32.dll")]
+    private static extern void mouse_event(uint dwFlags, int dx, int dy, uint dwData, UIntPtr dwExtraInfo);
+    private const uint MOUSEEVENTF_MOVE = 0x0001;
+
     /// <summary>
     /// Flip the toggle state for a mouse button. Returns the new toggle state.
     /// Call this on button press (rising edge) when HasToggle is enabled.
@@ -163,11 +167,18 @@ public static class MouseSimulator
     {
         try
         {
-            InputSimulator.Mouse.MoveMouseBy(x, y);
+            mouse_event(MOUSEEVENTF_MOVE, x, y, 0, UIntPtr.Zero);
         }
-        catch (Exception)
+        catch
         {
-            // Some simulated input commands were not sent successfully.
+            try
+            {
+                InputSimulator.Mouse.MoveMouseBy(x, y);
+            }
+            catch (Exception)
+            {
+                // Some simulated input commands were not sent successfully.
+            }
         }
     }
 

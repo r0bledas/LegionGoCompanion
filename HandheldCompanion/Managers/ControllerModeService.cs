@@ -89,27 +89,35 @@ namespace HandheldCompanion.Managers
 
                     case ControllerTargetMode.DS4:
                         PointerModeService.Instance.SetActive(false);
+                        UnhideVirtualControllers();
+                        if (IDevice.GetCurrent() is LegionGoTablet tablet)
+                            tablet.EnableGyros();
                         ManagerFactory.settingsManager.SetProperty("HIDcloakonconnect", true);
                         ControllerManager.TargetController?.Hide(false);
                         SetLegionPassthrough(false);
                         ManagerFactory.layoutManager.SetLayoutMode(LayoutModes.Gamepad);
                         ManagerFactory.settingsManager.SetProperty("LayoutMode", (int)LayoutModes.Gamepad);
-                        ManagerFactory.settingsManager.SetProperty("HIDmode", (int)HIDmode.DualShock4Controller);
+                        VirtualManager.HIDstatus = HIDstatus.Connected;
                         await VirtualManager.SetControllerMode(HIDmode.DualShock4Controller);
                         await VirtualManager.SetControllerStatus(HIDstatus.Connected);
+                        ManagerFactory.settingsManager.SetProperty("HIDmode", (int)HIDmode.DualShock4Controller);
+                        ManagerFactory.settingsManager.SetProperty("HIDstatus", (int)HIDstatus.Connected);
                         PlaySound();
                         break;
 
                     case ControllerTargetMode.X360:
                         PointerModeService.Instance.SetActive(false);
+                        UnhideVirtualControllers();
                         ManagerFactory.settingsManager.SetProperty("HIDcloakonconnect", true);
                         ControllerManager.TargetController?.Hide(false);
                         SetLegionPassthrough(false);
                         ManagerFactory.layoutManager.SetLayoutMode(LayoutModes.Gamepad);
                         ManagerFactory.settingsManager.SetProperty("LayoutMode", (int)LayoutModes.Gamepad);
-                        ManagerFactory.settingsManager.SetProperty("HIDmode", (int)HIDmode.Xbox360Controller);
+                        VirtualManager.HIDstatus = HIDstatus.Connected;
                         await VirtualManager.SetControllerMode(HIDmode.Xbox360Controller);
                         await VirtualManager.SetControllerStatus(HIDstatus.Connected);
+                        ManagerFactory.settingsManager.SetProperty("HIDmode", (int)HIDmode.Xbox360Controller);
+                        ManagerFactory.settingsManager.SetProperty("HIDstatus", (int)HIDstatus.Connected);
                         PlaySound();
                         break;
 
@@ -120,6 +128,7 @@ namespace HandheldCompanion.Managers
                         ManagerFactory.settingsManager.SetProperty("HIDcloakonconnect", false);
                         ControllerManager.TargetController?.Unhide(false);
                         SetLegionPassthrough(true);
+                        UnhideLegionControllers();
                         ManagerFactory.layoutManager.SetLayoutMode(LayoutModes.Gamepad);
                         ManagerFactory.settingsManager.SetProperty("LayoutMode", (int)LayoutModes.Gamepad);
                         ManagerFactory.settingsManager.SetProperty("HIDmode", (int)HIDmode.NoController);
@@ -168,10 +177,29 @@ namespace HandheldCompanion.Managers
             try { SystemSounds.Exclamation.Play(); } catch { }
         }
 
+        private static void UnhideVirtualControllers()
+        {
+            try
+            {
+                foreach (string devPath in HidHide.GetRegisteredDevices())
+                {
+                    if (devPath.Contains("054C", StringComparison.OrdinalIgnoreCase) ||
+                        devPath.Contains("045E", StringComparison.OrdinalIgnoreCase) ||
+                        devPath.Contains("17EF&PID_61ED", StringComparison.OrdinalIgnoreCase) ||
+                        devPath.Contains("17EF&PID_6184", StringComparison.OrdinalIgnoreCase))
+                    {
+                        HidHide.UnhidePath(devPath);
+                    }
+                }
+            }
+            catch { }
+        }
+
         private static void UnhideLegionControllers()
         {
             try
             {
+                UnhideVirtualControllers();
                 if (ManagerFactory.deviceManager?.PnPDevices != null)
                 {
                     foreach (var dev in ManagerFactory.deviceManager.PnPDevices.Values.Where(d => d.VendorID == 0x17EF && (d.ProductID == 0x6184 || d.ProductID == 0x61ED || d.ProductID == 0x6183 || d.ProductID == 0x61EC || d.ProductID == 0x61EB)))

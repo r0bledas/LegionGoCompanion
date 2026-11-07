@@ -122,6 +122,8 @@ namespace HandheldCompanion.Devices.Lenovo
                 foreach (byte[] cmd in ControllerFactoryReset())
                     device.Write(cmd);
 
+                await System.Threading.Tasks.Task.Delay(150).ConfigureAwait(false);
+
                 // enable left gyro
                 foreach (byte[] cmd in EnableControllerGyro(LeftJoyconIndex))
                     device.Write(cmd);
@@ -136,6 +138,8 @@ namespace HandheldCompanion.Devices.Lenovo
                 // disable windows-specific keyboard commands
                 device.Write(SetSteamOSMode(true));
             }
+
+            EnableGyros();
 
             base.Device_Inserted(reScan);
 
@@ -152,6 +156,49 @@ namespace HandheldCompanion.Devices.Lenovo
             lightProfileL = GetCurrentLightProfile(3);
             lightProfileR = GetCurrentLightProfile(4);
 #endif
+        }
+
+        public void EnableGyros()
+        {
+            try
+            {
+                if (hidDevices.TryGetValue(INPUT_HID_ID, out HidDevice? device))
+                {
+                    if (!device.IsOpen)
+                        device.OpenDevice();
+
+                    foreach (byte[] cmd in EnableControllerGyro(LeftJoyconIndex))
+                        device.Write(cmd);
+                    foreach (byte[] cmd in EnableControllerGyro(RightJoyconIndex))
+                        device.Write(cmd);
+                }
+
+                // Also write 64-byte gyro enable commands directly to any MI_02 vendor interface
+                foreach (var hid in HidDevices.Enumerate(0x17EF, productIds))
+                {
+                    try
+                    {
+                        if (hid.DevicePath != null && hid.DevicePath.Contains("mi_02", StringComparison.OrdinalIgnoreCase))
+                        {
+                            hid.OpenDevice();
+                            foreach (byte[] cmd in EnableControllerGyro(LeftJoyconIndex))
+                            {
+                                byte[] buf = new byte[64];
+                                Array.Copy(cmd, buf, cmd.Length);
+                                hid.Write(buf);
+                            }
+                            foreach (byte[] cmd in EnableControllerGyro(RightJoyconIndex))
+                            {
+                                byte[] buf = new byte[64];
+                                Array.Copy(cmd, buf, cmd.Length);
+                                hid.Write(buf);
+                            }
+                        }
+                    }
+                    catch { }
+                }
+            }
+            catch { }
         }
 
         #region Controller

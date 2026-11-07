@@ -92,6 +92,7 @@ namespace HandheldCompanion.Views
         {
             this.SuspendLayout();
 
+            this.DoubleBuffered = true;
             this.AutoScaleMode = AutoScaleMode.None;
             this.Dock = DockStyle.Fill;
             this.Font = new Font("Segoe UI", 9F, FontStyle.Regular);
@@ -353,11 +354,18 @@ namespace HandheldCompanion.Views
             RefreshControlSizes();
         }
 
+        private float _lastAppliedScale = -1f;
+        private static bool _startupModeApplied = false;
+
         public void RefreshControlSizes()
         {
             if (this.IsDisposed) return;
 
             float scale = GetUiScaleFactor();
+            if (Math.Abs(scale - _lastAppliedScale) < 0.001f)
+                return;
+
+            _lastAppliedScale = scale;
 
             this.SuspendLayout();
             try
@@ -397,10 +405,31 @@ namespace HandheldCompanion.Views
 
         private async Task ApplyStartupControllerMode()
         {
+            if (_startupModeApplied)
+                return;
+            _startupModeApplied = true;
+
             try
             {
                 // Brief delay to allow initial hardware & driver initialization
                 await Task.Delay(350);
+
+                // Respect Pointer Mode or DS4 Mode if already active or persisted in settings
+                if (PointerModeService.Instance.IsActive)
+                {
+                    UpdateActiveControllerHighlight();
+                    return;
+                }
+
+                HIDmode savedHidMode = (HIDmode)ManagerFactory.settingsManager.GetInt("HIDmode");
+                int savedLayoutMode = ManagerFactory.settingsManager.GetInt("LayoutMode");
+                if (savedHidMode == HIDmode.DualShock4Controller && savedLayoutMode == (int)LayoutModes.Gamepad)
+                {
+                    await ControllerModeService.ApplyMode(ControllerTargetMode.DS4);
+                    UpdateActiveControllerHighlight();
+                    return;
+                }
+
                 bool desktopOnStart = ManagerFactory.settingsManager.GetBoolean("DesktopLayoutOnStart");
                 if (desktopOnStart)
                 {

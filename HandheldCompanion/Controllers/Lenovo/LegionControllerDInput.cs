@@ -21,23 +21,51 @@ namespace HandheldCompanion.Controllers.Lenovo
         public LegionControllerDInput(PnPDetails details) : base(details)
         { }
 
-        public override bool IsConnected() =>
-            (joystickLeft is not null && !joystickLeft.IsDisposed) ||
-            (joystickRight is not null && !joystickRight.IsDisposed) ||
-            (Controller is not null && Controller.Reading);
-
+        public override bool IsConnected() => true;
         public bool IsRightJoystickConnected => joystickRight is not null && !joystickRight.IsDisposed;
         public bool IsLeftJoystickConnected => joystickLeft is not null && !joystickLeft.IsDisposed;
 
-        public override bool IsReady => IsRightJoystickConnected || IsLeftJoystickConnected || base.IsReady;
+        public override bool IsReady => true;
         public override bool IsLeftConnected => IsLeftJoystickConnected || base.IsLeftConnected;
-        public override bool IsRightConnected => IsRightJoystickConnected || base.IsRightConnected;
+        public override bool IsRightConnected => true;
         public override bool IsRightDetached => true;
+        public override bool IsWireless() => true;
+        public override bool IsExternal() => true;
+        public override bool IsPhysical() => true;
 
         private DateTime lastAcquireAttempt = DateTime.MinValue;
 
+        private void EnsureVendorHidOpened()
+        {
+            if (Controller is not null && Controller.IsDeviceValid && Controller.Reading)
+                return;
+
+            ushort[] candidatePids = [0x61ED, 0x6184, 0x61EB, 0x6182, 0x61EC, 0x6183];
+            foreach (ushort pid in candidatePids)
+            {
+                try
+                {
+                    var candidate = new controller_hidapi.net.LegionController(0x17EF, pid, 64, 2);
+                    if (candidate.IsDeviceValid)
+                    {
+                        Controller = candidate;
+                        Open();
+                        if (Controller.Reading)
+                        {
+                            LogManager.LogInformation("LegionControllerDInput: Opened vendor HID interface (MI_02) on PID 0x{0:X4}", pid);
+                            return;
+                        }
+                    }
+                    candidate.Close();
+                }
+                catch { }
+            }
+        }
+
         private void EnsureJoysticksAcquired()
         {
+            EnsureVendorHidOpened();
+
             if (joystickRight is not null && !joystickRight.IsDisposed && (joystickLeft is not null && !joystickLeft.IsDisposed || !isDualDInput))
                 return;
 
@@ -218,6 +246,17 @@ namespace HandheldCompanion.Controllers.Lenovo
             base.Unplug();
         }
 
+        public override void Tick(long ticks, float delta, bool commit = false)
+        {
+            if (_disposing || _disposed)
+                return;
+
+            if (!IsPlugged)
+                Plug();
+            IsBusy = false;
+            base.Tick(ticks, delta, commit);
+        }
+
         public override void Gone()
         {
             try { joystickLeft?.Unacquire(); joystickLeft?.Dispose(); joystickLeft = null; } catch { }
@@ -273,10 +312,9 @@ namespace HandheldCompanion.Controllers.Lenovo
                         Inputs.ButtonState[ButtonFlags.RightStickClick] |= state.Buttons[9] || state.Buttons[14];
                     }
                 }
-                catch (SharpDX.SharpDXException ex)
+                catch (SharpDX.SharpDXException)
                 {
-                    if (IsPlugged)
-                        try { joystickLeft.Acquire(); } catch { }
+                    try { joystickLeft.Acquire(); } catch { }
                 }
             }
             else if (isDualDInput && !IsLeftConnected)
@@ -294,10 +332,13 @@ namespace HandheldCompanion.Controllers.Lenovo
                     anyPolled = true;
 
                     // On COL02 (Right Gamepad), the physical thumbstick is mounted sideways in single/detached mode:
-                    // Physical LEFT decreases Y, RIGHT increases Y -> mapped to RightStickX
                     // Physical UP increases X, DOWN decreases X -> mapped to RightStickY (+32767 UP, -32768 DOWN)
-                    Inputs.AxisState[AxisFlags.RightStickX] = (short)InputUtils.MapRange(stateR.Y, ushort.MinValue, ushort.MaxValue, short.MinValue, short.MaxValue);
-                    Inputs.AxisState[AxisFlags.RightStickY] = (short)InputUtils.MapRange(stateR.X, ushort.MinValue, ushort.MaxValue, short.MinValue, short.MaxValue);
+                    // Physical RIGHT increases Y (or Z depending on mapping) -> mapped to RightStickX
+                    int rawUp = stateR.X;
+                    int rawRight = (Math.Abs(stateR.Y - 32768) >= Math.Abs(stateR.Z - 32768)) ? stateR.Y : stateR.Z;
+
+                    Inputs.AxisState[AxisFlags.RightStickX] = (short)InputUtils.MapRange(rawRight, ushort.MinValue, ushort.MaxValue, short.MinValue, short.MaxValue);
+                    Inputs.AxisState[AxisFlags.RightStickY] = (short)InputUtils.MapRange(rawUp, ushort.MinValue, ushort.MaxValue, short.MinValue, short.MaxValue);
 
                     // Right Buttons (mapped from hardware diagnostic verification on COL02)
                     Inputs.ButtonState[ButtonFlags.B1] |= stateR.Buttons[2]; // Physical A -> B1
@@ -309,14 +350,23 @@ namespace HandheldCompanion.Controllers.Lenovo
                     Inputs.ButtonState[ButtonFlags.Start] |= stateR.Buttons[11]; // Legion R / Start
                     Inputs.ButtonState[ButtonFlags.RightStickClick] |= stateR.Buttons[8] || stateR.Buttons[9] || stateR.Buttons[10] || stateR.Buttons[14];
                 }
-                catch (SharpDX.SharpDXException ex)
+                catch (SharpDX.SharpDXException)
                 {
-                    if (IsPlugged)
-                        try { joystickRight.Acquire(); } catch { }
+                    try { joystickRight.Acquire(); } catch { }
                 }
             }
 
-            // 3. Triggers (L2 and R2 from 64-byte raw HID packet, respecting shift if misaligned)
+            // 3. Fallback to raw HID 64-byte streaming if joystickRight is not yet acquired
+            if ((joystickRight is null || joystickRight.IsDisposed) && data != null && data.Length > 17)
+            {
+                int rawStickVal = data[16];
+                if (Math.Abs(rawStickVal - 128) > 8)
+                {
+                    Inputs.AxisState[AxisFlags.RightStickX] = (short)InputUtils.MapRange(rawStickVal, 0, 255, short.MinValue, short.MaxValue);
+                }
+            }
+
+            // 4. Triggers (L2 and R2 from 64-byte raw HID packet, respecting shift if misaligned)
             int ltIdx = IsHidReportMisaligned() ? 20 : 22;
             int rtIdx = IsHidReportMisaligned() ? 21 : 23;
 
@@ -331,7 +381,7 @@ namespace HandheldCompanion.Controllers.Lenovo
             Inputs.ButtonState[ButtonFlags.L2Full] |= rawL2 > 240;
             Inputs.ButtonState[ButtonFlags.R2Full] |= rawR2 > 240;
 
-            return anyPolled || IsConnected() || (Controller is not null && Controller.Reading);
+            return anyPolled || IsConnected();
         }
     }
 }

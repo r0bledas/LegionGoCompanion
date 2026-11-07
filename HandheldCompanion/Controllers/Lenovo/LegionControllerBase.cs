@@ -28,6 +28,7 @@ namespace HandheldCompanion.Controllers.Lenovo
                 {
                     if (Controller is not null)
                     {
+                        Controller.OnControllerInputReceived -= Controller_OnControllerInputReceived;
                         Controller.OnControllerInputReceived += Controller_OnControllerInputReceived;
                         Controller.Open();
                     }

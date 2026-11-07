@@ -48,11 +48,54 @@ namespace HandheldCompanion
         private static readonly IntPtr HWND_BROADCAST = new IntPtr(0xffff);
         public static uint WM_SHOWME = 0;
         public const string ShowWindowEventName = @"Global\LegionGoCompanion_ShowWindow_Event";
+        public const string SingleInstanceMutexName = @"Global\LegionGoCompanion_SingleInstance_Mutex";
+        public static Mutex? SingleInstanceMutex;
+        public static EventWaitHandle? GlobalShowWindowEvent;
 
-        private static bool CheckExistingInstanceAndSignal()
+        public static EventWaitHandle? EnsureShowWindowEventCreated()
+        {
+            if (GlobalShowWindowEvent != null)
+                return GlobalShowWindowEvent;
+
+            try
+            {
+                var security = new System.Security.AccessControl.EventWaitHandleSecurity();
+                security.AddAccessRule(new System.Security.AccessControl.EventWaitHandleAccessRule(
+                    new System.Security.Principal.SecurityIdentifier(System.Security.Principal.WellKnownSidType.WorldSid, null),
+                    System.Security.AccessControl.EventWaitHandleRights.FullControl,
+                    System.Security.AccessControl.AccessControlType.Allow));
+
+                GlobalShowWindowEvent = EventWaitHandleAcl.Create(false, EventResetMode.AutoReset, ShowWindowEventName, out _, security);
+            }
+            catch
+            {
+                try
+                {
+                    GlobalShowWindowEvent = new EventWaitHandle(false, EventResetMode.AutoReset, ShowWindowEventName);
+                }
+                catch { }
+            }
+
+            return GlobalShowWindowEvent;
+        }
+
+        private static bool CheckExistingInstanceAndSignal(string[] args)
         {
             try
             {
+                bool isExplicitRestart = false;
+                if (args != null)
+                {
+                    foreach (string a in args)
+                    {
+                        if (string.Equals(a?.Trim(), "--restart", StringComparison.OrdinalIgnoreCase))
+                        {
+                            isExplicitRestart = true;
+                            break;
+                        }
+                    }
+                }
+
                 int currentPid = Process.GetCurrentProcess().Id;
                 string currentName = Process.GetCurrentProcess().ProcessName;
                 var targetNames = new System.Collections.Generic.HashSet<string>(StringComparer.OrdinalIgnoreCase)
@@ -62,7 +105,6 @@ namespace HandheldCompanion
                     "LegionGoCompanion"
                 };
 
-                bool hasOtherProcesses = false;
                 var otherProcesses = new System.Collections.Generic.List<Process>();
 
                 foreach (var name in targetNames)
@@ -71,18 +113,30 @@ namespace HandheldCompanion
                     {
                         if (p.Id != currentPid)
                         {
-                            hasOtherProcesses = true;
                             otherProcesses.Add(p);
                         }
                     }
                 }
 
-                if (!hasOtherProcesses)
+                if (otherProcesses.Count == 0)
                     return false;
 
-                bool isCurrentAdmin = IsAdministrator();
+                if (isExplicitRestart)
+                {
+                    foreach (var p in otherProcesses)
+                    {
+                        try
+                        {
+                            p.Kill();
+                            p.WaitForExit(1500);
+                        }
+                        catch { }
+                    }
+                    TrayCleaner.Clean();
+                    return false;
+                }
 
-                // 1. Signal cross-integrity Global EventWaitHandle (works reliably across user/admin boundary)
+                // 1. Signal cross-integrity Global EventWaitHandle (works reliably across user/admin boundary and when hidden in system tray)
                 try
                 {
                     if (EventWaitHandle.TryOpenExisting(ShowWindowEventName, out var handle))
@@ -101,51 +155,23 @@ namespace HandheldCompanion
                 }
                 catch { }
 
-                // 3. Check if an existing instance actually has an active window that responds
-                bool activeWindowFound = false;
-                for (int i = 0; i < 5; i++)
-                {
-                    Thread.Sleep(100);
-                    foreach (var p in otherProcesses)
-                    {
-                        try
-                        {
-                            p.Refresh();
-                            if (p.MainWindowHandle != IntPtr.Zero)
-                            {
-                                ShowWindow(p.MainWindowHandle, 9 /* SW_RESTORE */);
-                                SetForegroundWindow(p.MainWindowHandle);
-                                activeWindowFound = true;
-                                break;
-                            }
-                        }
-                        catch { }
-                    }
-                    if (activeWindowFound) break;
-                }
-
-                // If an existing instance is alive, has a window, and this instance is NOT elevating to admin,
-                // let the existing instance stay in the foreground and exit this duplicate
-                if (activeWindowFound && !isCurrentAdmin)
-                {
-                    return true;
-                }
-
-                // If no active window was found (meaning the other instance is a zombie/ghost/dead process)
-                // OR if this process is running elevated as Administrator:
-                // Kill the old zombie instances, sweep ghost icons, and run THIS instance!
+                // 3. If the existing process currently has a visible top-level window handle, bring it to foreground directly
                 foreach (var p in otherProcesses)
                 {
                     try
                     {
-                        p.Kill();
-                        p.WaitForExit(1500);
+                        if (p.MainWindowHandle != IntPtr.Zero)
+                        {
+                            ShowWindow(p.MainWindowHandle, 9 /* SW_RESTORE */);
+                            SetForegroundWindow(p.MainWindowHandle);
+                            break;
+                        }
                     }
                     catch { }
                 }
 
-                TrayCleaner.Clean();
-                return false;
+                // Always exit this duplicate launch immediately so we never spawn 2 instances or kill/cold-reboot the active tray instance
+                return true;
             }
             catch { }
             return false;
@@ -286,11 +312,19 @@ namespace HandheldCompanion
         static void Main(string[] args)
         {
             // If another instance is already running, signal it to restore its window and exit immediately!
-            if (CheckExistingInstanceAndSignal())
+            if (CheckExistingInstanceAndSignal(args))
                 return;
 
             if (!args.Contains("--no-elevate") && TryElevateViaScheduledTaskOrUac())
                 return;
+
+            // Create global ShowWindowEvent immediately so any second launch during startup signals us instead of racing
+            EnsureShowWindowEventCreated();
+            try
+            {
+                SingleInstanceMutex = new Mutex(true, SingleInstanceMutexName, out _);
+            }
+            catch { }
 
             Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
             Application.EnableVisualStyles();
@@ -339,27 +373,35 @@ namespace HandheldCompanion
                 MotionManager.Start();
                 ManagerFactory.settingsManager.Start();
 
-                // Initialize hardware
-                LogManager.LogInformation("Initializing IDevice...");
-                IDevice.GetCurrent().Initialize(false, false);
-
-                // Start factory managers
-                LogManager.LogInformation("Loading ManagerFactory managers...");
-                foreach (IManager manager in ManagerFactory.Managers)
+                // Initialize hardware and background managers asynchronously so UI renders immediately
+                _ = Task.Run(() =>
                 {
-                    Task.Run(() => manager.Start());
-                }
+                    try
+                    {
+                        LogManager.LogInformation("Initializing IDevice...");
+                        IDevice.GetCurrent().Initialize(false, false);
+                    }
+                    catch (Exception ex)
+                    {
+                        LogManager.LogError("IDevice initialization error: {0}", ex.Message);
+                    }
 
-                // Start static managers (essential Legion Go & controller services only)
-                LogManager.LogInformation("Loading static managers...");
-                Task.Run(() => SystemManager.Start());
-                Task.Run(() => VirtualManager.Start());
-                Task.Run(() => SensorsManager.Start());
-                Task.Run(() => ControllerManager.Start());
-                string exePath = Process.GetCurrentProcess().MainModule?.FileName ?? "LegionGoCompanion.exe";
-                Task.Run(() => TaskManager.Start(exePath));
-                Task.Run(() => HidHide.RegisterApplication(exePath));
-                Task.Run(() => PerformanceManager.Start());
+                    LogManager.LogInformation("Loading ManagerFactory managers...");
+                    foreach (IManager manager in ManagerFactory.Managers)
+                    {
+                        Task.Run(() => manager.Start());
+                    }
+
+                    LogManager.LogInformation("Loading static managers...");
+                    Task.Run(() => SystemManager.Start());
+                    Task.Run(() => VirtualManager.Start());
+                    Task.Run(() => SensorsManager.Start());
+                    Task.Run(() => ControllerManager.Start());
+                    string exePath = Process.GetCurrentProcess().MainModule?.FileName ?? "LegionGoCompanion.exe";
+                    Task.Run(() => TaskManager.Start(exePath));
+                    Task.Run(() => HidHide.RegisterApplication(exePath));
+                    Task.Run(() => PerformanceManager.Start());
+                });
 
                 LogManager.LogInformation("Starting UI...");
                 Application.Run(new MainForm());

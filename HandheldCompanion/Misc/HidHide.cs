@@ -1,4 +1,4 @@
-﻿using HandheldCompanion.Shared;
+using HandheldCompanion.Shared;
 using HandheldCompanion.Utils;
 using Nefarius.Drivers.HidHide;
 using Newtonsoft.Json;
@@ -13,8 +13,42 @@ namespace HandheldCompanion;
 
 public static class HidHide
 {
-    private static readonly Process? process;
     private static object hidLock = new();
+
+    private static string? GetCliPath()
+    {
+        var installPath = RegistryUtils.GetString(@"SOFTWARE\Nefarius Software Solutions e.U.\HidHide", "Path");
+        if (string.IsNullOrEmpty(installPath)) return null;
+        string cliPath = Path.Combine(installPath, "x64", "HidHideCLI.exe");
+        return File.Exists(cliPath) ? cliPath : null;
+    }
+
+    private static bool RunCli(string arguments, out string output)
+    {
+        output = string.Empty;
+        try
+        {
+            string? cliPath = GetCliPath();
+            if (string.IsNullOrEmpty(cliPath)) return false;
+
+            using var p = new Process
+            {
+                StartInfo = new ProcessStartInfo
+                {
+                    FileName = cliPath,
+                    Arguments = arguments,
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    CreateNoWindow = true
+                }
+            };
+            if (!p.Start()) return false;
+            output = p.StandardOutput.ReadToEnd();
+            return p.WaitForExit(3000);
+        }
+        catch { return false; }
+    }
 
     static HidHide()
     {
@@ -26,26 +60,6 @@ public static class HidHide
             LogManager.LogCritical("HidHide is missing. Please get it from: {0}", "https://github.com/ViGEm/HidHide/releases");
             MessageBox.Show("Unable to start Handheld Companion, the HidHide application is missing.\n\nPlease get it from: https://github.com/ViGEm/HidHide/releases", "Error");
             throw new InvalidOperationException();
-        }
-
-        // prepare backup path
-        var InstallPath = RegistryUtils.GetString(@"SOFTWARE\Nefarius Software Solutions e.U.\HidHide", "Path");
-        if (!string.IsNullOrEmpty(InstallPath))
-        {
-            InstallPath = Path.Combine(InstallPath, "x64", "HidHideCLI.exe");
-            if (File.Exists(InstallPath))
-                process = new Process
-                {
-                    StartInfo =
-                    {
-                        UseShellExecute = false,
-                        RedirectStandardOutput = true,
-                        RedirectStandardError = true,
-                        CreateNoWindow = true,
-                        FileName = InstallPath,
-                        Verb = "runas"
-                    }
-                };
         }
     }
 
@@ -109,17 +123,13 @@ public static class HidHide
         {
             LogManager.LogError("Failed to UnregisterApplication({0}), HidHideControlService is unreachable", fileName);
 
-            if (process is null)
-                return false;
-
-            process.StartInfo.Arguments = $"--app-unreg \"{fileName}\"";
-            bool started = process.Start();
-            bool success = process.WaitForExit(TimeSpan.FromSeconds(3));
-
-            if (started && success)
+            if (RunCli($"--app-unreg \"{fileName}\"", out _))
             {
-                process.StandardOutput.ReadToEnd(); // todo: parse result
                 LogManager.LogInformation("HideDevice RemoveApplicationPath: {0}", fileName);
+            }
+            else
+            {
+                return false;
             }
         }
 
@@ -144,17 +154,13 @@ public static class HidHide
         {
             LogManager.LogError("Failed to RegisterApplication({0}), HidHideControlService is unreachable", fileName);
 
-            if (process is null)
-                return false;
-
-            process.StartInfo.Arguments = $"--app-reg \"{fileName}\"";
-            bool started = process.Start();
-            bool success = process.WaitForExit(TimeSpan.FromSeconds(3));
-
-            if (started && success)
+            if (RunCli($"--app-reg \"{fileName}\"", out _))
             {
-                process.StandardOutput.ReadToEnd(); // todo: parse result
                 LogManager.LogInformation("HideDevice AddApplicationPath: {0}", fileName);
+            }
+            else
+            {
+                return false;
             }
         }
 
@@ -175,25 +181,14 @@ public static class HidHide
         {
             LogManager.LogError("Failed to SetCloaking({0}), HidHideControlService is unreachable", status);
 
-            if (process is null)
-                return false;
-
-            switch (status)
+            string arg = status ? "--cloak-on" : "--cloak-off";
+            if (RunCli(arg, out _))
             {
-                case true:
-                    process.StartInfo.Arguments = $"--cloak-on";
-                    break;
-                case false:
-                    process.StartInfo.Arguments = $"--cloak-off";
-                    break;
-            }
-            bool started = process.Start();
-            bool success = process.WaitForExit(TimeSpan.FromSeconds(3));
-
-            if (started && success)
-            {
-                process.StandardOutput.ReadToEnd(); // todo: parse result
                 LogManager.LogInformation("HideDevice SetCloaking: {0}", status);
+            }
+            else
+            {
+                return false;
             }
         }
 
@@ -221,17 +216,10 @@ public static class HidHide
         {
             LogManager.LogError("Failed to UnhidePath({0}), HidHideControlService is unreachable", deviceInstancePath);
 
-            if (process is null)
-                return false;
-
-            process.StartInfo.Arguments = $"--dev-unhide \"{deviceInstancePath}\"";
-            bool started = process.Start();
-            bool success = process.WaitForExit(TimeSpan.FromSeconds(3));
-
-            if (started && success)
+            bool success = RunCli($"--dev-unhide \"{deviceInstancePath}\"", out _);
+            if (success)
             {
-                process.StandardOutput.ReadToEnd(); // todo: parse result
-                LogManager.LogInformation("HideDevice AddBlockedInstanceId: {0}", deviceInstancePath);
+                LogManager.LogInformation("HideDevice RemoveBlockedInstanceId (CLI): {0}", deviceInstancePath);
             }
         }
 
@@ -259,17 +247,10 @@ public static class HidHide
         {
             LogManager.LogError("Failed to HidePath({0}), HidHideControlService is unreachable", deviceInstancePath);
 
-            if (process is null)
-                return false;
-
-            process.StartInfo.Arguments = $"--dev-hide \"{deviceInstancePath}\"";
-            bool started = process.Start();
-            bool success = process.WaitForExit(TimeSpan.FromSeconds(3));
-
-            if (started && success)
+            bool success = RunCli($"--dev-hide \"{deviceInstancePath}\"", out _);
+            if (success)
             {
-                process.StandardOutput.ReadToEnd(); // todo: parse result
-                LogManager.LogInformation("HideDevice AddBlockedInstanceId: {0}", deviceInstancePath);
+                LogManager.LogInformation("HideDevice AddBlockedInstanceId (CLI): {0}", deviceInstancePath);
             }
         }
 
@@ -280,17 +261,11 @@ public static class HidHide
     {
         try
         {
-            if (process is null)
-                return [];
-
             // using --dev-gaming sometimes doesn't report controllers or have empty BaseContainerDeviceInstancePath
-            process.StartInfo.Arguments = $"--dev-all";
-            bool started = process.Start();
-            bool success = process.WaitForExit(TimeSpan.FromSeconds(3));
-
-            if (started && success)
+            bool success = RunCli(arg, out string jsonString);
+            if (success)
             {
-                string jsonString = process.StandardOutput.ReadToEnd().Trim();
+                jsonString = jsonString.Trim();
                 if (string.IsNullOrEmpty(jsonString))
                     return [];
 
