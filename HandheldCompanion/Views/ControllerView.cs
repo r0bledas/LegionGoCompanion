@@ -22,9 +22,36 @@ namespace HandheldCompanion.Views
 
         // GroupBoxes for scaling
         private GroupBox? grpGyro;
+        private GroupBox? grpLed;
         private GroupBox? grpPointer;
         private GroupBox? grpHoldCycle;
         private GroupBox? grpRemap;
+
+        // Joystick LED controls
+        private Button? btnLedOn;
+        private Button? btnLedOff;
+        private ComboBox? cmbLedEffect;
+        private NumericUpDown? numLedBrightness;
+        private NumericUpDown? numLedSpeed;
+        private Panel? pnlLedSwatchLeft;
+        private Panel? pnlLedSwatchRight;
+        private CheckBox? chkLedSyncLR;
+        private Button? btnLedCustomLeft;
+        private Button? btnLedCustomRight;
+        private Label? lblLedStatus;
+        private bool _updatingLedUi = false;
+
+        private static readonly (string Name, Color Color)[] LedColorPresets = new[]
+        {
+            ("Blue", Color.FromArgb(0, 120, 215)),
+            ("Cyan", Color.FromArgb(0, 229, 255)),
+            ("Red", Color.FromArgb(255, 30, 30)),
+            ("Green", Color.FromArgb(0, 230, 118)),
+            ("Purple", Color.FromArgb(170, 0, 255)),
+            ("Orange", Color.FromArgb(255, 145, 0)),
+            ("Yellow", Color.FromArgb(255, 214, 0)),
+            ("White", Color.FromArgb(255, 255, 255))
+        };
 
         // Pointer Mode controls
         private CheckBox? chkPointerDetachedOnly;
@@ -240,6 +267,7 @@ namespace HandheldCompanion.Views
 
             lblGyroStatus = new Label
             {
+                Name = "lblGyroStatus",
                 Dock = DockStyle.Top,
                 AutoSize = true,
                 Font = new Font("Segoe UI", 8F, FontStyle.Regular),
@@ -247,6 +275,247 @@ namespace HandheldCompanion.Views
                 Padding = new Padding(4, 4, 4, 4)
             };
             grpGyro.Controls.Add(lblGyroStatus);
+
+            // ==========================================
+            // 1B. Joystick LED Lighting GroupBox
+            // ==========================================
+            grpLed = new GroupBox
+            {
+                Text = "Joystick LED Lighting (RGB Rings)",
+                Dock = DockStyle.Top,
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
+                Padding = new Padding(8, 6, 8, 8),
+                Margin = new Padding(0, 0, 0, 6)
+            };
+
+            FlowLayoutPanel flowLedTop = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Top,
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                WrapContents = true,
+                Padding = new Padding(2)
+            };
+
+            btnLedOn = CreateCompactButton("On", 56, 30, 9.0F, () =>
+            {
+                JoystickLedService.Instance.SetEnabled(true);
+                UpdateLedControlsFromService();
+            });
+
+            btnLedOff = CreateCompactButton("Off", 56, 30, 9.0F, () =>
+            {
+                JoystickLedService.Instance.SetEnabled(false);
+                UpdateLedControlsFromService();
+            });
+
+            Label lblLedEffect = new Label
+            {
+                Text = "Effect:",
+                AutoSize = true,
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Regular),
+                ForeColor = Color.FromArgb(40, 45, 55),
+                Margin = new Padding(6, 7, 3, 3)
+            };
+
+            cmbLedEffect = new ComboBox
+            {
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Regular),
+                Width = 145,
+                Margin = new Padding(2, 4, 8, 3)
+            };
+            cmbLedEffect.Items.AddRange(new object[]
+            {
+                "Solid Color",
+                "Pulse (Breathing)",
+                "Dynamic (Rainbow)",
+                "Spiral (Wheel)"
+            });
+            cmbLedEffect.SelectedIndexChanged += (s, e) =>
+            {
+                if (_updatingLedUi) return;
+                LegionGo.RgbMode mode = (cmbLedEffect.SelectedIndex + 1) switch
+                {
+                    1 => LegionGo.RgbMode.Solid,
+                    2 => LegionGo.RgbMode.Pulse,
+                    3 => LegionGo.RgbMode.Dynamic,
+                    4 => LegionGo.RgbMode.Spiral,
+                    _ => LegionGo.RgbMode.Solid
+                };
+                JoystickLedService.Instance.SetEffect(mode);
+                UpdateLedControlsFromService();
+            };
+
+            Label lblLedBright = new Label
+            {
+                Text = "Brightness:",
+                AutoSize = true,
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Regular),
+                ForeColor = Color.FromArgb(40, 45, 55),
+                Margin = new Padding(4, 7, 3, 3)
+            };
+
+            numLedBrightness = new NumericUpDown
+            {
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Regular),
+                Width = 54,
+                Minimum = 0,
+                Maximum = 100,
+                Increment = 10,
+                Value = Math.Clamp(JoystickLedService.Instance.Brightness, 0, 100),
+                Margin = new Padding(2, 4, 8, 3)
+            };
+            numLedBrightness.ValueChanged += (s, e) =>
+            {
+                if (_updatingLedUi) return;
+                JoystickLedService.Instance.SetBrightness((int)numLedBrightness.Value);
+                UpdateLedControlsFromService();
+            };
+
+            Label lblLedSpeed = new Label
+            {
+                Text = "Speed:",
+                AutoSize = true,
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Regular),
+                ForeColor = Color.FromArgb(40, 45, 55),
+                Margin = new Padding(4, 7, 3, 3)
+            };
+
+            numLedSpeed = new NumericUpDown
+            {
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Regular),
+                Width = 54,
+                Minimum = 0,
+                Maximum = 100,
+                Increment = 10,
+                Value = Math.Clamp(JoystickLedService.Instance.Speed, 0, 100),
+                Margin = new Padding(2, 4, 4, 3)
+            };
+            numLedSpeed.ValueChanged += (s, e) =>
+            {
+                if (_updatingLedUi) return;
+                JoystickLedService.Instance.SetSpeed((int)numLedSpeed.Value);
+                UpdateLedControlsFromService();
+            };
+
+            flowLedTop.Controls.Add(btnLedOn);
+            flowLedTop.Controls.Add(btnLedOff);
+            flowLedTop.Controls.Add(lblLedEffect);
+            flowLedTop.Controls.Add(cmbLedEffect);
+            flowLedTop.Controls.Add(lblLedBright);
+            flowLedTop.Controls.Add(numLedBrightness);
+            flowLedTop.Controls.Add(lblLedSpeed);
+            flowLedTop.Controls.Add(numLedSpeed);
+
+            FlowLayoutPanel flowLedColors = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Top,
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                WrapContents = true,
+                Padding = new Padding(2)
+            };
+
+            Label lblPresets = new Label
+            {
+                Text = "Presets:",
+                AutoSize = true,
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Regular),
+                ForeColor = Color.FromArgb(40, 45, 55),
+                Margin = new Padding(3, 7, 4, 3)
+            };
+            flowLedColors.Controls.Add(lblPresets);
+
+            foreach (var preset in LedColorPresets)
+            {
+                Color c = preset.Color;
+                Button btnColor = CreateCompactButton(preset.Name, 58, 28, 8.2F, () =>
+                {
+                    JoystickLedService.Instance.SetLeftColor(c);
+                    UpdateLedControlsFromService();
+                });
+                flowLedColors.Controls.Add(btnColor);
+            }
+
+            FlowLayoutPanel flowLedCustom = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Top,
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                WrapContents = true,
+                Padding = new Padding(2)
+            };
+
+            pnlLedSwatchLeft = new Panel
+            {
+                Size = new Size(24, 24),
+                BackColor = JoystickLedService.Instance.LeftColor,
+                BorderStyle = BorderStyle.FixedSingle,
+                Margin = new Padding(4, 5, 4, 3),
+                Cursor = Cursors.Hand
+            };
+            pnlLedSwatchLeft.Click += (s, e) => PickCustomLedColor(isRight: false);
+
+            btnLedCustomLeft = CreateCompactButton("Pick Color...", 94, 28, 8.5F, () => PickCustomLedColor(isRight: false));
+
+            chkLedSyncLR = new CheckBox
+            {
+                Text = "Sync Left & Right Joysticks",
+                AutoSize = true,
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Regular),
+                Checked = JoystickLedService.Instance.SyncLeftRight,
+                Margin = new Padding(10, 6, 8, 3)
+            };
+            chkLedSyncLR.CheckedChanged += (s, e) =>
+            {
+                if (_updatingLedUi) return;
+                JoystickLedService.Instance.SetSyncLeftRight(chkLedSyncLR.Checked);
+                UpdateLedControlsFromService();
+            };
+
+            pnlLedSwatchRight = new Panel
+            {
+                Size = new Size(24, 24),
+                BackColor = JoystickLedService.Instance.RightColor,
+                BorderStyle = BorderStyle.FixedSingle,
+                Margin = new Padding(4, 5, 4, 3),
+                Cursor = Cursors.Hand
+            };
+            pnlLedSwatchRight.Click += (s, e) => PickCustomLedColor(isRight: true);
+
+            btnLedCustomRight = CreateCompactButton("Right Color...", 94, 28, 8.5F, () => PickCustomLedColor(isRight: true));
+
+            flowLedCustom.Controls.Add(pnlLedSwatchLeft);
+            flowLedCustom.Controls.Add(btnLedCustomLeft);
+            flowLedCustom.Controls.Add(chkLedSyncLR);
+            flowLedCustom.Controls.Add(pnlLedSwatchRight);
+            flowLedCustom.Controls.Add(btnLedCustomRight);
+
+            lblLedStatus = new Label
+            {
+                Name = "lblLedStatus",
+                Dock = DockStyle.Top,
+                AutoSize = true,
+                Font = new Font("Segoe UI", 8F, FontStyle.Regular),
+                ForeColor = Color.FromArgb(0, 120, 195),
+                Padding = new Padding(4, 2, 4, 2)
+            };
+
+            grpLed.Controls.Add(lblLedStatus);
+            grpLed.Controls.Add(flowLedCustom);
+            grpLed.Controls.Add(flowLedColors);
+            grpLed.Controls.Add(flowLedTop);
+
+            JoystickLedService.Instance.ConfigChanged += () =>
+            {
+                if (this.IsHandleCreated && !this.IsDisposed)
+                {
+                    this.BeginInvoke(new Action(UpdateLedControlsFromService));
+                }
+            };
 
             // ==========================================
             // 2. Pointer Mode (Right Controller Gyro Air Mouse) GroupBox
@@ -802,13 +1071,113 @@ namespace HandheldCompanion.Views
             mainScrollPanel.Controls.Add(grpRemap);
             mainScrollPanel.Controls.Add(grpHoldCycle);
             if (grpPointer != null) mainScrollPanel.Controls.Add(grpPointer);
+            if (grpLed != null) mainScrollPanel.Controls.Add(grpLed);
             mainScrollPanel.Controls.Add(grpGyro);
 
             this.Controls.Add(mainScrollPanel);
 
             UpdateGyroStatus();
+            UpdateLedControlsFromService();
 
             this.ResumeLayout(false);
+        }
+
+        private void PickCustomLedColor(bool isRight)
+        {
+            var svc = JoystickLedService.Instance;
+            using var dlg = new ColorDialog
+            {
+                AllowFullOpen = true,
+                FullOpen = true,
+                Color = isRight ? svc.RightColor : svc.LeftColor
+            };
+            if (dlg.ShowDialog(this) == DialogResult.OK)
+            {
+                if (isRight)
+                    svc.SetRightColor(dlg.Color);
+                else
+                    svc.SetLeftColor(dlg.Color);
+                UpdateLedControlsFromService();
+            }
+        }
+
+        private void UpdateLedControlsFromService()
+        {
+            if (this.IsDisposed) return;
+            _updatingLedUi = true;
+            try
+            {
+                var svc = JoystickLedService.Instance;
+                SetButtonActive(btnLedOn, svc.Enabled);
+                SetButtonActive(btnLedOff, !svc.Enabled);
+
+                if (cmbLedEffect != null)
+                {
+                    int idx = Math.Clamp((int)svc.Effect - 1, 0, cmbLedEffect.Items.Count - 1);
+                    if (cmbLedEffect.SelectedIndex != idx)
+                        cmbLedEffect.SelectedIndex = idx;
+                }
+
+                if (numLedBrightness != null)
+                {
+                    decimal b = Math.Clamp(svc.Brightness, 0, 100);
+                    if (numLedBrightness.Value != b)
+                        numLedBrightness.Value = b;
+                }
+
+                if (numLedSpeed != null)
+                {
+                    decimal sp = Math.Clamp(svc.Speed, 0, 100);
+                    if (numLedSpeed.Value != sp)
+                        numLedSpeed.Value = sp;
+                    numLedSpeed.Enabled = svc.Effect != LegionGo.RgbMode.Solid;
+                }
+
+                if (chkLedSyncLR != null && chkLedSyncLR.Checked != svc.SyncLeftRight)
+                {
+                    chkLedSyncLR.Checked = svc.SyncLeftRight;
+                }
+
+                if (pnlLedSwatchLeft != null)
+                {
+                    pnlLedSwatchLeft.BackColor = svc.LeftColor;
+                }
+
+                if (pnlLedSwatchRight != null)
+                {
+                    pnlLedSwatchRight.BackColor = svc.RightColor;
+                    pnlLedSwatchRight.Visible = !svc.SyncLeftRight;
+                }
+
+                if (btnLedCustomRight != null)
+                {
+                    btnLedCustomRight.Visible = !svc.SyncLeftRight;
+                }
+
+                if (lblLedStatus != null)
+                {
+                    if (!svc.Enabled)
+                    {
+                        lblLedStatus.Text = "Joystick LEDs are Off.";
+                        lblLedStatus.ForeColor = Color.FromArgb(100, 105, 115);
+                    }
+                    else
+                    {
+                        string effName = JoystickLedService.GetEffectDisplayName(svc.Effect);
+                        string colorDesc = svc.Effect == LegionGo.RgbMode.Dynamic || svc.Effect == LegionGo.RgbMode.Spiral
+                            ? $"Brightness {svc.Brightness}%  |  Speed {svc.Speed}%"
+                            : svc.SyncLeftRight
+                                ? $"RGB({svc.LeftR}, {svc.LeftG}, {svc.LeftB})  |  Brightness {svc.Brightness}%"
+                                : $"L: RGB({svc.LeftR},{svc.LeftG},{svc.LeftB}) / R: RGB({svc.RightR},{svc.RightG},{svc.RightB})  |  Brightness {svc.Brightness}%";
+                        lblLedStatus.Text = $"Active: {effName}  |  {colorDesc}";
+                        lblLedStatus.ForeColor = Color.FromArgb(0, 130, 60);
+                    }
+                }
+            }
+            finally
+            {
+                _updatingLedUi = false;
+            }
         }
 
         private void SetupButtonRow(ButtonFlags btn, ComboBox comboType, ComboBox comboTarget, CheckBox chkRepeat, NumericUpDown numRate)
@@ -1095,6 +1464,7 @@ namespace HandheldCompanion.Views
             if (this.Visible)
             {
                 UpdateGyroStatus();
+                UpdateLedControlsFromService();
             }
         }
 
@@ -1148,6 +1518,7 @@ namespace HandheldCompanion.Views
                 // Scale GroupBox headers
                 float headerFontSize = 8.5f * (1.0f + (scale - 1.0f) * 0.50f);
                 if (grpGyro != null) grpGyro.Font = new Font("Segoe UI", headerFontSize, FontStyle.Bold);
+                if (grpLed != null) grpLed.Font = new Font("Segoe UI", headerFontSize, FontStyle.Bold);
                 if (grpPointer != null) grpPointer.Font = new Font("Segoe UI", headerFontSize, FontStyle.Bold);
                 if (grpHoldCycle != null) grpHoldCycle.Font = new Font("Segoe UI", headerFontSize, FontStyle.Bold);
                 if (grpRemap != null) grpRemap.Font = new Font("Segoe UI", headerFontSize, FontStyle.Bold);
@@ -1156,6 +1527,27 @@ namespace HandheldCompanion.Views
                 float smallFontSize = 8.0f * (1.0f + (scale - 1.0f) * 0.50f);
 
                 if (lblGyroStatus != null) lblGyroStatus.Font = new Font("Segoe UI", smallFontSize, FontStyle.Regular);
+                if (lblLedStatus != null) lblLedStatus.Font = new Font("Segoe UI", smallFontSize, FontStyle.Regular);
+
+                // Scale Joystick LED controls
+                if (cmbLedEffect != null)
+                {
+                    cmbLedEffect.Font = new Font("Segoe UI", bodyFontSize, FontStyle.Regular);
+                    cmbLedEffect.Width = (int)Math.Round(145 * scale);
+                }
+                if (numLedBrightness != null)
+                {
+                    numLedBrightness.Font = new Font("Segoe UI", bodyFontSize, FontStyle.Regular);
+                    numLedBrightness.Width = (int)Math.Round(54 * scale);
+                }
+                if (numLedSpeed != null)
+                {
+                    numLedSpeed.Font = new Font("Segoe UI", bodyFontSize, FontStyle.Regular);
+                    numLedSpeed.Width = (int)Math.Round(54 * scale);
+                }
+                if (chkLedSyncLR != null) chkLedSyncLR.Font = new Font("Segoe UI", bodyFontSize, FontStyle.Regular);
+                if (pnlLedSwatchLeft != null) pnlLedSwatchLeft.Size = new Size((int)Math.Round(24 * scale), (int)Math.Round(24 * scale));
+                if (pnlLedSwatchRight != null) pnlLedSwatchRight.Size = new Size((int)Math.Round(24 * scale), (int)Math.Round(24 * scale));
 
                 // Scale Pointer Mode controls
                 if (chkPointerDetachedOnly != null) chkPointerDetachedOnly.Font = new Font("Segoe UI", bodyFontSize, FontStyle.Regular);
@@ -1211,6 +1603,7 @@ namespace HandheldCompanion.Views
                     }
                 }
 
+                ScaleChildLabels(grpLed, scale);
                 ScaleChildLabels(grpPointer, scale);
                 ScaleChildLabels(grpHoldCycle, scale);
                 ScaleChildLabels(grpRemap, scale);
@@ -1227,7 +1620,7 @@ namespace HandheldCompanion.Views
             float bodyFontSize = 8.5f * (1.0f + (scale - 1.0f) * 0.50f);
             foreach (Control c in parent.Controls)
             {
-                if (c is Label lbl && c.Name != "lblCycleSummary" && c.Name != "lblGyroStatus")
+                if (c is Label lbl && c.Name != "lblCycleSummary" && c.Name != "lblGyroStatus" && c.Name != "lblLedStatus")
                 {
                     lbl.Font = new Font("Segoe UI", bodyFontSize, FontStyle.Regular);
                 }

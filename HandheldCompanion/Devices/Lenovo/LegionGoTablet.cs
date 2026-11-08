@@ -1,6 +1,7 @@
 // #define USE_SAPIENTIAUSB
 using HandheldCompanion.Actions;
 using HandheldCompanion.Inputs;
+using HandheldCompanion.Managers;
 using HidLibrary;
 using System;
 using System.Collections.Generic;
@@ -16,6 +17,18 @@ namespace HandheldCompanion.Devices.Lenovo
     {
         public const int LeftJoyconIndex = 3;
         public const int RightJoyconIndex = 4;
+
+        private static readonly int[] KnownProductIds =
+        [
+            0x6182, // xinput
+            0x6183, // dinput
+            0x6184, // dual_dinput
+            0x6185, // fps
+            0x61EB, // xinput (2025 FW)
+            0x61EC, // dinput (2025 FW)
+            0x61ED, // dual_dinput (2025 FW)
+            0x61EE, // fps (2025 FW)
+        ];
 
         private LightionProfile lightProfileL = new();
         private LightionProfile lightProfileR = new();
@@ -141,6 +154,9 @@ namespace HandheldCompanion.Devices.Lenovo
 
             EnableGyros();
 
+            // Apply persistent user Joystick LED configuration
+            JoystickLedService.Instance.ApplyToHardware();
+
             base.Device_Inserted(reScan);
 
 #if USE_SAPIENTIAUSB
@@ -254,6 +270,110 @@ namespace HandheldCompanion.Devices.Lenovo
         #endregion
 
         #region RGB
+        private void WriteRgbHidCommands(IEnumerable<byte[]> commands)
+        {
+            var cmdList = new List<byte[]>(commands);
+            if (cmdList.Count == 0) return;
+
+            try
+            {
+                if (hidDevices.TryGetValue(INPUT_HID_ID, out HidDevice? device) && device != null)
+                {
+                    if (!device.IsOpen)
+                        device.OpenDevice();
+
+                    foreach (byte[] cmd in cmdList)
+                        device.Write(cmd);
+                }
+            }
+            catch { }
+
+            WriteStandaloneVendorCommands(cmdList);
+        }
+
+        private static void WriteStandaloneVendorCommands(IReadOnlyList<byte[]> cmdList)
+        {
+            try
+            {
+                foreach (var hid in HidDevices.Enumerate(0x17EF, KnownProductIds))
+                {
+                    try
+                    {
+                        if (hid.DevicePath != null && hid.DevicePath.Contains("mi_02", StringComparison.OrdinalIgnoreCase))
+                        {
+                            if (!hid.IsOpen)
+                                hid.OpenDevice();
+
+                            foreach (byte[] cmd in cmdList)
+                            {
+                                hid.Write(cmd);
+                                byte[] buf = new byte[64];
+                                Array.Copy(cmd, buf, Math.Min(cmd.Length, buf.Length));
+                                hid.Write(buf);
+                            }
+                        }
+                    }
+                    catch { }
+                }
+            }
+            catch { }
+        }
+
+        public void ApplyJoystickLedConfig(bool enabled, RgbMode mode, byte lR, byte lG, byte lB, byte rR, byte rG, byte rB, int brightness, int speed)
+        {
+            lightProfileL.effect = (int)mode;
+            lightProfileR.effect = (int)mode;
+            lightProfileL.r = lR;
+            lightProfileL.g = lG;
+            lightProfileL.b = lB;
+            lightProfileR.r = rR;
+            lightProfileR.g = rG;
+            lightProfileR.b = rB;
+            lightProfileL.brightness = Math.Clamp(brightness, 0, 100);
+            lightProfileR.brightness = Math.Clamp(brightness, 0, 100);
+            int invertedSpeed = Math.Clamp(100 - speed, 0, 100);
+            lightProfileL.speed = invertedSpeed;
+            lightProfileR.speed = invertedSpeed;
+
+#if USE_SAPIENTIAUSB
+            SetLightingEffectProfileID(LeftJoyconIndex, lightProfileL);
+            SetLightingEffectProfileID(RightJoyconIndex, lightProfileR);
+            SetLightingEnable(0, enabled);
+#else
+            var cmds = BuildJoystickLedCommands(enabled, mode, lR, lG, lB, rR, rG, rB, lightProfileL.brightness, invertedSpeed);
+            WriteRgbHidCommands(cmds);
+#endif
+        }
+
+        public static void WriteStandaloneJoystickLedConfig(bool enabled, RgbMode mode, byte lR, byte lG, byte lB, byte rR, byte rG, byte rB, int brightness, int speed)
+        {
+            int clampedBrightness = Math.Clamp(brightness, 0, 100);
+            int invertedSpeed = Math.Clamp(100 - speed, 0, 100);
+            var cmds = BuildJoystickLedCommands(enabled, mode, lR, lG, lB, rR, rG, rB, clampedBrightness, invertedSpeed);
+            WriteStandaloneVendorCommands(cmds);
+        }
+
+        private static List<byte[]> BuildJoystickLedCommands(bool enabled, RgbMode mode, byte lR, byte lG, byte lB, byte rR, byte rG, byte rB, double brightness, double invertedSpeed)
+        {
+            byte profile = 0x03;
+            var cmds = new List<byte[]>();
+            if (enabled)
+            {
+                cmds.Add(RgbSetProfileStatic(LeftJoyconIndex, profile, mode, lR, lG, lB, brightness, invertedSpeed));
+                cmds.Add(RgbSetProfileStatic(RightJoyconIndex, profile, mode, rR, rG, rB, brightness, invertedSpeed));
+                cmds.Add(RgbLoadProfileStatic(LeftJoyconIndex, profile));
+                cmds.Add(RgbLoadProfileStatic(RightJoyconIndex, profile));
+                cmds.Add(RgbEnableStatic(LeftJoyconIndex, true));
+                cmds.Add(RgbEnableStatic(RightJoyconIndex, true));
+            }
+            else
+            {
+                cmds.Add(RgbEnableStatic(LeftJoyconIndex, false));
+                cmds.Add(RgbEnableStatic(RightJoyconIndex, false));
+            }
+            return cmds;
+        }
+
         public override bool SetLedBrightness(int brightness)
         {
             lightProfileL.brightness = brightness;
@@ -263,12 +383,14 @@ namespace HandheldCompanion.Devices.Lenovo
             SetLightingEffectProfileID(LeftJoyconIndex, lightProfileL);
             SetLightingEffectProfileID(RightJoyconIndex, lightProfileR);
 #else
-            if (hidDevices.TryGetValue(INPUT_HID_ID, out HidDevice? device))
-            {
-                // write RGB
-                foreach (byte[] cmd in RgbMultiLoadSettings((RgbMode)lightProfileL.effect, 0x03, (byte)lightProfileL.r, (byte)lightProfileL.g, (byte)lightProfileL.b, lightProfileL.brightness, lightProfileL.speed, false))
-                    device.Write(cmd);
-            }
+            var cmds = BuildJoystickLedCommands(
+                true,
+                (RgbMode)(lightProfileL.effect > 0 ? lightProfileL.effect : 1),
+                (byte)lightProfileL.r, (byte)lightProfileL.g, (byte)lightProfileL.b,
+                (byte)lightProfileR.r, (byte)lightProfileR.g, (byte)lightProfileR.b,
+                lightProfileL.brightness,
+                lightProfileL.speed);
+            WriteRgbHidCommands(cmds);
 #endif
             return true;
         }
@@ -278,12 +400,7 @@ namespace HandheldCompanion.Devices.Lenovo
 #if USE_SAPIENTIAUSB
             SetLightingEnable(0, status);
 #else
-            if (hidDevices.TryGetValue(INPUT_HID_ID, out HidDevice? device))
-            {
-                // write RGB
-                foreach (byte[] cmd in RgbMultiEnable(status))
-                    device.Write(cmd);
-            }
+            WriteRgbHidCommands(RgbMultiEnable(status));
 #endif
             return true;
         }
@@ -332,12 +449,14 @@ namespace HandheldCompanion.Devices.Lenovo
             SetLightingEffectProfileID(LeftJoyconIndex, lightProfileL);
             SetLightingEffectProfileID(RightJoyconIndex, lightProfileR);
 #else
-            if (hidDevices.TryGetValue(INPUT_HID_ID, out HidDevice? device))
-            {
-                // write RGB
-                foreach (byte[] cmd in RgbMultiLoadSettings((RgbMode)lightProfileL.effect, 0x03, (byte)lightProfileL.r, (byte)lightProfileL.g, (byte)lightProfileL.b, lightProfileL.brightness, lightProfileL.speed, false))
-                    device.Write(cmd);
-            }
+            var cmds = BuildJoystickLedCommands(
+                true,
+                (RgbMode)lightProfileL.effect,
+                (byte)lightProfileL.r, (byte)lightProfileL.g, (byte)lightProfileL.b,
+                (byte)lightProfileR.r, (byte)lightProfileR.g, (byte)lightProfileR.b,
+                lightProfileL.brightness,
+                lightProfileL.speed);
+            WriteRgbHidCommands(cmds);
 #endif
             return true;
         }
@@ -353,10 +472,10 @@ namespace HandheldCompanion.Devices.Lenovo
             lightProfileR.b = SecondaryColor.B;
         }
 
-        private byte[] RgbSetProfile(int idx, byte profile, RgbMode mode, byte red, byte green, byte blue, double brightness = 1, double speed = 1)
+        private static byte[] RgbSetProfileStatic(int idx, byte profile, RgbMode mode, byte red, byte green, byte blue, double brightness = 1, double speed = 1)
         {
-            byte r_brightness = Math.Clamp(ClampByte((int)(64 * brightness / 100)), (byte)0, (byte)63);
-            byte r_period = Math.Clamp(ClampByte((int)(64 * speed / 100)), (byte)0, (byte)63);
+            byte r_brightness = (byte)Math.Clamp((int)Math.Round(63.0 * brightness / 100.0), 0, 63);
+            byte r_period = (byte)Math.Clamp((int)Math.Round(63.0 * speed / 100.0), 0, 63);
 
             return
             [
@@ -371,15 +490,24 @@ namespace HandheldCompanion.Devices.Lenovo
             ];
         }
 
-        private byte[] RgbLoadProfile(int idx, int profile)
+        private static byte[] RgbLoadProfileStatic(int idx, int profile)
         {
             return [0x05, 0x06, 0x73, 0x02, (byte)idx, (byte)profile, 0x01];
         }
 
-        private byte[] RgbEnable(int idx, bool enable)
+        private static byte[] RgbEnableStatic(int idx, bool enable)
         {
             return [0x05, 0x06, 0x70, 0x02, (byte)idx, (byte)(enable ? 1 : 0), 0x01];
         }
+
+        private byte[] RgbSetProfile(int idx, byte profile, RgbMode mode, byte red, byte green, byte blue, double brightness = 1, double speed = 1)
+            => RgbSetProfileStatic(idx, profile, mode, red, green, blue, brightness, speed);
+
+        private byte[] RgbLoadProfile(int idx, int profile)
+            => RgbLoadProfileStatic(idx, profile);
+
+        private byte[] RgbEnable(int idx, bool enable)
+            => RgbEnableStatic(idx, enable);
 
         private IEnumerable<byte[]> RgbMultiLoadSettings(RgbMode mode, byte profile, byte red, byte green, byte blue, double brightness = 1, double speed = 1, bool init = true)
         {

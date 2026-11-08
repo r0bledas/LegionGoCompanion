@@ -32,7 +32,9 @@ namespace HandheldCompanion.Managers
         Fan100 = 5,
         FanAuto = 6,
         ToggleGyro = 7,
-        CycleControllerMode = 8
+        CycleControllerMode = 8,
+        ToggleLeds = 9,
+        CycleLedEffect = 10
     }
 
     public class CustomMappingConfigFile
@@ -84,6 +86,8 @@ namespace HandheldCompanion.Managers
             (CustomActionType.ToggleWindow, "Toggle Window"),
             (CustomActionType.ToggleFan, "Toggle Fan"),
             (CustomActionType.ToggleGyro, "Toggle Gyro"),
+            (CustomActionType.ToggleLeds, "Toggle Joystick LEDs"),
+            (CustomActionType.CycleLedEffect, "Cycle LED Effect"),
             (CustomActionType.CycleControllerMode, "Cycle Controller Mode (Hold)"),
             (CustomActionType.ShowWindow, "Show Window"),
             (CustomActionType.HideWindow, "Hide Window"),
@@ -412,6 +416,12 @@ namespace HandheldCompanion.Managers
                         break;
                     case CustomActionType.CycleControllerMode:
                         ControllerModeService.CycleToNextMode();
+                        break;
+                    case CustomActionType.ToggleLeds:
+                        JoystickLedService.Instance.ToggleEnabled();
+                        break;
+                    case CustomActionType.CycleLedEffect:
+                        JoystickLedService.Instance.CycleEffect();
                         break;
                 }
             }

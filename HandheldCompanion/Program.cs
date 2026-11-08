@@ -47,10 +47,13 @@ namespace HandheldCompanion
         private const uint MSGFLT_ADD = 1;
         private static readonly IntPtr HWND_BROADCAST = new IntPtr(0xffff);
         public static uint WM_SHOWME = 0;
+        public static uint WM_EXITME = 0;
         public const string ShowWindowEventName = @"Global\LegionGoCompanion_ShowWindow_Event";
+        public const string ExitEventName = @"Global\LegionGoCompanion_Exit_Event";
         public const string SingleInstanceMutexName = @"Global\LegionGoCompanion_SingleInstance_Mutex";
         public static Mutex? SingleInstanceMutex;
         public static EventWaitHandle? GlobalShowWindowEvent;
+        public static EventWaitHandle? GlobalExitEvent;
 
         public static EventWaitHandle? EnsureShowWindowEventCreated()
         {
@@ -77,6 +80,33 @@ namespace HandheldCompanion
             }
 
             return GlobalShowWindowEvent;
+        }
+
+        public static EventWaitHandle? EnsureExitEventCreated()
+        {
+            if (GlobalExitEvent != null)
+                return GlobalExitEvent;
+
+            try
+            {
+                var security = new System.Security.AccessControl.EventWaitHandleSecurity();
+                security.AddAccessRule(new System.Security.AccessControl.EventWaitHandleAccessRule(
+                    new System.Security.Principal.SecurityIdentifier(System.Security.Principal.WellKnownSidType.WorldSid, null),
+                    System.Security.AccessControl.EventWaitHandleRights.FullControl,
+                    System.Security.AccessControl.AccessControlType.Allow));
+
+                GlobalExitEvent = EventWaitHandleAcl.Create(false, EventResetMode.AutoReset, ExitEventName, out _, security);
+            }
+            catch
+            {
+                try
+                {
+                    GlobalExitEvent = new EventWaitHandle(false, EventResetMode.AutoReset, ExitEventName);
+                }
+                catch { }
+            }
+
+            return GlobalExitEvent;
         }
 
         private static bool CheckExistingInstanceAndSignal(string[] args)
@@ -318,8 +348,9 @@ namespace HandheldCompanion
             if (!args.Contains("--no-elevate") && TryElevateViaScheduledTaskOrUac())
                 return;
 
-            // Create global ShowWindowEvent immediately so any second launch during startup signals us instead of racing
+            // Create global ShowWindowEvent and ExitEvent immediately so any second launch or installer can signal us
             EnsureShowWindowEventCreated();
+            EnsureExitEventCreated();
             try
             {
                 SingleInstanceMutex = new Mutex(true, SingleInstanceMutexName, out _);
@@ -330,9 +361,11 @@ namespace HandheldCompanion
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
 
-            // Register message so lower-integrity processes can signal us to show window
+            // Register message so lower-integrity processes can signal us to show window or exit
             WM_SHOWME = (uint)RegisterWindowMessage("HANDHELD_COMPANION_SHOW_WINDOW");
+            WM_EXITME = (uint)RegisterWindowMessage("HANDHELD_COMPANION_EXIT_APP");
             try { ChangeWindowMessageFilter(WM_SHOWME, MSGFLT_ADD); } catch { }
+            try { ChangeWindowMessageFilter(WM_EXITME, MSGFLT_ADD); } catch { }
 
             // Terminate any previous dead instances
             KillPreviousInstances();

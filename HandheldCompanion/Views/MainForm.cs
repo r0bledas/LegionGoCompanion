@@ -45,6 +45,7 @@ namespace HandheldCompanion.Views
         private bool isExiting = false;
 
         private EventWaitHandle? showWindowEvent;
+        private EventWaitHandle? exitAppEvent;
         private Thread? showWindowThread;
         private volatile bool isListeningForShow = true;
 
@@ -223,16 +224,31 @@ namespace HandheldCompanion.Views
             try
             {
                 showWindowEvent = Program.EnsureShowWindowEventCreated();
+                exitAppEvent = Program.EnsureExitEventCreated();
 
                 showWindowThread = new Thread(() =>
                 {
-                    while (isListeningForShow)
+                    var handles = new System.Collections.Generic.List<WaitHandle>();
+                    if (showWindowEvent != null) handles.Add(showWindowEvent);
+                    if (exitAppEvent != null) handles.Add(exitAppEvent);
+                    var waitArray = handles.ToArray();
+
+                    while (isListeningForShow && waitArray.Length > 0)
                     {
                         try
                         {
-                            if (showWindowEvent != null && showWindowEvent.WaitOne(1000))
+                            int sig = WaitHandle.WaitAny(waitArray, 1000);
+                            if (!isListeningForShow || this.IsDisposed) break;
+
+                            if (sig >= 0 && sig < waitArray.Length)
                             {
-                                if (isListeningForShow && !this.IsDisposed)
+                                var signaled = waitArray[sig];
+                                if (signaled == exitAppEvent)
+                                {
+                                    this.BeginInvoke(new Action(() => ExitApplication(restart: false)));
+                                    break;
+                                }
+                                else if (signaled == showWindowEvent)
                                 {
                                     this.BeginInvoke(new Action(() => RestoreFromTray()));
                                 }
@@ -362,6 +378,18 @@ namespace HandheldCompanion.Views
                 {
                     RestoreFromTray();
                 }
+            }
+            else if (Program.WM_EXITME != 0 && (uint)m.Msg == Program.WM_EXITME)
+            {
+                if (this.InvokeRequired)
+                {
+                    this.BeginInvoke(new Action(() => ExitApplication(restart: false)));
+                }
+                else
+                {
+                    ExitApplication(restart: false);
+                }
+                return;
             }
             else if (m.Msg == WM_DISPLAYCHANGE || m.Msg == WM_DPICHANGED)
             {

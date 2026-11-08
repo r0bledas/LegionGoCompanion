@@ -586,6 +586,9 @@ namespace HandheldCompanion.Views
                     lego.set_short_limit(tdp);
                 }
 
+                // Re-apply user's Joystick LED configuration in case WMI power mode altered LED state
+                JoystickLedService.Instance.ApplyToHardware();
+
                 HighlightTdpButton(tdp);
             }
             catch (Exception ex)
