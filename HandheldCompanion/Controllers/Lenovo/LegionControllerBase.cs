@@ -30,7 +30,10 @@ namespace HandheldCompanion.Controllers.Lenovo
                     {
                         Controller.OnControllerInputReceived -= Controller_OnControllerInputReceived;
                         Controller.OnControllerInputReceived += Controller_OnControllerInputReceived;
-                        Controller.Open();
+                        if (!Controller.IsDeviceValid || !Controller.Reading)
+                        {
+                            Controller.Open();
+                        }
                         SendGyroEnableCommands();
                     }
                 }

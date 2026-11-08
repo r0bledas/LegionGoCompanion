@@ -38,12 +38,14 @@ public static class HidHide
                     FileName = cliPath,
                     Arguments = arguments,
                     UseShellExecute = false,
+                    RedirectStandardInput = true,
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
                     CreateNoWindow = true
                 }
             };
             if (!p.Start()) return false;
+            try { p.StandardInput.Close(); } catch { }
             output = p.StandardOutput.ReadToEnd();
             return p.WaitForExit(3000);
         }

@@ -413,6 +413,8 @@ namespace HandheldCompanion
                     {
                         LogManager.LogInformation("Initializing IDevice...");
                         IDevice.GetCurrent().Initialize(false, false);
+                        IDevice.GetCurrent().Open();
+                        IDevice.GetCurrent().OpenEvents();
                     }
                     catch (Exception ex)
                     {

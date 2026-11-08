@@ -252,18 +252,21 @@ namespace HandheldCompanion.Controllers.Lenovo
         {
             base.AttachDetails(details);
 
-            // (un)plug controller if needed
-            bool WasPlugged = Controller?.Reading == true && Controller?.IsDeviceValid == true;
-            if (WasPlugged) Close();
-
-            // create controller targeting Interface 2 (vendor feature report interface FFA0 for back buttons and triggers)
-            Controller = new(details.VendorID, details.ProductID, 64, 2);
-            Open();
-
-            if (Controller is null || !Controller.IsDeviceValid)
+            // Keep existing Interface 2 (MI_02) handle if already valid and reading; otherwise open Interface 2
+            if (Controller is null || !Controller.IsDeviceValid || !Controller.Reading)
             {
-                Controller = new(details.VendorID, details.ProductID);
+                if (Controller is not null)
+                {
+                    try { Close(); } catch { }
+                }
+
+                // create controller targeting Interface 2 (vendor feature report interface FFA0 for back buttons and triggers)
+                Controller = new(details.VendorID, details.ProductID, 64, 2);
                 Open();
+            }
+            else
+            {
+                SendGyroEnableCommands();
             }
 
             switch (Controller.DeviceVersion)
@@ -299,10 +302,40 @@ namespace HandheldCompanion.Controllers.Lenovo
             if (data == null || data.Length < 60)
                 return;
 
+            bool noVendorReport = (data[0] == 0 && data[1] == 0 && data[2] == 0 && data[3] == 0);
+            if ((Controller is null || !Controller.IsDeviceValid || !Controller.Reading || noVendorReport) &&
+                (DateTime.UtcNow - _lastGyroWakeAttempt).TotalSeconds > 2.0)
+            {
+                _lastGyroWakeAttempt = DateTime.UtcNow;
+                System.Threading.Tasks.Task.Run(() =>
+                {
+                    try
+                    {
+                        if (Details is not null && (Controller is null || !Controller.IsDeviceValid || !Controller.Reading))
+                        {
+                            lock (hidLock)
+                            {
+                                try { Controller?.Close(); } catch { }
+                                Controller = new(Details.VendorID, Details.ProductID, 64, 2);
+                            }
+                            Open();
+                        }
+                        else
+                        {
+                            SendGyroEnableCommands();
+                        }
+
+                        if (IDevice.GetCurrent() is LegionGoTablet tablet)
+                            tablet.EnableGyros();
+                    }
+                    catch { }
+                });
+            }
+
             IsHidReportMisaligned();
 
             // Check if vendor HID report has arrived
-            if (data[0] == 0 && data[1] == 0 && data[2] == 0 && data[3] == 0)
+            if (noVendorReport)
                 return;
 
             FrontEnum frontButton = (FrontEnum)data[FRONT_IDX];

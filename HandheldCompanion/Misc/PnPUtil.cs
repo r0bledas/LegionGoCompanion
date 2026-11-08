@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Text.RegularExpressions;
 
@@ -100,8 +100,9 @@ namespace HandheldCompanion
 
         private static PnPUtilResult GetPnPUtilResult(string arguments)
         {
-            Process process = StartPnPUtil(arguments);
+            using Process process = StartPnPUtil(arguments);
             var output = process.StandardOutput.ReadToEnd();
+            process.WaitForExit(5000);
             var exitCode = process.ExitCode;
 
             return new PnPUtilResult(exitCode, output);
@@ -110,22 +111,18 @@ namespace HandheldCompanion
         // this function validates the results for /enable-device, /disable-device and /restart-device.
         private static bool ValidateChangeDeviceStatusResult(string instanceId, PnPUtilResult pnpResult)
         {
-            string[] output = pnpResult.StandardOutput.Split("\r\n");
-            var exitCode = pnpResult.ExitCode;
+            if (pnpResult.ExitCode != ERROR_SUCCESS)
+                return false;
 
-            switch (exitCode)
+            string text = pnpResult.StandardOutput ?? string.Empty;
+            if (text.Contains("Failed", System.StringComparison.OrdinalIgnoreCase) ||
+                text.Contains("Access is denied", System.StringComparison.OrdinalIgnoreCase) ||
+                text.Contains("reboot", System.StringComparison.OrdinalIgnoreCase))
             {
-                case ERROR_SUCCESS:
-                    if (output[2].Contains(instanceId))
-                        // we assume the operation was successful if the instance id was found
-                        return true;
-                    break;
-                default:
-                    // operation was not successful or requires a reboot.
-                    return false;
+                return false;
             }
 
-            return true;
+            return text.Contains(instanceId, System.StringComparison.OrdinalIgnoreCase);
         }
     }
 }

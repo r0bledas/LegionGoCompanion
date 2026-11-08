@@ -178,6 +178,8 @@ namespace HandheldCompanion.Devices.Lenovo
         {
             try
             {
+                IsReady();
+
                 if (hidDevices.TryGetValue(INPUT_HID_ID, out HidDevice? device))
                 {
                     if (!device.IsOpen)
@@ -187,16 +189,55 @@ namespace HandheldCompanion.Devices.Lenovo
                     {
                         foreach (byte[] cmd in EnableControllerGyro(LeftJoyconIndex))
                         {
+                            device.Write(cmd);
                             byte[] buf = new byte[64];
                             Array.Copy(cmd, buf, cmd.Length);
                             device.Write(buf);
                         }
                         foreach (byte[] cmd in EnableControllerGyro(RightJoyconIndex))
                         {
+                            device.Write(cmd);
                             byte[] buf = new byte[64];
                             Array.Copy(cmd, buf, cmd.Length);
                             device.Write(buf);
                         }
+                    }
+                }
+                else
+                {
+                    int[] productIds = [0x6182, 0x61EB, 0x6183, 0x61EC, 0x6184, 0x61ED];
+                    foreach (var hid in HidDevices.Enumerate(0x17EF, productIds))
+                    {
+                        try
+                        {
+                            string path = hid.DevicePath?.ToLowerInvariant() ?? "";
+                            if (path.Contains("mi_02") || (ushort)hid.Capabilities.UsagePage == 0xFFA0)
+                            {
+                                if (!hid.IsOpen)
+                                    hid.OpenDevice();
+
+                                if (hid.IsOpen)
+                                {
+                                    foreach (byte[] cmd in EnableControllerGyro(LeftJoyconIndex))
+                                    {
+                                        hid.Write(cmd);
+                                        byte[] buf = new byte[64];
+                                        Array.Copy(cmd, buf, cmd.Length);
+                                        hid.Write(buf);
+                                    }
+                                    foreach (byte[] cmd in EnableControllerGyro(RightJoyconIndex))
+                                    {
+                                        hid.Write(cmd);
+                                        byte[] buf = new byte[64];
+                                        Array.Copy(cmd, buf, cmd.Length);
+                                        hid.Write(buf);
+                                    }
+                                    hidDevices[INPUT_HID_ID] = hid;
+                                    break;
+                                }
+                            }
+                        }
+                        catch { }
                     }
                 }
 

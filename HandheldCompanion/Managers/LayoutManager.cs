@@ -299,7 +299,7 @@ public class LayoutManager : IManager
                 // In Desktop mode:
                 // 1. Cloak physical Legion Go controllers with HidHide so games detect 0 gamepads
                 ManagerFactory.settingsManager.SetProperty("HIDcloakonconnect", true);
-                ControllerManager.TargetController?.Hide(false);
+                ControllerModeService.EnsurePhysicalControllerHidden();
 
                 // 2. Disconnect any virtual controller completely if not already disconnected
                 if (VirtualManager.HIDmode != HIDmode.NoController || VirtualManager.HIDstatus != HIDstatus.Disconnected)
@@ -325,13 +325,13 @@ public class LayoutManager : IManager
                 if (currentMode == ControllerTargetMode.Native)
                 {
                     ManagerFactory.settingsManager.SetProperty("HIDcloakonconnect", false);
-                    ControllerManager.TargetController?.Unhide(false);
+                    ControllerModeService.EnsurePhysicalControllerUnhidden();
                     return;
                 }
 
                 // 1. Ensure physical controller remains cloaked so only virtual controller is visible to games
                 ManagerFactory.settingsManager.SetProperty("HIDcloakonconnect", true);
-                ControllerManager.TargetController?.Hide(false);
+                ControllerModeService.EnsurePhysicalControllerHidden();
 
                 // 2. Determine target virtual controller mode based on user's target mode
                 HIDmode preferredMode = (currentMode == ControllerTargetMode.DS4)

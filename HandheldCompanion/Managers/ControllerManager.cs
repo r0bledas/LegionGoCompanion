@@ -2416,10 +2416,12 @@ public static class ControllerManager
                     // Capture for post-lock call: Hide() -> CyclePort() can block for seconds
                     // and fires IsBusy which dispatches to the UI thread — invoking it while
                     // holding targetLock deadlocks if the UI thread is also waiting for the lock.
-                    if (!targetController.IsHidden())
+                    if (!targetController.IsHidden() || !ControllerModeService.HasCycledForCloak)
                     {
                         controllerToHide = targetController;
                         hideWithPowerCycle = powerCycle;
+                        if (powerCycle)
+                            ControllerModeService.HasCycledForCloak = true;
                     }
                 }
             }

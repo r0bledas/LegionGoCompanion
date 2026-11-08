@@ -1,4 +1,4 @@
-﻿using HandheldCompanion.Managers;
+using HandheldCompanion.Managers;
 using Nefarius.Utilities.DeviceManagement.Extensions;
 using Nefarius.Utilities.DeviceManagement.PnP;
 using System;
@@ -95,7 +95,30 @@ public class PnPDetails
             enumerator = device.GetProperty<string>(DevicePropertyKey.Device_EnumeratorName);
         }
 
-        if (!Equals(enumerator, "USB"))
+        // If this USB node is a composite child interface (&MI_xx or &IG_xx), its parent is usbccgp (USB Composite Device),
+        // not a USB Hub. Walk up to the root USB composite device whose parent is the actual USB Hub so CyclePort() succeeds.
+        int guard = 0;
+        while (device is not null && Equals(enumerator, "USB") && guard++ < 4 &&
+               (device.InstanceId.Contains("&MI_", StringComparison.OrdinalIgnoreCase) ||
+                device.InstanceId.Contains("&IG_", StringComparison.OrdinalIgnoreCase)))
+        {
+            string? parentId = device.GetProperty<string>(DevicePropertyKey.Device_Parent);
+            if (string.IsNullOrEmpty(parentId))
+                break;
+
+            PnPDevice? parentDevice = PnPDevice.GetDeviceByInstanceId(parentId);
+            if (parentDevice is null)
+                break;
+
+            string? parentEnumerator = parentDevice.GetProperty<string>(DevicePropertyKey.Device_EnumeratorName);
+            if (!Equals(parentEnumerator, "USB"))
+                break;
+
+            device = parentDevice;
+            enumerator = parentEnumerator;
+        }
+
+        if (device is null || !Equals(enumerator, "USB"))
             return null;
 
         return device.ToUsbPnPDevice();
@@ -125,6 +148,16 @@ public class PnPDetails
 
     public bool CyclePort()
     {
+        if (!isVirtual && !string.IsNullOrEmpty(baseContainerDeviceInstanceId))
+        {
+            try
+            {
+                if (PnPUtil.RestartDevice(baseContainerDeviceInstanceId))
+                    return true;
+            }
+            catch { }
+        }
+
         UsbPnPDevice? device = GetUsbPnPDevice();
 
         if (device is not null)

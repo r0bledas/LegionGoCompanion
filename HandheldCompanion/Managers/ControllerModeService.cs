@@ -25,6 +25,7 @@ namespace HandheldCompanion.Managers
     {
         public static event Action<ControllerTargetMode>? ModeChanged;
         public static bool IsApplyingMode { get; private set; }
+        public static bool HasCycledForCloak { get; set; } = false;
         private static ControllerTargetMode _currentMode = ControllerTargetMode.Desktop;
         private static bool _initialized = false;
 
@@ -87,9 +88,8 @@ namespace HandheldCompanion.Managers
                     case ControllerTargetMode.Pointer:
                         PointerModeService.Instance.SetActive(true);
                         ManagerFactory.settingsManager.SetProperty("HIDcloakonconnect", false);
-                        ControllerManager.TargetController?.Unhide(false);
                         SetLegionPassthrough(true);
-                        UnhideLegionControllers();
+                        EnsurePhysicalControllerUnhidden();
                         ManagerFactory.settingsManager.SetProperty("LayoutMode", (int)LayoutModes.Desktop);
                         ManagerFactory.layoutManager.SetLayoutMode(LayoutModes.Desktop);
                         await VirtualManager.SetControllerMode(HIDmode.NoController).ConfigureAwait(false);
@@ -100,8 +100,8 @@ namespace HandheldCompanion.Managers
                     case ControllerTargetMode.Desktop:
                         PointerModeService.Instance.SetActive(false);
                         ManagerFactory.settingsManager.SetProperty("HIDcloakonconnect", true);
-                        ControllerManager.TargetController?.Hide(false);
                         SetLegionPassthrough(false);
+                        EnsurePhysicalControllerHidden();
                         ManagerFactory.settingsManager.SetProperty("LayoutMode", (int)LayoutModes.Desktop);
                         ManagerFactory.layoutManager.SetLayoutMode(LayoutModes.Desktop);
                         await VirtualManager.SetControllerMode(HIDmode.NoController).ConfigureAwait(false);
@@ -113,8 +113,8 @@ namespace HandheldCompanion.Managers
                         PointerModeService.Instance.SetActive(false);
                         UnhideVirtualControllers();
                         ManagerFactory.settingsManager.SetProperty("HIDcloakonconnect", true);
-                        ControllerManager.TargetController?.Hide(false);
                         SetLegionPassthrough(false);
+                        EnsurePhysicalControllerHidden();
                         // Persist DS4 mode in settings first so background layout checks never clobber it
                         ManagerFactory.settingsManager.SetProperty("HIDmode", (int)HIDmode.DualShock4Controller);
                         ManagerFactory.settingsManager.SetProperty("HIDstatus", (int)HIDstatus.Connected);
@@ -134,8 +134,8 @@ namespace HandheldCompanion.Managers
                         PointerModeService.Instance.SetActive(false);
                         UnhideVirtualControllers();
                         ManagerFactory.settingsManager.SetProperty("HIDcloakonconnect", true);
-                        ControllerManager.TargetController?.Hide(false);
                         SetLegionPassthrough(false);
+                        EnsurePhysicalControllerHidden();
                         // Persist X360 mode in settings first
                         ManagerFactory.settingsManager.SetProperty("HIDmode", (int)HIDmode.Xbox360Controller);
                         ManagerFactory.settingsManager.SetProperty("HIDstatus", (int)HIDstatus.Connected);
@@ -152,9 +152,8 @@ namespace HandheldCompanion.Managers
                         ManagerFactory.settingsManager.SetProperty("HIDmode", (int)HIDmode.NoController);
                         ManagerFactory.settingsManager.SetProperty("HIDstatus", (int)HIDstatus.Disconnected);
                         ManagerFactory.settingsManager.SetProperty("HIDcloakonconnect", false);
-                        ControllerManager.TargetController?.Unhide(false);
                         SetLegionPassthrough(true);
-                        UnhideLegionControllers();
+                        EnsurePhysicalControllerUnhidden();
                         ManagerFactory.settingsManager.SetProperty("LayoutMode", (int)LayoutModes.Gamepad);
                         ManagerFactory.layoutManager.SetLayoutMode(LayoutModes.Gamepad);
                         await VirtualManager.SetControllerMode(HIDmode.NoController).ConfigureAwait(false);
@@ -208,6 +207,71 @@ namespace HandheldCompanion.Managers
             try { SystemSounds.Exclamation.Play(); } catch { }
         }
 
+        public static void EnsurePhysicalControllerHidden()
+        {
+            try
+            {
+                HidHide.SetCloaking(true);
+                string? exePath = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName;
+                if (!string.IsNullOrEmpty(exePath))
+                    HidHide.RegisterApplication(exePath);
+
+                var target = ControllerManager.TargetController;
+                bool wasAlreadyHidden = target != null && !target.IsDummy() && target.IsHidden() && HasCycledForCloak;
+
+                if (ManagerFactory.deviceManager?.PnPDevices != null)
+                {
+                    foreach (var dev in ManagerFactory.deviceManager.PnPDevices.Values.Where(d => d.VendorID == 0x17EF && (d.ProductID == 0x61EB || d.ProductID == 0x6182) && d.isXInput))
+                    {
+                        if (!string.IsNullOrEmpty(dev.baseContainerDeviceInstanceId) && !HidHide.IsRegistered(dev.baseContainerDeviceInstanceId))
+                            wasAlreadyHidden = false;
+                        if (!string.IsNullOrEmpty(dev.deviceInstanceId) && !HidHide.IsRegistered(dev.deviceInstanceId))
+                            wasAlreadyHidden = false;
+
+                        if (!string.IsNullOrEmpty(dev.baseContainerDeviceInstanceId))
+                            HidHide.HidePath(dev.baseContainerDeviceInstanceId);
+                        if (!string.IsNullOrEmpty(dev.deviceInstanceId))
+                            HidHide.HidePath(dev.deviceInstanceId);
+                    }
+                }
+
+                if (target != null && !target.IsDummy() && !target.IsVirtual())
+                {
+                    bool shouldCycle = !wasAlreadyHidden;
+                    target.Hide(shouldCycle);
+                    if (shouldCycle)
+                        HasCycledForCloak = true;
+                }
+            }
+            catch (Exception ex)
+            {
+                LogManager.LogWarning("EnsurePhysicalControllerHidden error: {0}", ex.Message);
+            }
+        }
+
+        public static void EnsurePhysicalControllerUnhidden()
+        {
+            try
+            {
+                var target = ControllerManager.TargetController;
+                bool wasHidden = (target != null && !target.IsDummy() && target.IsHidden()) ||
+                                 HidHide.GetRegisteredDevices().Any(d => d.Contains("17EF&PID_61EB", StringComparison.OrdinalIgnoreCase) &&
+                                                                         (d.Contains("MI_00", StringComparison.OrdinalIgnoreCase) || d.Contains("IG_00", StringComparison.OrdinalIgnoreCase)));
+
+                UnhideLegionControllers();
+                HasCycledForCloak = false;
+
+                if (target != null && !target.IsDummy() && !target.IsVirtual())
+                {
+                    target.Unhide(wasHidden);
+                }
+            }
+            catch (Exception ex)
+            {
+                LogManager.LogWarning("EnsurePhysicalControllerUnhidden error: {0}", ex.Message);
+            }
+        }
+
         private static void UnhideVirtualControllers()
         {
             try
@@ -231,6 +295,15 @@ namespace HandheldCompanion.Managers
             try
             {
                 UnhideVirtualControllers();
+                foreach (string devPath in HidHide.GetRegisteredDevices())
+                {
+                    if (devPath.Contains("17EF&PID_61EB&MI_00", StringComparison.OrdinalIgnoreCase) ||
+                        devPath.Contains("17EF&PID_61EB&IG_00", StringComparison.OrdinalIgnoreCase) ||
+                        devPath.Contains("17EF&PID_6182", StringComparison.OrdinalIgnoreCase))
+                    {
+                        HidHide.UnhidePath(devPath);
+                    }
+                }
                 if (ManagerFactory.deviceManager?.PnPDevices != null)
                 {
                     foreach (var dev in ManagerFactory.deviceManager.PnPDevices.Values.Where(d => d.VendorID == 0x17EF && (d.ProductID == 0x6184 || d.ProductID == 0x61ED || d.ProductID == 0x6183 || d.ProductID == 0x61EC || d.ProductID == 0x61EB)))

@@ -597,6 +597,16 @@ namespace HandheldCompanion.Controllers
                 IsBusy = false;
                 ControllerManager.PowerCyclers[GetContainerInstanceId()] = false;
             }
+            else
+            {
+                string cid = GetContainerInstanceId();
+                _ = Task.Run(async () =>
+                {
+                    await Task.Delay(1200).ConfigureAwait(false);
+                    IsBusy = false;
+                    ControllerManager.PowerCyclers[cid] = false;
+                });
+            }
 
             return success;
         }
@@ -617,6 +627,17 @@ namespace HandheldCompanion.Controllers
             if (Details.VendorID == 0x045E && Details.ProductID == 0x028E && !Details.deviceInstanceId.Contains("17EF", StringComparison.OrdinalIgnoreCase))
                 return;
 
+            try
+            {
+                PnPDevice? baseDevice = Details.GetBasePnPDevice();
+                if (baseDevice is not null)
+                {
+                    foreach (string instanceId in EnumerateDeviceAndChildren(baseDevice))
+                        HidHide.HidePath(instanceId);
+                }
+            }
+            catch { }
+
             HidHide.HidePath(Details.baseContainerDeviceInstanceId);
             HidHide.HidePath(Details.deviceInstanceId);
         }
@@ -626,14 +647,16 @@ namespace HandheldCompanion.Controllers
             if (Details is null)
                 return;
 
-            /*
-            PnPDevice? baseDevice = Details.GetBasePnPDevice();
-            if (baseDevice is not null)
+            try
             {
-                foreach (string instanceId in EnumerateDeviceAndChildren(baseDevice))
-                    HidHide.UnhidePath(instanceId);
+                PnPDevice? baseDevice = Details.GetBasePnPDevice();
+                if (baseDevice is not null)
+                {
+                    foreach (string instanceId in EnumerateDeviceAndChildren(baseDevice))
+                        HidHide.UnhidePath(instanceId);
+                }
             }
-            */
+            catch { }
 
             HidHide.UnhidePath(Details.baseContainerDeviceInstanceId);
             HidHide.UnhidePath(Details.deviceInstanceId);
