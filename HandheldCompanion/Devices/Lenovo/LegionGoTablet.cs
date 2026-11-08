@@ -196,18 +196,30 @@ namespace HandheldCompanion.Devices.Lenovo
                     {
                         if (hid.DevicePath != null && hid.DevicePath.Contains("mi_02", StringComparison.OrdinalIgnoreCase))
                         {
-                            hid.OpenDevice();
-                            foreach (byte[] cmd in EnableControllerGyro(LeftJoyconIndex))
+                            if (!hid.IsOpen)
+                                hid.OpenDevice();
+
+                            if (hid.IsOpen)
                             {
-                                byte[] buf = new byte[64];
-                                Array.Copy(cmd, buf, cmd.Length);
-                                hid.Write(buf);
-                            }
-                            foreach (byte[] cmd in EnableControllerGyro(RightJoyconIndex))
-                            {
-                                byte[] buf = new byte[64];
-                                Array.Copy(cmd, buf, cmd.Length);
-                                hid.Write(buf);
+                                try
+                                {
+                                    foreach (byte[] cmd in EnableControllerGyro(LeftJoyconIndex))
+                                    {
+                                        byte[] buf = new byte[64];
+                                        Array.Copy(cmd, buf, cmd.Length);
+                                        hid.Write(buf);
+                                    }
+                                    foreach (byte[] cmd in EnableControllerGyro(RightJoyconIndex))
+                                    {
+                                        byte[] buf = new byte[64];
+                                        Array.Copy(cmd, buf, cmd.Length);
+                                        hid.Write(buf);
+                                    }
+                                }
+                                finally
+                                {
+                                    hid.CloseDevice();
+                                }
                             }
                         }
                     }

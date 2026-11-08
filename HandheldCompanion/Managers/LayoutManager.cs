@@ -288,6 +288,10 @@ public class LayoutManager : IManager
     {
         try
         {
+            // If ControllerModeService is actively applying a mode, do not interfere
+            if (ControllerModeService.IsApplyingMode)
+                return;
+
             if (isDesktop)
             {
                 // In Desktop mode:
@@ -295,23 +299,30 @@ public class LayoutManager : IManager
                 ManagerFactory.settingsManager.SetProperty("HIDcloakonconnect", true);
                 ControllerManager.TargetController?.Hide(false);
 
-                // 2. Disconnect any virtual controller completely
-                _ = Task.Run(async () =>
+                // 2. Disconnect any virtual controller completely if not already disconnected
+                if (VirtualManager.HIDmode != HIDmode.NoController || VirtualManager.HIDstatus != HIDstatus.Disconnected)
                 {
-                    try
+                    _ = Task.Run(async () =>
                     {
-                        await VirtualManager.SetControllerMode(HIDmode.NoController).ConfigureAwait(false);
-                        await VirtualManager.SetControllerStatus(HIDstatus.Disconnected).ConfigureAwait(false);
-                    }
-                    catch (Exception ex)
-                    {
-                        LogManager.LogError("Failed to disconnect virtual controller for Desktop mode: {0}", ex.Message);
-                    }
-                });
+                        try
+                        {
+                            await VirtualManager.SetControllerMode(HIDmode.NoController).ConfigureAwait(false);
+                            await VirtualManager.SetControllerStatus(HIDstatus.Disconnected).ConfigureAwait(false);
+                        }
+                        catch (Exception ex)
+                        {
+                            LogManager.LogError("Failed to disconnect virtual controller for Desktop mode: {0}", ex.Message);
+                        }
+                    });
+                }
             }
             else
             {
                 // In Gamepad mode:
+                // Check if user is in Native mode (no virtual controller wanted)
+                if (ControllerModeService.GetCurrentMode() == ControllerTargetMode.Native)
+                    return;
+
                 // 1. Ensure physical controller remains cloaked so only virtual controller is visible to games
                 ManagerFactory.settingsManager.SetProperty("HIDcloakonconnect", true);
                 ControllerManager.TargetController?.Hide(false);
@@ -320,8 +331,15 @@ public class LayoutManager : IManager
                 if (VirtualManager.HIDmode == HIDmode.NoController || VirtualManager.HIDstatus == HIDstatus.Disconnected)
                 {
                     HIDmode preferredMode = (HIDmode)ManagerFactory.settingsManager.GetInt("HIDmode");
+                    if (ControllerModeService.GetCurrentMode() == ControllerTargetMode.DS4)
+                        preferredMode = HIDmode.DualShock4Controller;
+
                     if (preferredMode == HIDmode.NoController || preferredMode == HIDmode.NotSelected)
                         preferredMode = HIDmode.Xbox360Controller;
+
+                    // If virtual controller is already in the preferred mode and connected, nothing to do
+                    if (VirtualManager.HIDmode == preferredMode && VirtualManager.HIDstatus == HIDstatus.Connected)
+                        return;
 
                     _ = Task.Run(async () =>
                     {
@@ -329,6 +347,8 @@ public class LayoutManager : IManager
                         {
                             await VirtualManager.SetControllerMode(preferredMode).ConfigureAwait(false);
                             await VirtualManager.SetControllerStatus(HIDstatus.Connected).ConfigureAwait(false);
+                            if (preferredMode == HIDmode.DualShock4Controller && Devices.IDevice.GetCurrent() is Devices.Lenovo.LegionGoTablet tablet)
+                                tablet.EnableGyros();
                         }
                         catch (Exception ex)
                         {

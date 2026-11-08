@@ -223,6 +223,8 @@ namespace HandheldCompanion.Views
                 ControllerTargetMode.Native => "Active Mode: Native Direct (Raw Legion Go hardware passthrough)",
                 _ => $"Active Mode: {mode}"
             };
+
+            UpdateGyroStatus();
         }
 
         private async void BtnModeDesktop_Click(object sender, RoutedEventArgs e) => await ControllerModeService.ApplyMode(ControllerTargetMode.Desktop);

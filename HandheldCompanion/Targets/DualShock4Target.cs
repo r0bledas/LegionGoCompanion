@@ -99,6 +99,11 @@ namespace HandheldCompanion.Targets
                 {
                     var gyro = inputs.GyroState.GetGyroscope(GyroState.SensorState.DSU);
                     var accel = inputs.GyroState.GetAccelerometer(GyroState.SensorState.DSU);
+                    if (gyro.X == 0f && gyro.Y == 0f && gyro.Z == 0f)
+                    {
+                        gyro = inputs.GyroState.GetGyroscope(GyroState.SensorState.Default);
+                        accel = inputs.GyroState.GetAccelerometer(GyroState.SensorState.Default);
+                    }
                     gx = gyro.X; gy = gyro.Y; gz = gyro.Z;
                     ax = accel.X; ay = accel.Y; az = accel.Z;
                 }
