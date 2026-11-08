@@ -390,13 +390,22 @@ namespace HandheldCompanion.Managers
                 switch (action)
                 {
                     case CustomActionType.ToggleWindow:
-                        MainForm.ToggleOrShowWindow();
+                        if (ModernMainWindow.Instance != null)
+                            ModernMainWindow.ToggleOrShowWindow();
+                        else
+                            MainForm.ToggleOrShowWindow();
                         break;
                     case CustomActionType.ShowWindow:
-                        MainForm.ShowWindowDirect();
+                        if (ModernMainWindow.Instance != null)
+                            ModernMainWindow.ShowWindowDirect();
+                        else
+                            MainForm.ShowWindowDirect();
                         break;
                     case CustomActionType.HideWindow:
-                        MainForm.HideWindowDirect();
+                        if (ModernMainWindow.Instance != null)
+                            ModernMainWindow.HideWindowDirect();
+                        else
+                            MainForm.HideWindowDirect();
                         break;
                     case CustomActionType.ToggleFan:
                         ToggleFanMode();

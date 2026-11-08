@@ -436,8 +436,27 @@ namespace HandheldCompanion
                     Task.Run(() => PerformanceManager.Start());
                 });
 
-                LogManager.LogInformation("Starting UI...");
-                Application.Run(new MainForm());
+                LogManager.LogInformation("Starting Modern UI (WPF)...");
+                var wpfApp = new System.Windows.Application();
+                var modernWindow = new ModernMainWindow();
+
+                bool isSilent = false;
+                foreach (string a in args)
+                {
+                    string low = a?.Trim().ToLowerInvariant() ?? "";
+                    if (low == "--minimized" || low == "--silent" || low == "-minimized" || low == "-silent" || low == "/minimized" || low == "/silent")
+                    {
+                        isSilent = true;
+                        break;
+                    }
+                }
+
+                if (!isSilent)
+                {
+                    modernWindow.Show();
+                }
+
+                wpfApp.Run(modernWindow);
                 TrayCleaner.Clean();
                 Environment.Exit(0);
             }
