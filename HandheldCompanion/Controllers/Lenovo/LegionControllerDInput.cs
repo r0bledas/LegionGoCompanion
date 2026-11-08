@@ -356,17 +356,7 @@ namespace HandheldCompanion.Controllers.Lenovo
                 }
             }
 
-            // 3. Fallback to raw HID 64-byte streaming if joystickRight is not yet acquired
-            if ((joystickRight is null || joystickRight.IsDisposed) && data != null && data.Length > 17)
-            {
-                int rawStickVal = data[16];
-                if (Math.Abs(rawStickVal - 128) > 8)
-                {
-                    Inputs.AxisState[AxisFlags.RightStickX] = (short)InputUtils.MapRange(rawStickVal, 0, 255, short.MinValue, short.MaxValue);
-                }
-            }
-
-            // 4. Triggers (L2 and R2 from 64-byte raw HID packet, respecting shift if misaligned)
+            // 3. Triggers (L2 and R2 from 64-byte raw HID packet, respecting shift if misaligned)
             int ltIdx = IsHidReportMisaligned() ? 20 : 22;
             int rtIdx = IsHidReportMisaligned() ? 21 : 23;
 

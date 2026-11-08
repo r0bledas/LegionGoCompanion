@@ -244,10 +244,8 @@ namespace HandheldCompanion.Managers
 
                 if (target != null && !target.IsDummy() && !target.IsVirtual())
                 {
-                    bool shouldCycle = !wasAlreadyHidden;
-                    target.Hide(shouldCycle);
-                    if (shouldCycle)
-                        HasCycledForCloak = true;
+                    target.Hide(false);
+                    HasCycledForCloak = true;
                 }
             }
             catch (Exception ex)
@@ -270,7 +268,7 @@ namespace HandheldCompanion.Managers
 
                 if (target != null && !target.IsDummy() && !target.IsVirtual())
                 {
-                    target.Unhide(wasHidden);
+                    target.Unhide(false);
                 }
             }
             catch (Exception ex)

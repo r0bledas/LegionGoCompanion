@@ -315,9 +315,12 @@ public static class ControllerManager
     {
         // Snapshot to avoid races after HasTargetController check
         IController? tc = targetController;
-        if (tc is null || tc.IsDummy())
+        if (tc is null || tc.IsDummy() || (tc is LegionControllerDInput && Controllers.Values.OfType<LegionControllerXInput>().Any(c => c.IsConnected())))
         {
-            tc = Controllers.Values.OfType<LegionControllerDInput>().FirstOrDefault() ??
+            tc = (IController?)Controllers.Values.OfType<LegionControllerXInput>().FirstOrDefault(c => c.IsConnected()) ??
+                 (IController?)Controllers.Values.OfType<LegionControllerXInput>().FirstOrDefault() ??
+                 (IController?)Controllers.Values.OfType<LegionControllerDInput>().FirstOrDefault(c => c.IsConnected()) ??
+                 (IController?)Controllers.Values.OfType<LegionControllerDInput>().FirstOrDefault() ??
                  Controllers.Values.OfType<LegionController>().FirstOrDefault();
 
             if (tc is not null)
@@ -327,7 +330,8 @@ public static class ControllerManager
             else if (PointerModeService.Instance.IsActive)
             {
                 TryHydrateLegionDInput();
-                tc = Controllers.Values.OfType<LegionControllerDInput>().FirstOrDefault();
+                tc = (IController?)Controllers.Values.OfType<LegionControllerXInput>().FirstOrDefault(c => c.IsConnected()) ??
+                     Controllers.Values.OfType<LegionControllerDInput>().FirstOrDefault();
                 if (tc is not null)
                     targetController = tc;
                 else
@@ -1122,7 +1126,7 @@ public static class ControllerManager
                         // If a Legion XInput controller detached, immediately attempt to discover/hydrate
                         // any connected Legion DInput controller (e.g. detached right controller COL02)
                         // so targetController smoothly transitions to the remaining physical controller.
-                        if (controller is LegionControllerXInput)
+                        if (controller is LegionControllerXInput && PointerModeService.Instance.IsActive)
                         {
                             TryHydrateLegionDInput();
                         }

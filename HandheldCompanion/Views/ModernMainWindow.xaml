@@ -268,7 +268,7 @@
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                     <TextBlock Text="Legion Go Companion" FontSize="15" FontWeight="Bold" Foreground="#FFFFFF" VerticalAlignment="Center" />
                     <Border Background="#252932" CornerRadius="4" Padding="6,2" Margin="10,0,0,0" VerticalAlignment="Center">
-                        <TextBlock x:Name="txtVersionTag" Text="v1.3.19" FontSize="11" Foreground="#9EA4B0" />
+                        <TextBlock x:Name="txtVersionTag" Text="v1.4.0" FontSize="11" Foreground="#9EA4B0" />
                     </Border>
                 </StackPanel>
 
@@ -319,12 +319,12 @@
                         <StackPanel>
                             <TextBlock Text="TDP Power Limit (RyzenSMU &amp; Lenovo EC)" FontSize="13.5" FontWeight="Bold" Foreground="#FFFFFF" Margin="0,0,0,8" />
                             <WrapPanel Margin="-2">
-                                <Button x:Name="btnTdp10" Content="10" MinWidth="68" Height="36" Style="{StaticResource TouchButton}" Click="BtnTdpPreset_Click" Tag="10" />
-                                <Button x:Name="btnTdp15" Content="15" MinWidth="68" Height="36" Style="{StaticResource TouchButton}" Click="BtnTdpPreset_Click" Tag="15" />
-                                <Button x:Name="btnTdp20" Content="20" MinWidth="68" Height="36" Style="{StaticResource TouchButton}" Click="BtnTdpPreset_Click" Tag="20" />
-                                <Button x:Name="btnTdp25" Content="25" MinWidth="68" Height="36" Style="{StaticResource TouchButton}" Click="BtnTdpPreset_Click" Tag="25" />
-                                <Button x:Name="btnTdp30" Content="30" MinWidth="68" Height="36" Style="{StaticResource TouchButton}" Click="BtnTdpPreset_Click" Tag="30" />
-                                <Button x:Name="btnTdp35" Content="35" MinWidth="68" Height="36" Style="{StaticResource TouchButton}" Click="BtnTdpPreset_Click" Tag="35" />
+                                <Button x:Name="btnTdp10" Content="10W" MinWidth="68" Height="36" Style="{StaticResource TouchButton}" Click="BtnTdpPreset_Click" Tag="10" />
+                                <Button x:Name="btnTdp15" Content="15W" MinWidth="68" Height="36" Style="{StaticResource TouchButton}" Click="BtnTdpPreset_Click" Tag="15" />
+                                <Button x:Name="btnTdp20" Content="20W" MinWidth="68" Height="36" Style="{StaticResource TouchButton}" Click="BtnTdpPreset_Click" Tag="20" />
+                                <Button x:Name="btnTdp25" Content="25W" MinWidth="68" Height="36" Style="{StaticResource TouchButton}" Click="BtnTdpPreset_Click" Tag="25" />
+                                <Button x:Name="btnTdp30" Content="30W" MinWidth="68" Height="36" Style="{StaticResource TouchButton}" Click="BtnTdpPreset_Click" Tag="30" />
+                                <Button x:Name="btnTdp35" Content="35W" MinWidth="68" Height="36" Style="{StaticResource TouchButton}" Click="BtnTdpPreset_Click" Tag="35" />
                             </WrapPanel>
                             <!-- Custom Stepper (NO SLIDERS) -->
                             <StackPanel Orientation="Horizontal" Margin="0,8,0,0" VerticalAlignment="Center">

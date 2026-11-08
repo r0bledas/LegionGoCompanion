@@ -252,25 +252,37 @@ namespace HandheldCompanion.Views
         private void ApplyTdp(int tdp)
         {
             _currentTdp = Math.Clamp(tdp, 5, 35);
+            int targetTdp = _currentTdp;
             try
             {
-                ManagerFactory.settingsManager.SetProperty("SelectedTdp", _currentTdp);
-                PerformanceManager.SetTDP(_currentTdp, true);
+                ManagerFactory.settingsManager.SetProperty("SelectedTdp", targetTdp);
+                UpdateTdpUi(targetTdp);
 
-                if (IDevice.GetCurrent() is LegionGo lego)
+                Task.Run(() =>
                 {
-                    int oemMode = (int)LegionGo.LegionMode.Custom;
-                    if (_currentTdp <= 10) oemMode = (int)LegionGo.LegionMode.Quiet;
-                    else if (_currentTdp == 15) oemMode = (int)LegionGo.LegionMode.Balanced;
-                    else if (_currentTdp == 25 || _currentTdp == 30) oemMode = (int)LegionGo.LegionMode.Performance;
+                    try
+                    {
+                        PerformanceManager.SetTDP(targetTdp, true);
 
-                    lego.SetSmartFanMode(oemMode);
-                    lego.set_long_limit(_currentTdp);
-                    lego.set_short_limit(_currentTdp);
-                }
+                        if (IDevice.GetCurrent() is LegionGo lego)
+                        {
+                            int oemMode = (int)LegionGo.LegionMode.Custom;
+                            if (targetTdp <= 10) oemMode = (int)LegionGo.LegionMode.Quiet;
+                            else if (targetTdp == 15) oemMode = (int)LegionGo.LegionMode.Balanced;
+                            else if (targetTdp == 25 || targetTdp == 30) oemMode = (int)LegionGo.LegionMode.Performance;
 
-                JoystickLedService.Instance.ApplyToHardware();
-                UpdateTdpUi(_currentTdp);
+                            lego.SetSmartFanMode(oemMode);
+                            lego.set_long_limit(targetTdp);
+                            lego.set_short_limit(targetTdp);
+                        }
+
+                        JoystickLedService.Instance.ApplyToHardware();
+                    }
+                    catch (Exception ex)
+                    {
+                        LogManager.LogError("Failed to apply TDP in background: {0}", ex.Message);
+                    }
+                });
             }
             catch (Exception ex)
             {

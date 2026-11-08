@@ -15,10 +15,10 @@
 #define UsePawnIO
 #define UseUSBip
 
-#define InstallerVersion        "1.3.25"
+#define InstallerVersion        "1.4.0"
 #define MyAppSetupName         "Legion Go Companion"
 #define MyBuildId              "LegionGoCompanion"
-#define MyAppVersion           "1.3.25"
+#define MyAppVersion           "1.4.0"
 #define MyAppPublisher         "r0bledas"
 #define MyAppCopyright         "Copyright © r0bledas"
 #define MyAppURL               "https://github.com/r0bledas/LegionGoCompanion"
