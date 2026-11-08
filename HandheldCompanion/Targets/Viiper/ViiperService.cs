@@ -53,6 +53,12 @@ namespace HandheldCompanion.Targets.Viiper
                 }
 
                 _initialized = true;
+                try
+                {
+                    UsbipCli.DetachAll();
+                    UsbipCli.NoteServerStarted();
+                }
+                catch { }
                 LogManager.LogInformation("VIIPER USB/IP server started on {0}", listenAddr);
                 return true;
             }
@@ -118,6 +124,7 @@ namespace HandheldCompanion.Targets.Viiper
 
             try
             {
+                UsbipCli.NoteServerStarted();
                 Task.Run(() => UsbipCli.AttachExportedDevices());
             }
             catch { }

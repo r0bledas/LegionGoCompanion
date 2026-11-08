@@ -633,7 +633,16 @@ namespace HandheldCompanion.Controllers
                 if (baseDevice is not null)
                 {
                     foreach (string instanceId in EnumerateDeviceAndChildren(baseDevice))
+                    {
+                        if (instanceId.Contains("MI_01", StringComparison.OrdinalIgnoreCase) ||
+                            instanceId.Contains("MI_02", StringComparison.OrdinalIgnoreCase) ||
+                            instanceId.Contains("MI_03", StringComparison.OrdinalIgnoreCase))
+                        {
+                            HidHide.UnhidePath(instanceId);
+                            continue;
+                        }
                         HidHide.HidePath(instanceId);
+                    }
                 }
             }
             catch { }

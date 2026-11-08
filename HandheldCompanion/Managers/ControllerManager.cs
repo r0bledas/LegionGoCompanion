@@ -376,21 +376,24 @@ public static class ControllerManager
 
         if (gamepadMotion is not null && gyroActive)
         {
-            // sensor override
-            switch (sensorSelection)
+            // Only use Windows/SerialUSBIMU sensor override when the physical controller does not have its own motion sensor
+            if (tc is not HandheldCompanion.Controllers.Lenovo.LegionControllerBase && !tc.HasMotionSensor())
             {
-                case SensorFamily.Windows:
-                case SensorFamily.SerialUSBIMU:
-                    {
-                        IDevice dev = IDevice.GetCurrent();
-                        GamepadMotion? devMotion = dev?.GamepadMotion;
-                        if (devMotion is null)
-                            break; // keep existing gamepadMotion if device motion not ready
+                switch (sensorSelection)
+                {
+                    case SensorFamily.Windows:
+                    case SensorFamily.SerialUSBIMU:
+                        {
+                            IDevice dev = IDevice.GetCurrent();
+                            GamepadMotion? devMotion = dev?.GamepadMotion;
+                            if (devMotion is null)
+                                break; // keep existing gamepadMotion if device motion not ready
 
-                        gamepadMotion = devMotion;
-                        SensorsManager.UpdateReport(controllerState, gamepadMotion, ref delta);
-                        break;
-                    }
+                            gamepadMotion = devMotion;
+                            SensorsManager.UpdateReport(controllerState, gamepadMotion, ref delta);
+                            break;
+                        }
+                }
             }
 
             // Update motion consumers (null-safe)

@@ -1247,6 +1247,7 @@ namespace HandheldCompanion.Views
 
             try { _showWindowEvent?.Set(); _showWindowEvent?.Dispose(); } catch { }
             try { _exitAppEvent?.Set(); _exitAppEvent?.Dispose(); } catch { }
+            try { Targets.Viiper.UsbipCli.DetachAll(); } catch { }
             try { Program.SingleInstanceMutex?.ReleaseMutex(); Program.SingleInstanceMutex?.Dispose(); } catch { }
 
             if (_trayIcon != null)

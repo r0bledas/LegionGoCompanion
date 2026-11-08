@@ -183,7 +183,7 @@ namespace HandheldCompanion.Managers
 
         private static void ControllerManager_ControllerUnplugged(IController Controller, bool IsPowerCycling, bool WasTarget)
         {
-            if (sensorFamily != SensorFamily.Controller)
+            if (IsPowerCycling || sensorFamily != SensorFamily.Controller)
                 return;
 
             // skip if controller isn't current or doesn't have motion sensor anyway
@@ -226,8 +226,8 @@ namespace HandheldCompanion.Managers
             // If USB Gyro is plugged, hook into it
             USBSensor = SerialUSBIMU.GetCurrent();
 
-            // select serial usb as current sensor if current sensor selection is none
-            if (sensorFamily == SensorFamily.None)
+            // select serial usb as current sensor only if a USB sensor actually exists and current selection is none
+            if (USBSensor is not null && sensorFamily == SensorFamily.None)
                 ManagerFactory.settingsManager.SetProperty("SensorSelection", (int)SensorFamily.SerialUSBIMU);
         }
 
@@ -278,7 +278,7 @@ namespace HandheldCompanion.Managers
                                     if (USBSensor is null)
                                     {
                                         PickNextSensor();
-                                        break;
+                                        return;
                                     }
 
                                     SerialPlacement placement = (SerialPlacement)ManagerFactory.settingsManager.GetInt("SensorPlacement");
@@ -297,7 +297,7 @@ namespace HandheldCompanion.Managers
                                     if (controller is null || !controller.Capabilities.HasFlag(ControllerCapabilities.MotionSensor))
                                     {
                                         PickNextSensor();
-                                        break;
+                                        return;
                                     }
                                 }
                                 break;

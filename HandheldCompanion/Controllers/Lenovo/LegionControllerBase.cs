@@ -9,6 +9,7 @@ namespace HandheldCompanion.Controllers.Lenovo
     {
         protected controller_hidapi.net.LegionController? Controller;
         protected byte[] data = new byte[64];
+        protected DateTime _lastReportUtc = DateTime.MinValue;
 
         protected bool IsPassthrough = false;
         protected bool IsControllerSwap = false;
@@ -100,6 +101,7 @@ namespace HandheldCompanion.Controllers.Lenovo
         private void Controller_OnControllerInputReceived(byte[] Data)
         {
             Buffer.BlockCopy(Data, 0, this.data, 0, Data.Length);
+            _lastReportUtc = DateTime.UtcNow;
         }
 
         public override void Plug()

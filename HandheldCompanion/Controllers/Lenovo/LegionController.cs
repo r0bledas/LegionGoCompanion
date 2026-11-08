@@ -252,22 +252,14 @@ namespace HandheldCompanion.Controllers.Lenovo
         {
             base.AttachDetails(details);
 
-            // Keep existing Interface 2 (MI_02) handle if already valid and reading; otherwise open Interface 2
-            if (Controller is null || !Controller.IsDeviceValid || !Controller.Reading)
+            if (Controller is not null)
             {
-                if (Controller is not null)
-                {
-                    try { Close(); } catch { }
-                }
+                try { Close(); } catch { }
+            }
 
-                // create controller targeting Interface 2 (vendor feature report interface FFA0 for back buttons and triggers)
-                Controller = new(details.VendorID, details.ProductID, 64, 2);
-                Open();
-            }
-            else
-            {
-                SendGyroEnableCommands();
-            }
+            // create controller targeting Interface 2 (vendor feature report interface FFA0 for back buttons, triggers, and IMU)
+            Controller = new(details.VendorID, details.ProductID, 64, 2);
+            Open();
 
             switch (Controller.DeviceVersion)
             {
@@ -278,8 +270,10 @@ namespace HandheldCompanion.Controllers.Lenovo
             IsHidReportMisaligned();
 
             // manage gamepad motion from both controllers (Left Joy-Con and Right Joy-Con IMU)
-            gamepadMotions[0] = new($"{details.baseContainerDeviceInstanceId}\\{LegionGoTablet.LeftJoyconIndex}");
-            gamepadMotions[1] = new($"{details.baseContainerDeviceInstanceId}\\{LegionGoTablet.RightJoyconIndex}");
+            if (!gamepadMotions.ContainsKey(0) || gamepadMotions[0] is null)
+                gamepadMotions[0] = new($"{details.baseContainerDeviceInstanceId}\\{LegionGoTablet.LeftJoyconIndex}");
+            if (!gamepadMotions.ContainsKey(1) || gamepadMotions[1] is null)
+                gamepadMotions[1] = new($"{details.baseContainerDeviceInstanceId}\\{LegionGoTablet.RightJoyconIndex}");
         }
 
         private DateTime _lastGyroWakeAttempt = DateTime.MinValue;
@@ -303,19 +297,20 @@ namespace HandheldCompanion.Controllers.Lenovo
                 return;
 
             bool noVendorReport = (data[0] == 0 && data[1] == 0 && data[2] == 0 && data[3] == 0);
-            if ((Controller is null || !Controller.IsDeviceValid || !Controller.Reading || noVendorReport) &&
-                (DateTime.UtcNow - _lastGyroWakeAttempt).TotalSeconds > 2.0)
+            bool reportStale = (DateTime.UtcNow - _lastReportUtc).TotalSeconds > 1.0;
+            if ((Controller is null || !Controller.IsDeviceValid || !Controller.Reading || noVendorReport || reportStale) &&
+                (DateTime.UtcNow - _lastGyroWakeAttempt).TotalSeconds > 1.5)
             {
                 _lastGyroWakeAttempt = DateTime.UtcNow;
                 System.Threading.Tasks.Task.Run(() =>
                 {
                     try
                     {
-                        if (Details is not null && (Controller is null || !Controller.IsDeviceValid || !Controller.Reading))
+                        if (Details is not null && (Controller is null || !Controller.IsDeviceValid || !Controller.Reading || reportStale))
                         {
                             lock (hidLock)
                             {
-                                try { Controller?.Close(); } catch { }
+                                try { Close(); } catch { }
                                 Controller = new(Details.VendorID, Details.ProductID, 64, 2);
                             }
                             Open();

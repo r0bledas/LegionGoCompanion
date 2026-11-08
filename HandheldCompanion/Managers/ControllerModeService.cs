@@ -216,6 +216,16 @@ namespace HandheldCompanion.Managers
                 if (!string.IsNullOrEmpty(exePath))
                     HidHide.RegisterApplication(exePath);
 
+                foreach (var reg in HidHide.GetRegisteredDevices())
+                {
+                    if (reg.Contains("MI_01", StringComparison.OrdinalIgnoreCase) ||
+                        reg.Contains("MI_02", StringComparison.OrdinalIgnoreCase) ||
+                        reg.Contains("MI_03", StringComparison.OrdinalIgnoreCase))
+                    {
+                        HidHide.UnhidePath(reg);
+                    }
+                }
+
                 var target = ControllerManager.TargetController;
                 bool wasAlreadyHidden = target != null && !target.IsDummy() && target.IsHidden() && HasCycledForCloak;
 
