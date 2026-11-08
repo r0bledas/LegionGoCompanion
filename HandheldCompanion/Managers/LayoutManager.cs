@@ -292,7 +292,9 @@ public class LayoutManager : IManager
             if (ControllerModeService.IsApplyingMode)
                 return;
 
-            if (isDesktop)
+            var currentMode = ControllerModeService.GetCurrentMode();
+
+            if (isDesktop || currentMode == ControllerTargetMode.Desktop)
             {
                 // In Desktop mode:
                 // 1. Cloak physical Legion Go controllers with HidHide so games detect 0 gamepads
@@ -320,42 +322,45 @@ public class LayoutManager : IManager
             {
                 // In Gamepad mode:
                 // Check if user is in Native mode (no virtual controller wanted)
-                if (ControllerModeService.GetCurrentMode() == ControllerTargetMode.Native)
+                if (currentMode == ControllerTargetMode.Native)
+                {
+                    ManagerFactory.settingsManager.SetProperty("HIDcloakonconnect", false);
+                    ControllerManager.TargetController?.Unhide(false);
                     return;
+                }
 
                 // 1. Ensure physical controller remains cloaked so only virtual controller is visible to games
                 ManagerFactory.settingsManager.SetProperty("HIDcloakonconnect", true);
                 ControllerManager.TargetController?.Hide(false);
 
-                // 2. If virtual controller was disconnected (or set to NoController), reconnect preferred mode
-                if (VirtualManager.HIDmode == HIDmode.NoController || VirtualManager.HIDstatus == HIDstatus.Disconnected)
+                // 2. Determine target virtual controller mode based on user's target mode
+                HIDmode preferredMode = (currentMode == ControllerTargetMode.DS4)
+                    ? HIDmode.DualShock4Controller
+                    : HIDmode.Xbox360Controller;
+
+                // If virtual controller is already in the preferred mode and connected, nothing to do
+                if (VirtualManager.HIDmode == preferredMode && VirtualManager.HIDstatus == HIDstatus.Connected)
+                    return;
+
+                _ = Task.Run(async () =>
                 {
-                    HIDmode preferredMode = (HIDmode)ManagerFactory.settingsManager.GetInt("HIDmode");
-                    if (ControllerModeService.GetCurrentMode() == ControllerTargetMode.DS4)
-                        preferredMode = HIDmode.DualShock4Controller;
-
-                    if (preferredMode == HIDmode.NoController || preferredMode == HIDmode.NotSelected)
-                        preferredMode = HIDmode.Xbox360Controller;
-
-                    // If virtual controller is already in the preferred mode and connected, nothing to do
-                    if (VirtualManager.HIDmode == preferredMode && VirtualManager.HIDstatus == HIDstatus.Connected)
-                        return;
-
-                    _ = Task.Run(async () =>
+                    try
                     {
-                        try
+                        await VirtualManager.SetControllerMode(preferredMode).ConfigureAwait(false);
+                        await VirtualManager.SetControllerStatus(HIDstatus.Connected).ConfigureAwait(false);
+                        if (preferredMode == HIDmode.DualShock4Controller)
                         {
-                            await VirtualManager.SetControllerMode(preferredMode).ConfigureAwait(false);
-                            await VirtualManager.SetControllerStatus(HIDstatus.Connected).ConfigureAwait(false);
-                            if (preferredMode == HIDmode.DualShock4Controller && Devices.IDevice.GetCurrent() is Devices.Lenovo.LegionGoTablet tablet)
+                            if (Devices.IDevice.GetCurrent() is Devices.Lenovo.LegionGoTablet tablet)
                                 tablet.EnableGyros();
+                            if (ControllerManager.TargetController is Controllers.Lenovo.LegionControllerBase targetBase)
+                                targetBase.SendGyroEnableCommands();
                         }
-                        catch (Exception ex)
-                        {
-                            LogManager.LogError("Failed to reconnect virtual controller for Gamepad mode: {0}", ex.Message);
-                        }
-                    });
-                }
+                    }
+                    catch (Exception ex)
+                    {
+                        LogManager.LogError("Failed to reconnect virtual controller for Gamepad mode: {0}", ex.Message);
+                    }
+                });
             }
         }
         catch (Exception ex)

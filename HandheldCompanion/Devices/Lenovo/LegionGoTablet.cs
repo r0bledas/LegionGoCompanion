@@ -183,47 +183,32 @@ namespace HandheldCompanion.Devices.Lenovo
                     if (!device.IsOpen)
                         device.OpenDevice();
 
-                    foreach (byte[] cmd in EnableControllerGyro(LeftJoyconIndex))
-                        device.Write(cmd);
-                    foreach (byte[] cmd in EnableControllerGyro(RightJoyconIndex))
-                        device.Write(cmd);
-                }
-
-                // Also write 64-byte gyro enable commands directly to any MI_02 vendor interface
-                foreach (var hid in HidDevices.Enumerate(0x17EF, productIds))
-                {
-                    try
+                    if (device.IsOpen)
                     {
-                        if (hid.DevicePath != null && hid.DevicePath.Contains("mi_02", StringComparison.OrdinalIgnoreCase))
+                        foreach (byte[] cmd in EnableControllerGyro(LeftJoyconIndex))
                         {
-                            if (!hid.IsOpen)
-                                hid.OpenDevice();
-
-                            if (hid.IsOpen)
-                            {
-                                try
-                                {
-                                    foreach (byte[] cmd in EnableControllerGyro(LeftJoyconIndex))
-                                    {
-                                        byte[] buf = new byte[64];
-                                        Array.Copy(cmd, buf, cmd.Length);
-                                        hid.Write(buf);
-                                    }
-                                    foreach (byte[] cmd in EnableControllerGyro(RightJoyconIndex))
-                                    {
-                                        byte[] buf = new byte[64];
-                                        Array.Copy(cmd, buf, cmd.Length);
-                                        hid.Write(buf);
-                                    }
-                                }
-                                finally
-                                {
-                                    hid.CloseDevice();
-                                }
-                            }
+                            byte[] buf = new byte[64];
+                            Array.Copy(cmd, buf, cmd.Length);
+                            device.Write(buf);
+                        }
+                        foreach (byte[] cmd in EnableControllerGyro(RightJoyconIndex))
+                        {
+                            byte[] buf = new byte[64];
+                            Array.Copy(cmd, buf, cmd.Length);
+                            device.Write(buf);
                         }
                     }
-                    catch { }
+                }
+
+                // Write directly to active LegionController handles without opening/closing mi_02 externally
+                if (ControllerManager.TargetController is Controllers.Lenovo.LegionControllerBase targetBase)
+                {
+                    targetBase.SendGyroEnableCommands();
+                }
+
+                foreach (var c in ControllerManager.GetControllers<Controllers.Lenovo.LegionControllerBase>())
+                {
+                    c.SendGyroEnableCommands();
                 }
             }
             catch { }

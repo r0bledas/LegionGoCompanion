@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Media;
 using System.Threading.Tasks;
+using HandheldCompanion.Controllers;
+using HandheldCompanion.Controllers.Lenovo;
 using HandheldCompanion.Devices;
 using HandheldCompanion.Devices.Lenovo;
 using HandheldCompanion.Shared;
@@ -23,31 +25,39 @@ namespace HandheldCompanion.Managers
     {
         public static event Action<ControllerTargetMode>? ModeChanged;
         public static bool IsApplyingMode { get; private set; }
-        private static ControllerTargetMode? _activeMode;
+        private static ControllerTargetMode _currentMode = ControllerTargetMode.Desktop;
+        private static bool _initialized = false;
 
-        public static ControllerTargetMode GetCurrentMode()
+        private static void EnsureInitialized()
         {
+            if (_initialized)
+                return;
+
             try
             {
-                if (PointerModeService.Instance.IsActive)
-                    return ControllerTargetMode.Pointer;
-
-                if (ManagerFactory.layoutManager?.GetCurrentMode() == LayoutModes.Desktop)
-                    return ControllerTargetMode.Desktop;
-
-                if (VirtualManager.HIDmode == HIDmode.DualShock4Controller)
-                    return ControllerTargetMode.DS4;
-                else if (VirtualManager.HIDmode == HIDmode.Xbox360Controller)
-                    return ControllerTargetMode.X360;
-                else if (_activeMode.HasValue && _activeMode.Value == ControllerTargetMode.DS4 && IsApplyingMode)
-                    return ControllerTargetMode.DS4;
+                int saved = ManagerFactory.settingsManager?.GetInt("TargetMode") ?? -1;
+                if (saved >= 0 && Enum.IsDefined(typeof(ControllerTargetMode), saved))
+                {
+                    _currentMode = (ControllerTargetMode)saved;
+                }
                 else
-                    return ControllerTargetMode.Native;
+                {
+                    bool desktopOnStart = ManagerFactory.settingsManager?.GetBoolean("DesktopLayoutOnStart") ?? false;
+                    _currentMode = desktopOnStart ? ControllerTargetMode.Desktop : ControllerTargetMode.X360;
+                }
+                _initialized = true;
             }
             catch
             {
-                return ControllerTargetMode.Desktop;
+                _currentMode = ControllerTargetMode.Desktop;
+                _initialized = true;
             }
+        }
+
+        public static ControllerTargetMode GetCurrentMode()
+        {
+            EnsureInitialized();
+            return _currentMode;
         }
 
         public static string GetModeDisplayName(ControllerTargetMode mode) => mode switch
@@ -66,13 +76,15 @@ namespace HandheldCompanion.Managers
                 return false;
 
             IsApplyingMode = true;
-            _activeMode = mode;
+            _initialized = true;
+            _currentMode = mode;
             try
             {
+                ManagerFactory.settingsManager.SetProperty("TargetMode", (int)mode);
+
                 switch (mode)
                 {
                     case ControllerTargetMode.Pointer:
-                        ManagerFactory.settingsManager.SetProperty("TargetMode", (int)ControllerTargetMode.Pointer);
                         PointerModeService.Instance.SetActive(true);
                         ManagerFactory.settingsManager.SetProperty("HIDcloakonconnect", false);
                         ControllerManager.TargetController?.Unhide(false);
@@ -86,7 +98,6 @@ namespace HandheldCompanion.Managers
                         break;
 
                     case ControllerTargetMode.Desktop:
-                        ManagerFactory.settingsManager.SetProperty("TargetMode", (int)ControllerTargetMode.Desktop);
                         PointerModeService.Instance.SetActive(false);
                         ManagerFactory.settingsManager.SetProperty("HIDcloakonconnect", true);
                         ControllerManager.TargetController?.Hide(false);
@@ -99,7 +110,6 @@ namespace HandheldCompanion.Managers
                         break;
 
                     case ControllerTargetMode.DS4:
-                        ManagerFactory.settingsManager.SetProperty("TargetMode", (int)ControllerTargetMode.DS4);
                         PointerModeService.Instance.SetActive(false);
                         UnhideVirtualControllers();
                         ManagerFactory.settingsManager.SetProperty("HIDcloakonconnect", true);
@@ -115,11 +125,12 @@ namespace HandheldCompanion.Managers
                         await VirtualManager.SetControllerStatus(HIDstatus.Connected).ConfigureAwait(false);
                         if (IDevice.GetCurrent() is LegionGoTablet tabletDS4)
                             tabletDS4.EnableGyros();
+                        if (ControllerManager.TargetController is LegionControllerBase legoBaseDS4)
+                            legoBaseDS4.SendGyroEnableCommands();
                         PlaySound();
                         break;
 
                     case ControllerTargetMode.X360:
-                        ManagerFactory.settingsManager.SetProperty("TargetMode", (int)ControllerTargetMode.X360);
                         PointerModeService.Instance.SetActive(false);
                         UnhideVirtualControllers();
                         ManagerFactory.settingsManager.SetProperty("HIDcloakonconnect", true);
@@ -137,7 +148,6 @@ namespace HandheldCompanion.Managers
                         break;
 
                     case ControllerTargetMode.Native:
-                        ManagerFactory.settingsManager.SetProperty("TargetMode", (int)ControllerTargetMode.Native);
                         PointerModeService.Instance.SetActive(false);
                         ManagerFactory.settingsManager.SetProperty("HIDmode", (int)HIDmode.NoController);
                         ManagerFactory.settingsManager.SetProperty("HIDstatus", (int)HIDstatus.Disconnected);

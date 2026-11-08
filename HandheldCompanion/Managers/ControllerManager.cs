@@ -370,8 +370,8 @@ public static class ControllerManager
             }
         }
 
-        bool isDS4 = VirtualManager.HIDmode == HIDmode.DualShock4Controller;
-        bool isDesktop = ManagerFactory.layoutManager?.GetCurrentMode() == LayoutModes.Desktop;
+        bool isDS4 = VirtualManager.HIDmode == HIDmode.DualShock4Controller || ControllerModeService.GetCurrentMode() == ControllerTargetMode.DS4;
+        bool isDesktop = ControllerModeService.GetCurrentMode() == ControllerTargetMode.Desktop || ManagerFactory.layoutManager?.GetCurrentMode() == LayoutModes.Desktop;
         bool gyroActive = isDS4 && !isDesktop && GyroAimingEnabled;
 
         if (gamepadMotion is not null && gyroActive)

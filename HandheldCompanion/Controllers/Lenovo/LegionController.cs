@@ -365,6 +365,7 @@ namespace HandheldCompanion.Controllers.Lenovo
             if ((!slot1Active || !slot0Active) && (DateTime.UtcNow - _lastGyroWakeAttempt).TotalSeconds > 3.0)
             {
                 _lastGyroWakeAttempt = DateTime.UtcNow;
+                SendGyroEnableCommands();
                 System.Threading.Tasks.Task.Run(() =>
                 {
                     try

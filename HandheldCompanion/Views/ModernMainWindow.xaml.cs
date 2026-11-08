@@ -149,9 +149,12 @@ namespace HandheldCompanion.Views
             this.Loaded += ModernMainWindow_Loaded;
         }
 
-        private void ModernMainWindow_Loaded(object sender, RoutedEventArgs e)
+        private async void ModernMainWindow_Loaded(object sender, RoutedEventArgs e)
         {
             RefreshAllStates();
+            var currentMode = ControllerModeService.GetCurrentMode();
+            UpdateActiveControllerHighlight(currentMode);
+            await ControllerModeService.ApplyMode(currentMode);
         }
 
         #region Navigation

@@ -31,12 +31,40 @@ namespace HandheldCompanion.Controllers.Lenovo
                         Controller.OnControllerInputReceived -= Controller_OnControllerInputReceived;
                         Controller.OnControllerInputReceived += Controller_OnControllerInputReceived;
                         Controller.Open();
+                        SendGyroEnableCommands();
                     }
                 }
                 catch (Exception ex)
                 {
                     LogManager.LogError("Couldn't initialize {0}. Exception: {1}", GetType(), ex.Message);
                     return;
+                }
+            }
+        }
+
+        public void SendGyroEnableCommands()
+        {
+            lock (hidLock)
+            {
+                if (Controller is not null && Controller.IsDeviceValid)
+                {
+                    try
+                    {
+                        byte[][] cmds = [
+                            [0x05, 0x06, 0x6A, 0x02, (byte)Devices.Lenovo.LegionGoTablet.LeftJoyconIndex, 0x01, 0x01],
+                            [0x05, 0x06, 0x6A, 0x07, (byte)Devices.Lenovo.LegionGoTablet.LeftJoyconIndex, 0x02, 0x01],
+                            [0x05, 0x06, 0x6A, 0x02, (byte)Devices.Lenovo.LegionGoTablet.RightJoyconIndex, 0x01, 0x01],
+                            [0x05, 0x06, 0x6A, 0x07, (byte)Devices.Lenovo.LegionGoTablet.RightJoyconIndex, 0x02, 0x01]
+                        ];
+
+                        foreach (var cmd in cmds)
+                        {
+                            byte[] buf = new byte[64];
+                            Array.Copy(cmd, buf, cmd.Length);
+                            Controller.HidWrite(buf);
+                        }
+                    }
+                    catch { }
                 }
             }
         }
