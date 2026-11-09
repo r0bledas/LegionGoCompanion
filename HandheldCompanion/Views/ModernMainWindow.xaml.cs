@@ -204,7 +204,10 @@ namespace HandheldCompanion.Views
             };
 
             UpdateActiveControllerHighlight(ControllerModeService.GetCurrentMode());
-            UpdateTdpUi(_currentTdp);
+            int savedTdp = ManagerFactory.settingsManager.GetInt("SelectedTdp");
+            if (savedTdp >= 5 && savedTdp <= 35)
+                _currentTdp = savedTdp;
+            ApplyTdp(_currentTdp);
             UpdateResolutionControls();
         }
 
@@ -251,6 +254,7 @@ namespace HandheldCompanion.Views
             _currentTdp = Math.Clamp(tdp, 5, 35);
             try
             {
+                ManagerFactory.settingsManager.SetProperty("SelectedTdp", _currentTdp);
                 PerformanceManager.SetTDP(_currentTdp, true);
 
                 if (IDevice.GetCurrent() is LegionGo lego)
@@ -286,6 +290,7 @@ namespace HandheldCompanion.Views
             btnTdp20.Style = (tdp == 20) ? activeStyle : normalStyle;
             btnTdp25.Style = (tdp == 25) ? activeStyle : normalStyle;
             btnTdp30.Style = (tdp == 30) ? activeStyle : normalStyle;
+            btnTdp35.Style = (tdp == 35) ? activeStyle : normalStyle;
 
             if (tdp <= 10)
             {
@@ -362,6 +367,7 @@ namespace HandheldCompanion.Views
             {
                 if (s == "800") ApplyResolution(1280, 800);
                 else if (s == "1200") ApplyResolution(1920, 1200);
+                else if (s == "1440") ApplyResolution(2560, 1440);
                 else if (s == "1600") ApplyResolution(2560, 1600);
             }
         }
@@ -413,6 +419,7 @@ namespace HandheldCompanion.Views
 
             btnRes800.Style = (w == 1280 && h == 800) ? activeStyle : normalStyle;
             btnRes1200.Style = (w == 1920 && h == 1200) ? activeStyle : normalStyle;
+            btnRes1440.Style = (w == 2560 && h == 1440) ? activeStyle : normalStyle;
             btnRes1600.Style = (w == 2560 && h == 1600) ? activeStyle : normalStyle;
         }
         #endregion

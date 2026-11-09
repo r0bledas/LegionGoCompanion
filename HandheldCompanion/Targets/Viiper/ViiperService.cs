@@ -124,7 +124,6 @@ namespace HandheldCompanion.Targets.Viiper
 
             try
             {
-                UsbipCli.NoteServerStarted();
                 Task.Run(() => UsbipCli.AttachExportedDevices());
             }
             catch { }

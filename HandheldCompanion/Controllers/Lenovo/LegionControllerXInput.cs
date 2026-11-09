@@ -57,7 +57,27 @@ namespace HandheldCompanion.Controllers.Lenovo
             ButtonState.Overwrite(InjectedButtons, Inputs.ButtonState);
 
             if (!IsConnected())
-                return false;
+            {
+                for (int i = 0; i < 4; i++)
+                {
+                    var test = new Controller((UserIndex)i);
+                    if (test.IsConnected)
+                    {
+                        UserIndex = (byte)i;
+                        xinputController = test;
+                        break;
+                    }
+                }
+
+                if (!IsConnected())
+                {
+                    Inputs.AxisState[AxisFlags.LeftStickX] = 0;
+                    Inputs.AxisState[AxisFlags.LeftStickY] = 0;
+                    Inputs.AxisState[AxisFlags.RightStickX] = 0;
+                    Inputs.AxisState[AxisFlags.RightStickY] = 0;
+                    return false;
+                }
+            }
 
             try
             {

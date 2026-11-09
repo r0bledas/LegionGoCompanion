@@ -233,15 +233,12 @@ namespace HandheldCompanion.Managers
                 {
                     foreach (var dev in ManagerFactory.deviceManager.PnPDevices.Values.Where(d => d.VendorID == 0x17EF && (d.ProductID == 0x61EB || d.ProductID == 0x6182) && d.isXInput))
                     {
-                        if (!string.IsNullOrEmpty(dev.baseContainerDeviceInstanceId) && !HidHide.IsRegistered(dev.baseContainerDeviceInstanceId))
-                            wasAlreadyHidden = false;
-                        if (!string.IsNullOrEmpty(dev.deviceInstanceId) && !HidHide.IsRegistered(dev.deviceInstanceId))
-                            wasAlreadyHidden = false;
-
-                        if (!string.IsNullOrEmpty(dev.baseContainerDeviceInstanceId))
-                            HidHide.HidePath(dev.baseContainerDeviceInstanceId);
                         if (!string.IsNullOrEmpty(dev.deviceInstanceId))
+                        {
+                            if (!HidHide.IsRegistered(dev.deviceInstanceId))
+                                wasAlreadyHidden = false;
                             HidHide.HidePath(dev.deviceInstanceId);
+                        }
                     }
                 }
 
@@ -265,11 +262,11 @@ namespace HandheldCompanion.Managers
             {
                 var target = ControllerManager.TargetController;
                 bool wasHidden = (target != null && !target.IsDummy() && target.IsHidden()) ||
-                                 HidHide.GetRegisteredDevices().Any(d => d.Contains("17EF&PID_61EB", StringComparison.OrdinalIgnoreCase) &&
-                                                                         (d.Contains("MI_00", StringComparison.OrdinalIgnoreCase) || d.Contains("IG_00", StringComparison.OrdinalIgnoreCase)));
+                                 HidHide.GetRegisteredDevices().Any(d => d.Contains("17EF&PID_61EB", StringComparison.OrdinalIgnoreCase));
 
                 UnhideLegionControllers();
                 HasCycledForCloak = false;
+                HidHide.SetCloaking(false);
 
                 if (target != null && !target.IsDummy() && !target.IsVirtual())
                 {
@@ -307,8 +304,7 @@ namespace HandheldCompanion.Managers
                 UnhideVirtualControllers();
                 foreach (string devPath in HidHide.GetRegisteredDevices())
                 {
-                    if (devPath.Contains("17EF&PID_61EB&MI_00", StringComparison.OrdinalIgnoreCase) ||
-                        devPath.Contains("17EF&PID_61EB&IG_00", StringComparison.OrdinalIgnoreCase) ||
+                    if (devPath.Contains("17EF&PID_61EB", StringComparison.OrdinalIgnoreCase) ||
                         devPath.Contains("17EF&PID_6182", StringComparison.OrdinalIgnoreCase))
                     {
                         HidHide.UnhidePath(devPath);

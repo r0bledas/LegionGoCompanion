@@ -319,11 +319,12 @@
                         <StackPanel>
                             <TextBlock Text="TDP Power Limit (RyzenSMU &amp; Lenovo EC)" FontSize="13.5" FontWeight="Bold" Foreground="#FFFFFF" Margin="0,0,0,8" />
                             <WrapPanel Margin="-2">
-                                <Button x:Name="btnTdp10" Content="10W (Quiet)" MinWidth="105" Height="36" Style="{StaticResource TouchButton}" Click="BtnTdpPreset_Click" Tag="10" />
-                                <Button x:Name="btnTdp15" Content="15W (Balanced)" MinWidth="115" Height="36" Style="{StaticResource TouchButton}" Click="BtnTdpPreset_Click" Tag="15" />
-                                <Button x:Name="btnTdp20" Content="20W" MinWidth="70" Height="36" Style="{StaticResource TouchButton}" Click="BtnTdpPreset_Click" Tag="20" />
-                                <Button x:Name="btnTdp25" Content="25W (Performance)" MinWidth="140" Height="36" Style="{StaticResource TouchButton}" Click="BtnTdpPreset_Click" Tag="25" />
-                                <Button x:Name="btnTdp30" Content="30W (Custom)" MinWidth="115" Height="36" Style="{StaticResource TouchButton}" Click="BtnTdpPreset_Click" Tag="30" />
+                                <Button x:Name="btnTdp10" Content="10" MinWidth="68" Height="36" Style="{StaticResource TouchButton}" Click="BtnTdpPreset_Click" Tag="10" />
+                                <Button x:Name="btnTdp15" Content="15" MinWidth="68" Height="36" Style="{StaticResource TouchButton}" Click="BtnTdpPreset_Click" Tag="15" />
+                                <Button x:Name="btnTdp20" Content="20" MinWidth="68" Height="36" Style="{StaticResource TouchButton}" Click="BtnTdpPreset_Click" Tag="20" />
+                                <Button x:Name="btnTdp25" Content="25" MinWidth="68" Height="36" Style="{StaticResource TouchButton}" Click="BtnTdpPreset_Click" Tag="25" />
+                                <Button x:Name="btnTdp30" Content="30" MinWidth="68" Height="36" Style="{StaticResource TouchButton}" Click="BtnTdpPreset_Click" Tag="30" />
+                                <Button x:Name="btnTdp35" Content="35" MinWidth="68" Height="36" Style="{StaticResource TouchButton}" Click="BtnTdpPreset_Click" Tag="35" />
                             </WrapPanel>
                             <!-- Custom Stepper (NO SLIDERS) -->
                             <StackPanel Orientation="Horizontal" Margin="0,8,0,0" VerticalAlignment="Center">
@@ -356,9 +357,10 @@
                         <StackPanel>
                             <TextBlock Text="Display Resolution" FontSize="13.5" FontWeight="Bold" Foreground="#FFFFFF" Margin="0,0,0,8" />
                             <WrapPanel Margin="-2">
-                                <Button x:Name="btnRes800" Content="1280x800 (800p)" MinWidth="140" Height="36" Style="{StaticResource TouchButton}" Click="BtnRes_Click" Tag="800" />
-                                <Button x:Name="btnRes1200" Content="1920x1200 (1200p)" MinWidth="145" Height="36" Style="{StaticResource TouchButton}" Click="BtnRes_Click" Tag="1200" />
-                                <Button x:Name="btnRes1600" Content="2560x1600 (1600p)" MinWidth="145" Height="36" Style="{StaticResource TouchButton}" Click="BtnRes_Click" Tag="1600" />
+                                <Button x:Name="btnRes800" Content="1280x800 (800p)" MinWidth="125" Height="36" Style="{StaticResource TouchButton}" Click="BtnRes_Click" Tag="800" />
+                                <Button x:Name="btnRes1200" Content="1920x1200 (1200p)" MinWidth="135" Height="36" Style="{StaticResource TouchButton}" Click="BtnRes_Click" Tag="1200" />
+                                <Button x:Name="btnRes1440" Content="2560x1440 (1440p)" MinWidth="135" Height="36" Style="{StaticResource TouchButton}" Click="BtnRes_Click" Tag="1440" />
+                                <Button x:Name="btnRes1600" Content="2560x1600 (1600p)" MinWidth="135" Height="36" Style="{StaticResource TouchButton}" Click="BtnRes_Click" Tag="1600" />
                             </WrapPanel>
                             <TextBlock x:Name="txtCurrentRes" Text="Current: Checking..." FontSize="11.5" Foreground="#9EA4B0" Margin="4,6,0,0" />
                         </StackPanel>

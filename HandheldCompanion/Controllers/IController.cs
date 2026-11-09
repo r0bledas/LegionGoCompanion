@@ -647,7 +647,6 @@ namespace HandheldCompanion.Controllers
             }
             catch { }
 
-            HidHide.HidePath(Details.baseContainerDeviceInstanceId);
             HidHide.HidePath(Details.deviceInstanceId);
         }
 

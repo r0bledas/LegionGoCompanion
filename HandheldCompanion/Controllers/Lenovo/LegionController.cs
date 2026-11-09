@@ -283,9 +283,7 @@ namespace HandheldCompanion.Controllers.Lenovo
             if (IsBusy || !IsPlugged || _disposing || _disposed)
                 return;
 
-            if (!UpdateState())
-                return;
-
+            UpdateState();
             ProcessVendorHidInput(delta);
 
             base.Tick(ticks, delta, true);
@@ -464,11 +462,13 @@ namespace HandheldCompanion.Controllers.Lenovo
                     (short)InputUtils.MapRange((short)x, 0, 1000, short.MinValue, short.MaxValue);
                 Inputs.AxisState[AxisFlags.RightPadY] =
                     (short)InputUtils.MapRange((short)-y, 0, 1000, short.MinValue, short.MaxValue);
+                Inputs.ButtonState[ButtonFlags.RightPadTouch] = true;
             }
             else
             {
                 Inputs.AxisState[AxisFlags.RightPadX] = 0;
                 Inputs.AxisState[AxisFlags.RightPadY] = 0;
+                Inputs.ButtonState[ButtonFlags.RightPadTouch] = false;
             }
 
             // One-frame left-click pulse (single tap only)
