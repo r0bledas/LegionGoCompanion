@@ -730,6 +730,26 @@ public class MultimediaManager : IManager
 
     #region Audio Management
 
+    public int VolumeStep
+    {
+        get
+        {
+            int s = ManagerFactory.settingsManager?.GetInt("VolumeStep") ?? 10;
+            return (s > 0 && s <= 25) ? s : 10;
+        }
+        set
+        {
+            int clamped = Math.Clamp(value, 1, 25);
+            ManagerFactory.settingsManager?.SetProperty("VolumeStep", clamped);
+        }
+    }
+
+    public bool ModernFlyoutEnabled
+    {
+        get => ManagerFactory.settingsManager?.GetBoolean("ModernFlyoutEnabled") ?? true;
+        set => ManagerFactory.settingsManager?.SetProperty("ModernFlyoutEnabled", value);
+    }
+
     public bool HasVolumeSupport()
     {
         return _volumeSupport;
@@ -760,16 +780,22 @@ public class MultimediaManager : IManager
 
     public void IncreaseVolume()
     {
-        int stepRoundDn = (int)Math.Ceiling(Math.Round(GetVolume() / 2.0d));
-        int volume = stepRoundDn * 2 + 2;
-        SetVolume(volume);
+        int step = VolumeStep;
+        if (IsMuted())
+            Unmute();
+
+        int current = (int)Math.Round(GetVolume());
+        int next = Math.Clamp(((current / step) + 1) * step, 0, 100);
+        SetVolume(next);
     }
 
     public void DecreaseVolume()
     {
-        int stepRoundUp = (int)Math.Ceiling(Math.Round(GetVolume() / 2.0d));
-        int volume = stepRoundUp * 2 - 2;
-        SetVolume(volume);
+        int step = VolumeStep;
+        int current = (int)Math.Round(GetVolume());
+        int rem = current % step;
+        int next = Math.Clamp(rem == 0 ? current - step : current - rem, 0, 100);
+        SetVolume(next);
     }
 
     public void Mute()

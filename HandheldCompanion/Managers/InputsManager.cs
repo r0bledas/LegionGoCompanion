@@ -250,6 +250,35 @@ public static class InputsManager
         if (args.ExtraInfo == KeyboardReplayMarker)
             return;
 
+        if (!IsListening && !SystemManager.IsSessionLocked &&
+            args.KeyCode is Keys.VolumeUp or Keys.VolumeDown or Keys.VolumeMute)
+        {
+            var mm = ManagerFactory.multimediaManager;
+            if (mm != null && mm.ModernFlyoutEnabled)
+            {
+                args.SuppressKeyPress = true;
+                e.Handled = true;
+
+                if (args.IsKeyDown)
+                {
+                    switch (args.KeyCode)
+                    {
+                        case Keys.VolumeUp:
+                            mm.IncreaseVolume();
+                            break;
+                        case Keys.VolumeDown:
+                            mm.DecreaseVolume();
+                            break;
+                        case Keys.VolumeMute:
+                            mm.ToggleMute();
+                            break;
+                    }
+                    ModernVolumeFlyout.ShowCurrentVolume();
+                }
+                return;
+            }
+        }
+
         lock (KeyboardBufferLock)
             M_GlobalHook_KeyEventLocked(sender, e);
     }

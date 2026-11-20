@@ -54,11 +54,55 @@ public class SettingsManager : IManager
     public event SettingValueChangedEventHandler? SettingValueChanged;
 
     private readonly Dictionary<string, object?> Settings = [];
+    private readonly string _customPrefsPath;
+    private readonly object _prefsLock = new();
 
     public SettingsManager()
     {
-        if (!Directory.Exists(System.IO.Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.ApplicationData), "HandheldCompanion")))
-            Directory.CreateDirectory(System.IO.Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.ApplicationData), "HandheldCompanion"));
+        string appDataDir = System.IO.Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.ApplicationData), "HandheldCompanion");
+        if (!Directory.Exists(appDataDir))
+            Directory.CreateDirectory(appDataDir);
+
+        string localDir = System.IO.Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData), "HandheldCompanion");
+        if (!Directory.Exists(localDir))
+            Directory.CreateDirectory(localDir);
+
+        _customPrefsPath = System.IO.Path.Combine(localDir, "user_preferences.json");
+        LoadCustomPreferences();
+    }
+
+    private void LoadCustomPreferences()
+    {
+        lock (_prefsLock)
+        {
+            try
+            {
+                if (File.Exists(_customPrefsPath))
+                {
+                    string json = File.ReadAllText(_customPrefsPath);
+                    var dict = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, object?>>(json);
+                    if (dict != null)
+                    {
+                        foreach (var kv in dict)
+                            Settings[kv.Key] = kv.Value;
+                    }
+                }
+            }
+            catch { }
+        }
+    }
+
+    private void SaveCustomPreferences()
+    {
+        lock (_prefsLock)
+        {
+            try
+            {
+                string json = Newtonsoft.Json.JsonConvert.SerializeObject(Settings, Newtonsoft.Json.Formatting.Indented);
+                File.WriteAllText(_customPrefsPath, json);
+            }
+            catch { }
+        }
     }
 
     public override void Start()
@@ -125,6 +169,8 @@ public class SettingsManager : IManager
 
         // update internal settings dictionary
         Settings[name] = value;
+        if (!temporary)
+            SaveCustomPreferences();
 
         // raise event
         if (Status.HasFlag(ManagerStatus.Initialized) || force)
@@ -209,6 +255,19 @@ public class SettingsManager : IManager
                 if (Settings.TryGetValue("GyroAimingEnabled", out var gyroVal))
                     return Convert.ToBoolean(gyroVal);
                 return true;
+
+            case "ModernFlyoutEnabled":
+                if (Settings.TryGetValue("ModernFlyoutEnabled", out var flyoutVal))
+                    return Convert.ToBoolean(flyoutVal);
+                return true;
+
+            case "VolumeStep":
+                if (Settings.TryGetValue("VolumeStep", out var stepVal))
+                {
+                    int s = Convert.ToInt32(stepVal);
+                    if (s > 0 && s <= 25) return s;
+                }
+                return 10;
 
             default:
                 {

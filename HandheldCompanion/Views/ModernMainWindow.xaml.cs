@@ -29,6 +29,28 @@ namespace HandheldCompanion.Views
         [DllImport("user32.dll")]
         private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
 
+        [DllImport("user32.dll")]
+        private static extern IntPtr GetForegroundWindow();
+
+        [DllImport("user32.dll")]
+        private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
+
+        [DllImport("kernel32.dll")]
+        private static extern uint GetCurrentThreadId();
+
+        [DllImport("user32.dll")]
+        private static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, bool fAttach);
+
+        [DllImport("user32.dll")]
+        private static extern bool BringWindowToTop(IntPtr hWnd);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
+
+        private static readonly IntPtr HWND_TOPMOST = new IntPtr(-1);
+        private const uint SWP_NOSIZE = 0x0001;
+        private const uint SWP_NOMOVE = 0x0002;
+        private const uint SWP_SHOWWINDOW = 0x0040;
         private const int SW_RESTORE = 9;
 
         public static ModernMainWindow? Instance { get; private set; }
@@ -203,12 +225,21 @@ namespace HandheldCompanion.Views
                 Dispatcher.BeginInvoke(() => UpdateActiveControllerHighlight(mode));
             };
 
+            if (ManagerFactory.multimediaManager != null)
+            {
+                ManagerFactory.multimediaManager.VolumeNotification += (vol) =>
+                {
+                    Dispatcher.BeginInvoke(UpdateVolumeControls);
+                };
+            }
+
             UpdateActiveControllerHighlight(ControllerModeService.GetCurrentMode());
             int savedTdp = ManagerFactory.settingsManager.GetInt("SelectedTdp");
             if (savedTdp >= 5 && savedTdp <= 35)
                 _currentTdp = savedTdp;
             ApplyTdp(_currentTdp);
             UpdateResolutionControls();
+            UpdateVolumeControls();
         }
 
         private void UpdateActiveControllerHighlight(ControllerTargetMode mode)
@@ -443,6 +474,89 @@ namespace HandheldCompanion.Views
             btnRes1200.Style = (w == 1920 && h == 1200) ? activeStyle : normalStyle;
             btnRes1440.Style = (w == 2560 && h == 1440) ? activeStyle : normalStyle;
             btnRes1600.Style = (w == 2560 && h == 1600) ? activeStyle : normalStyle;
+        }
+
+        private void UpdateVolumeControls()
+        {
+            var mm = ManagerFactory.multimediaManager;
+            if (mm == null) return;
+
+            var activeStyle = (Style)FindResource("ActiveTouchButton");
+            var normalStyle = (Style)FindResource("TouchButton");
+
+            bool flyoutOn = mm.ModernFlyoutEnabled;
+            btnFlyoutOn.Style = flyoutOn ? activeStyle : normalStyle;
+            btnFlyoutOff.Style = !flyoutOn ? activeStyle : normalStyle;
+
+            int step = mm.VolumeStep;
+            btnVolStep10.Style = (step == 10) ? activeStyle : normalStyle;
+            btnVolStep5.Style = (step == 5) ? activeStyle : normalStyle;
+            btnVolStep2.Style = (step == 2) ? activeStyle : normalStyle;
+
+            int vol = (int)Math.Round(mm.GetVolume());
+            bool muted = mm.IsMuted();
+            txtVolCurrent.Text = muted ? "MUTE" : $"{vol}%";
+            btnVolMute.Style = muted ? activeStyle : normalStyle;
+            btnVolMute.Content = muted ? "Unmute" : "Mute";
+        }
+
+        private void BtnFlyoutOn_Click(object sender, RoutedEventArgs e)
+        {
+            if (ManagerFactory.multimediaManager != null)
+            {
+                ManagerFactory.multimediaManager.ModernFlyoutEnabled = true;
+                UpdateVolumeControls();
+                ModernVolumeFlyout.ShowCurrentVolume();
+            }
+        }
+
+        private void BtnFlyoutOff_Click(object sender, RoutedEventArgs e)
+        {
+            if (ManagerFactory.multimediaManager != null)
+            {
+                ManagerFactory.multimediaManager.ModernFlyoutEnabled = false;
+                UpdateVolumeControls();
+            }
+        }
+
+        private void BtnVolStep_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button b && b.Tag is string s && int.TryParse(s, out int step) && ManagerFactory.multimediaManager != null)
+            {
+                ManagerFactory.multimediaManager.VolumeStep = step;
+                UpdateVolumeControls();
+                ModernVolumeFlyout.ShowCurrentVolume();
+            }
+        }
+
+        private void BtnVolDown_Click(object sender, RoutedEventArgs e)
+        {
+            if (ManagerFactory.multimediaManager != null)
+            {
+                ManagerFactory.multimediaManager.DecreaseVolume();
+                UpdateVolumeControls();
+                ModernVolumeFlyout.ShowCurrentVolume();
+            }
+        }
+
+        private void BtnVolUp_Click(object sender, RoutedEventArgs e)
+        {
+            if (ManagerFactory.multimediaManager != null)
+            {
+                ManagerFactory.multimediaManager.IncreaseVolume();
+                UpdateVolumeControls();
+                ModernVolumeFlyout.ShowCurrentVolume();
+            }
+        }
+
+        private void BtnVolMute_Click(object sender, RoutedEventArgs e)
+        {
+            if (ManagerFactory.multimediaManager != null)
+            {
+                ManagerFactory.multimediaManager.ToggleMute();
+                UpdateVolumeControls();
+                ModernVolumeFlyout.ShowCurrentVolume();
+            }
         }
         #endregion
 
@@ -1235,16 +1349,46 @@ namespace HandheldCompanion.Views
                 this.WindowState = WindowState.Normal;
             }
 
+            this.Topmost = true;
+
             if (!this.IsVisible)
             {
                 this.Show();
             }
 
             var helper = new System.Windows.Interop.WindowInteropHelper(this);
-            ShowWindow(helper.Handle, SW_RESTORE);
+            IntPtr hwnd = helper.Handle;
+            if (hwnd != IntPtr.Zero)
+            {
+                ShowWindow(hwnd, SW_RESTORE);
+                SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
+
+                try
+                {
+                    IntPtr fg = GetForegroundWindow();
+                    uint fgThread = fg != IntPtr.Zero ? GetWindowThreadProcessId(fg, out _) : 0;
+                    uint curThread = GetCurrentThreadId();
+                    if (fgThread != 0 && fgThread != curThread)
+                    {
+                        AttachThreadInput(curThread, fgThread, true);
+                        BringWindowToTop(hwnd);
+                        SetForegroundWindow(hwnd);
+                        AttachThreadInput(curThread, fgThread, false);
+                    }
+                    else
+                    {
+                        BringWindowToTop(hwnd);
+                        SetForegroundWindow(hwnd);
+                    }
+                }
+                catch
+                {
+                    try { SetForegroundWindow(hwnd); } catch { }
+                }
+            }
+
             this.Activate();
             this.Focus();
-            try { SetForegroundWindow(helper.Handle); } catch { }
         }
 
         public static void ToggleOrShowWindow()
@@ -1343,6 +1487,7 @@ namespace HandheldCompanion.Views
             UpdateGyroStatus();
             UpdateLedControlsFromService();
             UpdateResolutionControls();
+            UpdateVolumeControls();
         }
         #endregion
     }

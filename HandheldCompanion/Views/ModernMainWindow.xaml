@@ -80,12 +80,43 @@
             </Setter>
         </Style>
 
-        <!-- Active/Selected Pill Button Style -->
+        <!-- Active/Selected Pill Button Style (Retains active blue highlight even when mouse hovers after touch) -->
         <Style x:Key="ActiveTouchButton" TargetType="Button" BasedOn="{StaticResource TouchButton}">
             <Setter Property="Background" Value="#0078D7" />
             <Setter Property="Foreground" Value="#FFFFFF" />
-            <Setter Property="BorderBrush" Value="#0090FF" />
+            <Setter Property="BorderBrush" Value="#33A8FF" />
             <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="border"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="6"
+                                Padding="{TemplateBinding Padding}"
+                                SnapsToDevicePixels="True">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" TextElement.Foreground="{TemplateBinding Foreground}" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="border" Property="Background" Value="#0E84E4" />
+                                <Setter TargetName="border" Property="BorderBrush" Value="#66C2FF" />
+                                <Setter Property="Foreground" Value="#FFFFFF" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="border" Property="Background" Value="#0066B8" />
+                                <Setter TargetName="border" Property="BorderBrush" Value="#33A8FF" />
+                                <Setter Property="Foreground" Value="#FFFFFF" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.45" />
+                                <Setter Property="Cursor" Value="Arrow" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
 
         <!-- Stepper Button Style -->
@@ -363,6 +394,33 @@
                                 <Button x:Name="btnRes1600" Content="2560x1600 (1600p)" MinWidth="135" Height="36" Style="{StaticResource TouchButton}" Click="BtnRes_Click" Tag="1600" />
                             </WrapPanel>
                             <TextBlock x:Name="txtCurrentRes" Text="Current: Checking..." FontSize="11.5" Foreground="#9EA4B0" Margin="4,6,0,0" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Volume Step & Minimal ModernFlyout OSD (NO SLIDERS) -->
+                    <Border Background="#1C1F26" BorderBrush="#2D323E" BorderThickness="1" CornerRadius="8" Padding="14,12" Margin="0,0,0,10">
+                        <StackPanel>
+                            <TextBlock Text="Volume Step &amp; Minimal ModernFlyout OSD" FontSize="13.5" FontWeight="Bold" Foreground="#FFFFFF" Margin="0,0,0,8" />
+                            <WrapPanel Margin="-2" VerticalAlignment="Center">
+                                <TextBlock Text="OSD:" FontSize="12.5" Foreground="#9EA4B0" VerticalAlignment="Center" Margin="4,0,6,0" />
+                                <Button x:Name="btnFlyoutOn" Content="On" MinWidth="58" Height="34" Style="{StaticResource ActiveTouchButton}" Click="BtnFlyoutOn_Click" />
+                                <Button x:Name="btnFlyoutOff" Content="Off" MinWidth="58" Height="34" Style="{StaticResource TouchButton}" Click="BtnFlyoutOff_Click" />
+
+                                <TextBlock Text="Division Step:" FontSize="12.5" Foreground="#9EA4B0" VerticalAlignment="Center" Margin="14,0,6,0" />
+                                <Button x:Name="btnVolStep10" Content="10% (10x10)" MinWidth="95" Height="34" Style="{StaticResource ActiveTouchButton}" Click="BtnVolStep_Click" Tag="10" />
+                                <Button x:Name="btnVolStep5" Content="5% (20x5)" MinWidth="85" Height="34" Style="{StaticResource TouchButton}" Click="BtnVolStep_Click" Tag="5" />
+                                <Button x:Name="btnVolStep2" Content="2% (2x2)" MinWidth="78" Height="34" Style="{StaticResource TouchButton}" Click="BtnVolStep_Click" Tag="2" />
+                            </WrapPanel>
+
+                            <StackPanel Orientation="Horizontal" Margin="0,8,0,0" VerticalAlignment="Center">
+                                <TextBlock Text="Volume:" FontSize="12.5" Foreground="#9EA4B0" VerticalAlignment="Center" Margin="2,0,10,0" />
+                                <Button x:Name="btnVolDown" Content="-" Style="{StaticResource StepButton}" Click="BtnVolDown_Click" />
+                                <Border Background="#252932" BorderBrush="#383E4C" BorderThickness="1" CornerRadius="6" MinWidth="68" Height="34" Margin="3" Padding="8,0">
+                                    <TextBlock x:Name="txtVolCurrent" Text="50%" FontSize="13.5" FontWeight="Bold" Foreground="#FFFFFF" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                </Border>
+                                <Button x:Name="btnVolUp" Content="+" Style="{StaticResource StepButton}" Click="BtnVolUp_Click" />
+                                <Button x:Name="btnVolMute" Content="Mute" MinWidth="68" Height="34" Style="{StaticResource TouchButton}" Margin="8,0,0,0" Click="BtnVolMute_Click" />
+                            </StackPanel>
                         </StackPanel>
                     </Border>
                 </StackPanel>
