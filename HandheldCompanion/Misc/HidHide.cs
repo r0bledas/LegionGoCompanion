@@ -52,12 +52,12 @@ public static class HidHide
         catch { return false; }
     }
 
+    private static readonly HidHideControlService _service = new();
+
     static HidHide()
     {
-        HidHideControlService service = new HidHideControlService();
-
         // verifying HidHide is installed
-        if (!service.IsInstalled)
+        if (!_service.IsInstalled)
         {
             LogManager.LogCritical("HidHide is missing. Please get it from: {0}", "https://github.com/ViGEm/HidHide/releases");
             MessageBox.Show("Unable to start Handheld Companion, the HidHide application is missing.\n\nPlease get it from: https://github.com/ViGEm/HidHide/releases", "Error");
@@ -67,32 +67,30 @@ public static class HidHide
 
     public static List<string> GetRegisteredApplications()
     {
-        try
+        lock (hidLock)
         {
-            lock (hidLock)
+            try
             {
-                HidHideControlService service = new HidHideControlService();
-                return service.ApplicationPaths.ToList();
+                return _service.ApplicationPaths.ToList();
             }
-        }
-        catch { }
+            catch { }
 
-        return [];
+            return [];
+        }
     }
 
     public static List<string> GetRegisteredDevices()
     {
-        try
+        lock (hidLock)
         {
-            lock (hidLock)
+            try
             {
-                HidHideControlService service = new HidHideControlService();
-                return service.BlockedInstanceIds.Select(x => x.ToUpper()).ToList();
+                return _service.BlockedInstanceIds.Select(x => x.ToUpper()).ToList();
             }
-        }
-        catch { }
+            catch { }
 
-        return [];
+            return [];
+        }
     }
 
     public static bool IsRegistered(string InstanceId)
@@ -109,92 +107,78 @@ public static class HidHide
 
     public static bool UnregisterApplication(string fileName)
     {
-        try
+        lock (hidLock)
         {
-            lock (hidLock)
+            try
             {
-                HidHideControlService service = new HidHideControlService();
-                if (service.ApplicationPaths.Contains(fileName))
+                if (_service.ApplicationPaths.Contains(fileName))
                 {
-                    service.RemoveApplicationPath(fileName);
+                    _service.RemoveApplicationPath(fileName);
                     LogManager.LogInformation("HideDevice RemoveApplicationPath: {0}", fileName);
                 }
+                return true;
             }
-        }
-        catch
-        {
-            LogManager.LogError("Failed to UnregisterApplication({0}), HidHideControlService is unreachable", fileName);
-
-            if (RunCli($"--app-unreg \"{fileName}\"", out _))
+            catch
             {
-                LogManager.LogInformation("HideDevice RemoveApplicationPath: {0}", fileName);
-            }
-            else
-            {
+                if (RunCli($"--app-unreg \"{fileName}\"", out _))
+                {
+                    LogManager.LogInformation("HideDevice RemoveApplicationPath (CLI): {0}", fileName);
+                    return true;
+                }
                 return false;
             }
         }
-
-        return true;
     }
 
     public static bool RegisterApplication(string fileName)
     {
-        try
+        lock (hidLock)
         {
-            lock (hidLock)
+            try
             {
-                HidHideControlService service = new HidHideControlService();
-                if (!service.ApplicationPaths.Contains(fileName))
+                if (!_service.ApplicationPaths.Contains(fileName))
                 {
-                    service.AddApplicationPath(fileName);
+                    _service.AddApplicationPath(fileName);
                     LogManager.LogInformation("HideDevice AddApplicationPath: {0}", fileName);
                 }
+                return true;
             }
-        }
-        catch
-        {
-            LogManager.LogError("Failed to RegisterApplication({0}), HidHideControlService is unreachable", fileName);
-
-            if (RunCli($"--app-reg \"{fileName}\"", out _))
+            catch
             {
-                LogManager.LogInformation("HideDevice AddApplicationPath: {0}", fileName);
-            }
-            else
-            {
+                if (RunCli($"--app-reg \"{fileName}\"", out _))
+                {
+                    LogManager.LogInformation("HideDevice AddApplicationPath (CLI): {0}", fileName);
+                    return true;
+                }
                 return false;
             }
         }
-
-        return true;
     }
 
     public static bool SetCloaking(bool status)
     {
-        try
+        lock (hidLock)
         {
-            lock (hidLock)
+            try
             {
-                HidHideControlService service = new HidHideControlService { IsActive = status };
-                LogManager.LogInformation("HideDevice IsActive: {0}", status);
+                if (_service.IsActive != status)
+                {
+                    _service.IsActive = status;
+                    LogManager.LogInformation("HideDevice IsActive: {0}", status);
+                }
+                return true;
             }
-        }
-        catch
-        {
-            LogManager.LogError("Failed to SetCloaking({0}), HidHideControlService is unreachable", status);
-
-            string arg = status ? "--cloak-on" : "--cloak-off";
-            if (RunCli(arg, out _))
+            catch
             {
-                LogManager.LogInformation("HideDevice SetCloaking: {0}", status);
-            }
-            else
-            {
+                string arg = status ? "--cloak-on" : "--cloak-off";
+                if (RunCli(arg, out _))
+                {
+                    LogManager.LogInformation("HideDevice SetCloaking (CLI): {0}", status);
+                    return true;
+                }
                 return false;
             }
         }
-
-        return true;
     }
 
     public static bool UnhidePath(string deviceInstancePath)
@@ -202,30 +186,29 @@ public static class HidHide
         if (string.IsNullOrEmpty(deviceInstancePath))
             return false;
 
-        try
+        lock (hidLock)
         {
-            lock (hidLock)
+            try
             {
-                HidHideControlService service = new HidHideControlService();
-                if (service.BlockedInstanceIds.Contains(deviceInstancePath))
+                if (_service.BlockedInstanceIds.Any(x => x.Equals(deviceInstancePath, StringComparison.OrdinalIgnoreCase)))
                 {
-                    service.RemoveBlockedInstanceId(deviceInstancePath);
-                    LogManager.LogInformation("HideDevice RemoveBlockedInstanceId: {0}", deviceInstancePath);
+                    foreach (var match in _service.BlockedInstanceIds.Where(x => x.Equals(deviceInstancePath, StringComparison.OrdinalIgnoreCase)).ToList())
+                    {
+                        _service.RemoveBlockedInstanceId(match);
+                        LogManager.LogInformation("HideDevice RemoveBlockedInstanceId: {0}", match);
+                    }
                 }
+                return true;
             }
-        }
-        catch
-        {
-            LogManager.LogError("Failed to UnhidePath({0}), HidHideControlService is unreachable", deviceInstancePath);
-
-            bool success = RunCli($"--dev-unhide \"{deviceInstancePath}\"", out _);
-            if (success)
+            catch
             {
-                LogManager.LogInformation("HideDevice RemoveBlockedInstanceId (CLI): {0}", deviceInstancePath);
+                if (RunCli($"--dev-unhide \"{deviceInstancePath}\"", out _))
+                {
+                    LogManager.LogInformation("HideDevice RemoveBlockedInstanceId (CLI): {0}", deviceInstancePath);
+                }
+                return true;
             }
         }
-
-        return true;
     }
 
     public static bool HidePath(string deviceInstancePath)
@@ -233,30 +216,26 @@ public static class HidHide
         if (string.IsNullOrEmpty(deviceInstancePath))
             return false;
 
-        try
+        lock (hidLock)
         {
-            lock (hidLock)
+            try
             {
-                HidHideControlService service = new HidHideControlService();
-                if (!service.BlockedInstanceIds.Contains(deviceInstancePath))
+                if (!_service.BlockedInstanceIds.Any(x => x.Equals(deviceInstancePath, StringComparison.OrdinalIgnoreCase)))
                 {
-                    service.AddBlockedInstanceId(deviceInstancePath);
+                    _service.AddBlockedInstanceId(deviceInstancePath);
                     LogManager.LogInformation("HideDevice AddBlockedInstanceId: {0}", deviceInstancePath);
                 }
+                return true;
             }
-        }
-        catch
-        {
-            LogManager.LogError("Failed to HidePath({0}), HidHideControlService is unreachable", deviceInstancePath);
-
-            bool success = RunCli($"--dev-hide \"{deviceInstancePath}\"", out _);
-            if (success)
+            catch
             {
-                LogManager.LogInformation("HideDevice AddBlockedInstanceId (CLI): {0}", deviceInstancePath);
+                if (RunCli($"--dev-hide \"{deviceInstancePath}\"", out _))
+                {
+                    LogManager.LogInformation("HideDevice AddBlockedInstanceId (CLI): {0}", deviceInstancePath);
+                }
+                return true;
             }
         }
-
-        return true;
     }
 
     public static List<HidHideDevice> GetHidHideDevices(string arg = "--dev-all")

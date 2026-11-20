@@ -200,7 +200,7 @@ namespace HandheldCompanion.Views
         {
             ControllerModeService.ModeChanged += (mode) =>
             {
-                Dispatcher.Invoke(() => UpdateActiveControllerHighlight(mode));
+                Dispatcher.BeginInvoke(() => UpdateActiveControllerHighlight(mode));
             };
 
             UpdateActiveControllerHighlight(ControllerModeService.GetCurrentMode());
@@ -340,32 +340,42 @@ namespace HandheldCompanion.Views
         {
             try
             {
-                if (IDevice.GetCurrent() is LegionGo lego)
+                var activeStyle = (Style)FindResource("ActiveTouchButton");
+                var normalStyle = (Style)FindResource("TouchButton");
+
+                btnFanAuto.Style = isAuto ? activeStyle : normalStyle;
+                btnFanFull.Style = isFullSpeed ? activeStyle : normalStyle;
+                btnFan50.Style = (!isAuto && !isFullSpeed && percentage == 50) ? activeStyle : normalStyle;
+                btnFan75.Style = (!isAuto && !isFullSpeed && percentage == 75) ? activeStyle : normalStyle;
+
+                Task.Run(() =>
                 {
-                    if (isFullSpeed)
+                    try
                     {
-                        lego.SetFanFullSpeed(true);
+                        if (IDevice.GetCurrent() is LegionGo lego)
+                        {
+                            if (isFullSpeed)
+                            {
+                                lego.SetFanFullSpeed(true);
+                            }
+                            else if (isAuto)
+                            {
+                                lego.SetFanFullSpeed(false);
+                                lego.SetSmartFanMode((int)LegionGo.LegionMode.Balanced);
+                            }
+                            else
+                            {
+                                lego.SetFanFullSpeed(false);
+                                ushort clampedSpeed = (ushort)Math.Clamp(percentage, 0, 100);
+                                lego.SetFanTable(new FanTable(new ushort[] { clampedSpeed, clampedSpeed, clampedSpeed, clampedSpeed, clampedSpeed, clampedSpeed, clampedSpeed, clampedSpeed, clampedSpeed, clampedSpeed }));
+                            }
+                        }
                     }
-                    else if (isAuto)
+                    catch (Exception ex)
                     {
-                        lego.SetFanFullSpeed(false);
-                        lego.SetSmartFanMode((int)LegionGo.LegionMode.Balanced);
+                        LogManager.LogError("Failed to apply Fan mode in background: {0}", ex.Message);
                     }
-                    else
-                    {
-                        lego.SetFanFullSpeed(false);
-                        ushort clampedSpeed = (ushort)Math.Clamp(percentage, 0, 100);
-                        lego.SetFanTable(new FanTable(new ushort[] { clampedSpeed, clampedSpeed, clampedSpeed, clampedSpeed, clampedSpeed, clampedSpeed, clampedSpeed, clampedSpeed, clampedSpeed, clampedSpeed }));
-                    }
-
-                    var activeStyle = (Style)FindResource("ActiveTouchButton");
-                    var normalStyle = (Style)FindResource("TouchButton");
-
-                    btnFanAuto.Style = isAuto ? activeStyle : normalStyle;
-                    btnFanFull.Style = isFullSpeed ? activeStyle : normalStyle;
-                    btnFan50.Style = (!isAuto && !isFullSpeed && percentage == 50) ? activeStyle : normalStyle;
-                    btnFan75.Style = (!isAuto && !isFullSpeed && percentage == 75) ? activeStyle : normalStyle;
-                }
+                });
             }
             catch (Exception ex)
             {
@@ -445,7 +455,7 @@ namespace HandheldCompanion.Views
             // LED Service events
             JoystickLedService.Instance.ConfigChanged += () =>
             {
-                Dispatcher.Invoke(UpdateLedControlsFromService);
+                Dispatcher.BeginInvoke(UpdateLedControlsFromService);
             };
             UpdateLedControlsFromService();
 
@@ -964,10 +974,17 @@ namespace HandheldCompanion.Views
         {
             bool val = chkBatteryLimit.IsChecked ?? false;
             ManagerFactory.settingsManager.SetProperty("BatteryChargeLimit", val);
-            if (IDevice.GetCurrent() is LegionGo lego)
+            Task.Run(() =>
             {
-                lego.SetBatteryChargeLimit(val);
-            }
+                try
+                {
+                    if (IDevice.GetCurrent() is LegionGo lego)
+                    {
+                        lego.SetBatteryChargeLimit(val);
+                    }
+                }
+                catch { }
+            });
         }
 
         private void ChkCloseMinimises_Click(object sender, RoutedEventArgs e)
@@ -1264,16 +1281,22 @@ namespace HandheldCompanion.Views
             _isListening = false;
             _diagnosticsTimer?.Stop();
 
+            try { this.Hide(); } catch { }
+            try { Program.SingleInstanceMutex?.ReleaseMutex(); Program.SingleInstanceMutex?.Dispose(); } catch { }
             try { _showWindowEvent?.Set(); _showWindowEvent?.Dispose(); } catch { }
             try { _exitAppEvent?.Set(); _exitAppEvent?.Dispose(); } catch { }
-            try { Targets.Viiper.UsbipCli.DetachAll(); } catch { }
-            try { Program.SingleInstanceMutex?.ReleaseMutex(); Program.SingleInstanceMutex?.Dispose(); } catch { }
 
             if (_trayIcon != null)
             {
                 _trayIcon.Visible = false;
                 _trayIcon.Dispose();
             }
+
+            try
+            {
+                Task.Run(() => { try { Targets.Viiper.UsbipCli.DetachAll(); } catch { } }).Wait(800);
+            }
+            catch { }
 
             TrayCleaner.Clean();
 

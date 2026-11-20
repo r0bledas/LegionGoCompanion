@@ -219,6 +219,7 @@ public static class ControllerManager
         // The slot monitor remains running to keep HasSlotIssue up-to-date and to support Automatic mode.
         ControllerPlugged += ControllerManager_ControllerPlugged;
         ControllerUnplugged += ControllerManager_ControllerUnplugged;
+        SystemManager.PowerModeChanged += SystemManager_PowerModeChanged;
 
         // manage device events
         IDevice.GetCurrent().KeyPressed += CurrentDevice_KeyPressed;
@@ -2415,9 +2416,8 @@ public static class ControllerManager
 
                     if (targetController is LegionController)
                     {
-                        // todo:    Look for a byte within hid report that'd tend to mean both controllers are synced.
-                        //          Then I guess we could try and power cycle them.
-                        powerCycle = !((LegionController)targetController).IsWireless();
+                        // Never power-cycle the USB composite Legion Go port during cloak; HidHide cloaks immediately without dropping MI_02
+                        powerCycle = false;
                     }
 
                     // Capture for post-lock call: Hide() -> CyclePort() can block for seconds
@@ -2427,8 +2427,7 @@ public static class ControllerManager
                     {
                         controllerToHide = targetController;
                         hideWithPowerCycle = powerCycle;
-                        if (powerCycle)
-                            ControllerModeService.HasCycledForCloak = true;
+                        ControllerModeService.HasCycledForCloak = true;
                     }
                 }
             }
@@ -2461,6 +2460,27 @@ public static class ControllerManager
         try
         {
             selectedHandlers?.Invoke(selectedController);
+        }
+        catch { }
+    }
+
+    private static void SystemManager_PowerModeChanged(SystemManager.PowerMode mode, SystemManager.WakeReason wakeReason)
+    {
+        try
+        {
+            foreach (var ctrl in Controllers.Values)
+            {
+                if (ctrl?.Inputs != null)
+                {
+                    ctrl.Inputs.AxisState[AxisFlags.LeftStickX] = 0;
+                    ctrl.Inputs.AxisState[AxisFlags.LeftStickY] = 0;
+                    ctrl.Inputs.AxisState[AxisFlags.RightStickX] = 0;
+                    ctrl.Inputs.AxisState[AxisFlags.RightStickY] = 0;
+                    ctrl.Inputs.AxisState[AxisFlags.RightPadX] = 0;
+                    ctrl.Inputs.AxisState[AxisFlags.RightPadY] = 0;
+                    ctrl.Inputs.ButtonState[ButtonFlags.RightPadTouch] = false;
+                }
+            }
         }
         catch { }
     }

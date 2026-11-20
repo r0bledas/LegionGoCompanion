@@ -277,7 +277,7 @@ public class LayoutManager : IManager
             _ => null,
         };
 
-        if (target is not null)
+        if (target is not null && !ReferenceEquals(target, activeLayoutSource))
         {
             SetActiveLayout(target);
             ApplyControllerIsolationForLayout(target == desktopLayout);

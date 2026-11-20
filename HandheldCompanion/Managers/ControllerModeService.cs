@@ -79,92 +79,97 @@ namespace HandheldCompanion.Managers
             IsApplyingMode = true;
             _initialized = true;
             _currentMode = mode;
+            ModeChanged?.Invoke(mode);
+
             try
             {
-                ManagerFactory.settingsManager.SetProperty("TargetMode", (int)mode);
-
-                switch (mode)
+                return await Task.Run(async () =>
                 {
-                    case ControllerTargetMode.Pointer:
-                        PointerModeService.Instance.SetActive(true);
-                        ManagerFactory.settingsManager.SetProperty("HIDcloakonconnect", false);
-                        SetLegionPassthrough(true);
-                        EnsurePhysicalControllerUnhidden();
-                        ManagerFactory.settingsManager.SetProperty("LayoutMode", (int)LayoutModes.Desktop);
-                        ManagerFactory.layoutManager.SetLayoutMode(LayoutModes.Desktop);
-                        await VirtualManager.SetControllerMode(HIDmode.NoController).ConfigureAwait(false);
-                        await VirtualManager.SetControllerStatus(HIDstatus.Disconnected).ConfigureAwait(false);
-                        PlaySound();
-                        break;
+                    ManagerFactory.settingsManager.SetProperty("TargetMode", (int)mode);
 
-                    case ControllerTargetMode.Desktop:
-                        PointerModeService.Instance.SetActive(false);
-                        ManagerFactory.settingsManager.SetProperty("HIDcloakonconnect", true);
-                        SetLegionPassthrough(false);
-                        EnsurePhysicalControllerHidden();
-                        ManagerFactory.settingsManager.SetProperty("LayoutMode", (int)LayoutModes.Desktop);
-                        ManagerFactory.layoutManager.SetLayoutMode(LayoutModes.Desktop);
-                        await VirtualManager.SetControllerMode(HIDmode.NoController).ConfigureAwait(false);
-                        await VirtualManager.SetControllerStatus(HIDstatus.Disconnected).ConfigureAwait(false);
-                        PlaySound();
-                        break;
+                    switch (mode)
+                    {
+                        case ControllerTargetMode.Pointer:
+                            PointerModeService.Instance.SetActive(true);
+                            ManagerFactory.settingsManager.SetProperty("HIDcloakonconnect", false);
+                            SetLegionPassthrough(true);
+                            EnsurePhysicalControllerUnhidden();
+                            ManagerFactory.settingsManager.SetProperty("LayoutMode", (int)LayoutModes.Desktop);
+                            ManagerFactory.layoutManager.SetLayoutMode(LayoutModes.Desktop);
+                            await VirtualManager.SetControllerMode(HIDmode.NoController).ConfigureAwait(false);
+                            await VirtualManager.SetControllerStatus(HIDstatus.Disconnected).ConfigureAwait(false);
+                            PlaySound();
+                            break;
 
-                    case ControllerTargetMode.DS4:
-                        PointerModeService.Instance.SetActive(false);
-                        UnhideVirtualControllers();
-                        ManagerFactory.settingsManager.SetProperty("HIDcloakonconnect", true);
-                        SetLegionPassthrough(false);
-                        EnsurePhysicalControllerHidden();
-                        // Persist DS4 mode in settings first so background layout checks never clobber it
-                        ManagerFactory.settingsManager.SetProperty("HIDmode", (int)HIDmode.DualShock4Controller);
-                        ManagerFactory.settingsManager.SetProperty("HIDstatus", (int)HIDstatus.Connected);
-                        ManagerFactory.settingsManager.SetProperty("LayoutMode", (int)LayoutModes.Gamepad);
-                        ManagerFactory.layoutManager.SetLayoutMode(LayoutModes.Gamepad);
-                        VirtualManager.HIDstatus = HIDstatus.Connected;
-                        await VirtualManager.SetControllerMode(HIDmode.DualShock4Controller).ConfigureAwait(false);
-                        await VirtualManager.SetControllerStatus(HIDstatus.Connected).ConfigureAwait(false);
-                        if (IDevice.GetCurrent() is LegionGoTablet tabletDS4)
-                            tabletDS4.EnableGyros();
-                        if (ControllerManager.TargetController is LegionControllerBase legoBaseDS4)
-                            legoBaseDS4.SendGyroEnableCommands();
-                        PlaySound();
-                        break;
+                        case ControllerTargetMode.Desktop:
+                            PointerModeService.Instance.SetActive(false);
+                            ManagerFactory.settingsManager.SetProperty("HIDcloakonconnect", true);
+                            SetLegionPassthrough(false);
+                            EnsurePhysicalControllerHidden();
+                            ManagerFactory.settingsManager.SetProperty("LayoutMode", (int)LayoutModes.Desktop);
+                            ManagerFactory.layoutManager.SetLayoutMode(LayoutModes.Desktop);
+                            await VirtualManager.SetControllerMode(HIDmode.NoController).ConfigureAwait(false);
+                            await VirtualManager.SetControllerStatus(HIDstatus.Disconnected).ConfigureAwait(false);
+                            PlaySound();
+                            break;
 
-                    case ControllerTargetMode.X360:
-                        PointerModeService.Instance.SetActive(false);
-                        UnhideVirtualControllers();
-                        ManagerFactory.settingsManager.SetProperty("HIDcloakonconnect", true);
-                        SetLegionPassthrough(false);
-                        EnsurePhysicalControllerHidden();
-                        // Persist X360 mode in settings first
-                        ManagerFactory.settingsManager.SetProperty("HIDmode", (int)HIDmode.Xbox360Controller);
-                        ManagerFactory.settingsManager.SetProperty("HIDstatus", (int)HIDstatus.Connected);
-                        ManagerFactory.settingsManager.SetProperty("LayoutMode", (int)LayoutModes.Gamepad);
-                        ManagerFactory.layoutManager.SetLayoutMode(LayoutModes.Gamepad);
-                        VirtualManager.HIDstatus = HIDstatus.Connected;
-                        await VirtualManager.SetControllerMode(HIDmode.Xbox360Controller).ConfigureAwait(false);
-                        await VirtualManager.SetControllerStatus(HIDstatus.Connected).ConfigureAwait(false);
-                        PlaySound();
-                        break;
+                        case ControllerTargetMode.DS4:
+                            PointerModeService.Instance.SetActive(false);
+                            UnhideVirtualControllers();
+                            ManagerFactory.settingsManager.SetProperty("HIDcloakonconnect", true);
+                            SetLegionPassthrough(false);
+                            EnsurePhysicalControllerHidden();
+                            // Persist DS4 mode in settings first so background layout checks never clobber it
+                            ManagerFactory.settingsManager.SetProperty("HIDmode", (int)HIDmode.DualShock4Controller);
+                            ManagerFactory.settingsManager.SetProperty("HIDstatus", (int)HIDstatus.Connected);
+                            ManagerFactory.settingsManager.SetProperty("LayoutMode", (int)LayoutModes.Gamepad);
+                            ManagerFactory.layoutManager.SetLayoutMode(LayoutModes.Gamepad);
+                            VirtualManager.HIDstatus = HIDstatus.Connected;
+                            await VirtualManager.SetControllerMode(HIDmode.DualShock4Controller).ConfigureAwait(false);
+                            await VirtualManager.SetControllerStatus(HIDstatus.Connected).ConfigureAwait(false);
+                            if (IDevice.GetCurrent() is LegionGoTablet tabletDS4)
+                                tabletDS4.EnableGyros();
+                            if (ControllerManager.TargetController is LegionControllerBase legoBaseDS4)
+                                legoBaseDS4.SendGyroEnableCommands();
+                            PlaySound();
+                            break;
 
-                    case ControllerTargetMode.Native:
-                        PointerModeService.Instance.SetActive(false);
-                        ManagerFactory.settingsManager.SetProperty("HIDmode", (int)HIDmode.NoController);
-                        ManagerFactory.settingsManager.SetProperty("HIDstatus", (int)HIDstatus.Disconnected);
-                        ManagerFactory.settingsManager.SetProperty("HIDcloakonconnect", false);
-                        SetLegionPassthrough(true);
-                        EnsurePhysicalControllerUnhidden();
-                        ManagerFactory.settingsManager.SetProperty("LayoutMode", (int)LayoutModes.Gamepad);
-                        ManagerFactory.layoutManager.SetLayoutMode(LayoutModes.Gamepad);
-                        await VirtualManager.SetControllerMode(HIDmode.NoController).ConfigureAwait(false);
-                        await VirtualManager.SetControllerStatus(HIDstatus.Disconnected).ConfigureAwait(false);
-                        PlaySound();
-                        break;
-                }
+                        case ControllerTargetMode.X360:
+                            PointerModeService.Instance.SetActive(false);
+                            UnhideVirtualControllers();
+                            ManagerFactory.settingsManager.SetProperty("HIDcloakonconnect", true);
+                            SetLegionPassthrough(false);
+                            EnsurePhysicalControllerHidden();
+                            // Persist X360 mode in settings first
+                            ManagerFactory.settingsManager.SetProperty("HIDmode", (int)HIDmode.Xbox360Controller);
+                            ManagerFactory.settingsManager.SetProperty("HIDstatus", (int)HIDstatus.Connected);
+                            ManagerFactory.settingsManager.SetProperty("LayoutMode", (int)LayoutModes.Gamepad);
+                            ManagerFactory.layoutManager.SetLayoutMode(LayoutModes.Gamepad);
+                            VirtualManager.HIDstatus = HIDstatus.Connected;
+                            await VirtualManager.SetControllerMode(HIDmode.Xbox360Controller).ConfigureAwait(false);
+                            await VirtualManager.SetControllerStatus(HIDstatus.Connected).ConfigureAwait(false);
+                            PlaySound();
+                            break;
 
-                ToastManager.SendToast($"Controller Mode: {GetModeDisplayName(mode)}");
-                ModeChanged?.Invoke(mode);
-                return true;
+                        case ControllerTargetMode.Native:
+                            PointerModeService.Instance.SetActive(false);
+                            ManagerFactory.settingsManager.SetProperty("HIDmode", (int)HIDmode.NoController);
+                            ManagerFactory.settingsManager.SetProperty("HIDstatus", (int)HIDstatus.Disconnected);
+                            ManagerFactory.settingsManager.SetProperty("HIDcloakonconnect", false);
+                            SetLegionPassthrough(true);
+                            EnsurePhysicalControllerUnhidden();
+                            ManagerFactory.settingsManager.SetProperty("LayoutMode", (int)LayoutModes.Gamepad);
+                            ManagerFactory.layoutManager.SetLayoutMode(LayoutModes.Gamepad);
+                            await VirtualManager.SetControllerMode(HIDmode.NoController).ConfigureAwait(false);
+                            await VirtualManager.SetControllerStatus(HIDstatus.Disconnected).ConfigureAwait(false);
+                            PlaySound();
+                            break;
+                    }
+
+                    ToastManager.SendToast($"Controller Mode: {GetModeDisplayName(mode)}");
+                    ModeChanged?.Invoke(mode);
+                    return true;
+                }).ConfigureAwait(false);
             }
             catch (Exception ex)
             {

@@ -100,7 +100,17 @@ namespace HandheldCompanion.Controllers.Lenovo
 
         private void Controller_OnControllerInputReceived(byte[] Data)
         {
-            Buffer.BlockCopy(Data, 0, this.data, 0, Data.Length);
+            if (Data == null || Data.Length < 60)
+                return;
+
+            // Only accept actual 60-byte streaming controller input reports (04 3C 74 01 or 2-byte shifted 74 01).
+            // Ignore short command ACK responses (e.g. 04 07 6A ...) so they never corrupt button/touchpad/IMU offsets.
+            bool isStandardInput = Data[0] == 0x04 && Data[1] == 0x3C && Data[2] == 0x74;
+            bool isShiftedInput = Data[0] == 0x74 && Data[1] == 0x01;
+            if (!isStandardInput && !isShiftedInput)
+                return;
+
+            Buffer.BlockCopy(Data, 0, this.data, 0, Math.Min(Data.Length, this.data.Length));
             _lastReportUtc = DateTime.UtcNow;
         }
 

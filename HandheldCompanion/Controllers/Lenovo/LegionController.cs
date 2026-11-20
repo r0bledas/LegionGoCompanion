@@ -184,24 +184,43 @@ namespace HandheldCompanion.Controllers.Lenovo
         public override bool IsReady => IsWireless() || IsWired() || IsConnected();
 
         /// <summary>
-        /// Detects if the HID report is misaligned (borked state).
-        /// When byte 1 equals 0 while data is present, the report is shifted by 2 bytes.
+        /// Detects if the HID report is misaligned (shifted by 2 bytes missing 04 3C prefix).
+        /// Dynamically restores standard alignment when a normal 04 3C 74 report arrives.
         /// </summary>
         public bool IsHidReportMisaligned()
         {
-            if (isMisaligned) return true;
-            if (data != null && data.Length > 2 && data[1] == 0)
+            if (data != null && data.Length > 3)
             {
-                for (int i = 2; i < data.Length; i++)
+                if (data[0] == 0x04 && data[1] == 0x3C && data[2] == 0x74)
                 {
-                    if (data[i] != 0)
-                    {
+                    if (isMisaligned)
+                        RestoreStandardAlignment();
+                    return false;
+                }
+                if (data[0] == 0x74 && data[1] == 0x01)
+                {
+                    if (!isMisaligned)
                         ApplyMisalignmentShift();
-                        return true;
-                    }
+                    return true;
                 }
             }
-            return false;
+            return isMisaligned;
+        }
+
+        public void RestoreStandardAlignment()
+        {
+            isMisaligned = false;
+            LCONTROLLER_STATE_IDX = 12;
+            RCONTROLLER_STATE_IDX = 13;
+            TOUCH_IDX = 26;
+            FRONT_IDX = 18;
+            BACK_IDX = 20;
+            EXTRA_IDX = 21;
+            SCROLL_IDX = 25;
+            LCONTROLLER_ACCE_IDX = 35;
+            LCONTROLLER_GYRO_IDX = 41;
+            RCONTROLLER_ACCE_IDX = 48;
+            RCONTROLLER_GYRO_IDX = 54;
         }
 
         public void ApplyMisalignmentShift()
@@ -358,12 +377,18 @@ namespace HandheldCompanion.Controllers.Lenovo
             // handle touchpad if passthrough is off
             if (!IsPassthrough)
             {
-                // Right Pad
+                // Right Pad: valid 2D coordinates on Legion Go trackpad require both X and Y to be non-zero within [1..1200]
                 ushort TouchpadX = (ushort)(data[TOUCH_IDX] << 8 | data[TOUCH_IDX + 1]);
                 ushort TouchpadY = (ushort)(data[TOUCH_IDX + 2] << 8 | data[TOUCH_IDX + 3]);
-                bool touched = TouchpadX != 0 || TouchpadY != 0;
+                bool touched = TouchpadX > 0 && TouchpadY > 0 && TouchpadX <= 1200 && TouchpadY <= 1200;
 
                 HandleTouchpadInput(touched, TouchpadX, TouchpadY);
+            }
+            else
+            {
+                Inputs.AxisState[AxisFlags.RightPadX] = 0;
+                Inputs.AxisState[AxisFlags.RightPadY] = 0;
+                Inputs.ButtonState[ButtonFlags.RightPadTouch] = false;
             }
 
             // LeftJoycon (Slot 0)

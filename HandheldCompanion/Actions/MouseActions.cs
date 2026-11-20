@@ -204,6 +204,9 @@ namespace HandheldCompanion.Actions
             // Invert Y so that "up" on a stick or pad moves the cursor up
             outVector.Y *= -1;
 
+            if (isTrackpad && !touched)
+                return;
+
             if (firstTouch && isTrackpad)
             {
                 prevVector = outVector;
@@ -230,6 +233,10 @@ namespace HandheldCompanion.Actions
                 case AxisLayoutFlags.RightPad:
                     Vector2 trackpadDelta = outVector - prevVector;
                     prevVector = outVector;
+
+                    // Reject single-frame coordinate jumps (e.g. re-cloned layout or edge contact recovery)
+                    if (MathF.Abs(trackpadDelta.X) > short.MaxValue * 0.4f || MathF.Abs(trackpadDelta.Y) > short.MaxValue * 0.4f)
+                        return;
 
                     deltaVector = trackpadDelta / short.MaxValue;
                     sensitivityScale = MouseType == MouseActionsType.Move ? 9.0f : 3.0f;
