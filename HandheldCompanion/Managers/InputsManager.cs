@@ -261,19 +261,27 @@ public static class InputsManager
 
                 if (args.IsKeyDown)
                 {
-                    switch (args.KeyCode)
+                    var key = args.KeyCode;
+                    System.Threading.ThreadPool.QueueUserWorkItem(_ =>
                     {
-                        case Keys.VolumeUp:
-                            mm.IncreaseVolume();
-                            break;
-                        case Keys.VolumeDown:
-                            mm.DecreaseVolume();
-                            break;
-                        case Keys.VolumeMute:
-                            mm.ToggleMute();
-                            break;
-                    }
-                    ModernVolumeFlyout.ShowCurrentVolume();
+                        try
+                        {
+                            switch (key)
+                            {
+                                case Keys.VolumeUp:
+                                    mm.IncreaseVolume();
+                                    break;
+                                case Keys.VolumeDown:
+                                    mm.DecreaseVolume();
+                                    break;
+                                case Keys.VolumeMute:
+                                    mm.ToggleMute();
+                                    break;
+                            }
+                            ModernVolumeFlyout.ShowCurrentVolume();
+                        }
+                        catch { }
+                    });
                 }
                 return;
             }

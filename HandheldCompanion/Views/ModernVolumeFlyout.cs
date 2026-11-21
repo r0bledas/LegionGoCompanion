@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -42,6 +43,19 @@ namespace HandheldCompanion.Views
         private const int SW_HIDE = 0;
         private const int SW_MINIMIZE = 6;
 
+        private const uint WINEVENT_OUTOFCONTEXT = 0x0000;
+        private const uint EVENT_OBJECT_CREATE = 0x8000;
+        private const uint EVENT_OBJECT_SHOW = 0x8002;
+
+        private delegate void WinEventDelegate(
+            IntPtr hWinEventHook,
+            uint eventType,
+            IntPtr hwnd,
+            int idObject,
+            int idChild,
+            uint dwEventThread,
+            uint dwmsEventTime);
+
         [DllImport("user32.dll")]
         private static extern int GetWindowLong(IntPtr hwnd, int index);
 
@@ -60,7 +74,26 @@ namespace HandheldCompanion.Views
         [DllImport("user32.dll")]
         private static extern bool ShowWindowAsync(IntPtr hWnd, int nCmdShow);
 
+        [DllImport("user32.dll")]
+        private static extern IntPtr GetShellWindow();
+
+        [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
+        private static extern int GetClassName(IntPtr hWnd, StringBuilder lpClassName, int nMaxCount);
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr SetWinEventHook(
+            uint eventMin,
+            uint eventMax,
+            IntPtr hmodWinEventProc,
+            WinEventDelegate lpfnWinEventProc,
+            uint idProcess,
+            uint idThread,
+            uint dwFlags);
+
         private static ModernVolumeFlyout? _instance;
+        private static bool _nativeHookInstalled;
+        private static IntPtr _winEventHook = IntPtr.Zero;
+        private static WinEventDelegate? _winEventDelegate;
 
         private readonly TextBlock _volumeShadowGlyph;
         private readonly TextBlock _volumeGlyph;
@@ -89,7 +122,7 @@ namespace HandheldCompanion.Views
         {
             // Minimal ModernFlyouts VolumeControl dimensions: 354x48 inside compact dark flyout card
             Title = "ModernFlyoutsVolumeOSD";
-            Width = 366;
+            Width = 362;
             Height = 60;
             WindowStyle = WindowStyle.None;
             ResizeMode = ResizeMode.NoResize;
@@ -108,7 +141,7 @@ namespace HandheldCompanion.Views
                 BorderThickness = new Thickness(1),
                 CornerRadius = new CornerRadius(8),
                 Height = 48,
-                Margin = new Thickness(6),
+                Margin = new Thickness(8, 6, 6, 6),
                 SnapsToDevicePixels = true
             };
 
@@ -219,8 +252,133 @@ namespace HandheldCompanion.Views
         }
 
         /// <summary>
+        /// Pre-creates and warms the flyout HWND/glyph layout on launch and installs the
+        /// NativeFlyoutHandler WinEvent hook so Windows' stock OSD never flashes on the first key press.
+        /// </summary>
+        public static void Initialize()
+        {
+            var app = Application.Current;
+            if (app == null)
+                return;
+
+            app.Dispatcher.BeginInvoke(() =>
+            {
+                try
+                {
+                    InstallNativeFlyoutHook();
+                    HideNativeWindowsFlyout();
+
+                    if (_instance == null)
+                    {
+                        _instance = new ModernVolumeFlyout();
+                        var mm = ManagerFactory.multimediaManager;
+                        if (mm != null)
+                        {
+                            _instance.UpdateVolume(mm.GetVolume(), mm.IsMuted());
+                        }
+
+                        // Pre-warm HWND, composition layer, and font cache silently off-screen
+                        double prevOpacity = _instance.Opacity;
+                        _instance.Opacity = 0;
+                        _instance.Left = -32000;
+                        _instance.Top = -32000;
+                        _instance.Show();
+                        _instance.Hide();
+                        _instance.Opacity = prevOpacity;
+                        _instance.PositionTopLeft();
+                    }
+                }
+                catch { }
+            });
+        }
+
+        private static void InstallNativeFlyoutHook()
+        {
+            if (_nativeHookInstalled && _winEventHook != IntPtr.Zero)
+                return;
+
+            try
+            {
+                uint shellPid = 0;
+                IntPtr shellHwnd = GetShellWindow();
+                if (shellHwnd != IntPtr.Zero)
+                {
+                    GetWindowThreadProcessId(shellHwnd, out int pid);
+                    if (pid > 0) shellPid = (uint)pid;
+                }
+
+                if (shellPid == 0)
+                    return;
+
+                _winEventDelegate ??= NativeWinEventProc;
+                _winEventHook = SetWinEventHook(
+                    EVENT_OBJECT_CREATE,
+                    EVENT_OBJECT_SHOW,
+                    IntPtr.Zero,
+                    _winEventDelegate,
+                    shellPid,
+                    0,
+                    WINEVENT_OUTOFCONTEXT);
+
+                if (_winEventHook != IntPtr.Zero)
+                {
+                    _nativeHookInstalled = true;
+                }
+            }
+            catch { }
+        }
+
+        private static void NativeWinEventProc(
+            IntPtr hWinEventHook,
+            uint eventType,
+            IntPtr hWnd,
+            int idObject,
+            int idChild,
+            uint dwEventThread,
+            uint dwmsEventTime)
+        {
+            if (idObject != 0 || idChild != 0 || hWnd == IntPtr.Zero)
+                return;
+
+            if (eventType != EVENT_OBJECT_CREATE && eventType != EVENT_OBJECT_SHOW)
+                return;
+
+            var mm = ManagerFactory.multimediaManager;
+            if (mm == null || !mm.ModernFlyoutEnabled)
+                return;
+
+            try
+            {
+                var sb = new StringBuilder(64);
+                if (GetClassName(hWnd, sb, sb.Capacity) <= 0)
+                    return;
+
+                string cls = sb.ToString();
+                if (cls == "NativeHWNDHost")
+                {
+                    IntPtr child = FindWindowEx(hWnd, IntPtr.Zero, "DirectUIHWND", null);
+                    if (child != IntPtr.Zero)
+                    {
+                        ShowWindowAsync(child, SW_MINIMIZE);
+                        ShowWindowAsync(hWnd, SW_HIDE);
+                    }
+                }
+                else if (cls == "XamlExplorerHostIslandWindow")
+                {
+                    IntPtr child = FindWindowEx(hWnd, IntPtr.Zero, "Windows.UI.Composition.DesktopWindowContentBridge", "DesktopWindowXamlSource");
+                    if (child != IntPtr.Zero)
+                    {
+                        ShowWindowAsync(child, SW_MINIMIZE);
+                        ShowWindowAsync(hWnd, SW_HIDE);
+                    }
+                }
+            }
+            catch { }
+        }
+
+        /// <summary>
         /// Ported from ModernFlyouts.Core.Interop.NativeFlyoutHandler.HideNativeFlyout().
-        /// Hides Windows' native top-left/bottom-center volume OSD host window if present.
+        /// Hides Windows' native volume OSD host window if present.
         /// </summary>
         public static void HideNativeWindowsFlyout()
         {
@@ -254,11 +412,11 @@ namespace HandheldCompanion.Views
             }
         }
 
-        private void PositionTopCenter()
+        private void PositionTopLeft()
         {
-            double screenW = SystemParameters.PrimaryScreenWidth;
-            Left = (screenW - Width) / 2.0;
-            Top = 24;
+            var workArea = SystemParameters.WorkArea;
+            Left = workArea.Left;
+            Top = workArea.Top + 16;
         }
 
         /// <summary>
@@ -318,12 +476,13 @@ namespace HandheldCompanion.Views
             if (app == null)
                 return;
 
-            HideNativeWindowsFlyout();
-
             app.Dispatcher.BeginInvoke(() =>
             {
                 try
                 {
+                    InstallNativeFlyoutHook();
+                    HideNativeWindowsFlyout();
+
                     var mm = ManagerFactory.multimediaManager;
                     if (mm == null || !mm.ModernFlyoutEnabled)
                         return;
@@ -332,7 +491,7 @@ namespace HandheldCompanion.Views
                     bool muted = mm.IsMuted();
 
                     _instance ??= new ModernVolumeFlyout();
-                    _instance.PositionTopCenter();
+                    _instance.PositionTopLeft();
                     _instance.UpdateVolume(vol, muted);
 
                     if (!_instance.IsVisible)

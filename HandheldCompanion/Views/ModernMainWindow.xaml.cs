@@ -168,6 +168,8 @@ namespace HandheldCompanion.Views
             InitializeControllerView();
             InitializeSettingsView();
 
+            ModernVolumeFlyout.Initialize();
+
             this.Loaded += ModernMainWindow_Loaded;
         }
 
@@ -419,6 +421,7 @@ namespace HandheldCompanion.Views
             if (sender is Button b && b.Tag is string s)
             {
                 if (s == "800") ApplyResolution(1280, 800);
+                else if (s == "1000") ApplyResolution(1600, 1000);
                 else if (s == "1200") ApplyResolution(1920, 1200);
                 else if (s == "1440") ApplyResolution(2560, 1440);
                 else if (s == "1600") ApplyResolution(2560, 1600);
@@ -471,6 +474,7 @@ namespace HandheldCompanion.Views
             var normalStyle = (Style)FindResource("TouchButton");
 
             btnRes800.Style = (w == 1280 && h == 800) ? activeStyle : normalStyle;
+            btnRes1000.Style = (w == 1600 && h == 1000) ? activeStyle : normalStyle;
             btnRes1200.Style = (w == 1920 && h == 1200) ? activeStyle : normalStyle;
             btnRes1440.Style = (w == 2560 && h == 1440) ? activeStyle : normalStyle;
             btnRes1600.Style = (w == 2560 && h == 1600) ? activeStyle : normalStyle;
