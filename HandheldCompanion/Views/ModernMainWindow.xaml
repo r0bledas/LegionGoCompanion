@@ -335,12 +335,18 @@
                     <Border Background="#1C1F26" BorderBrush="#2D323E" BorderThickness="1" CornerRadius="8" Padding="14,12" Margin="0,0,0,10">
                         <StackPanel>
                             <TextBlock Text="Controller Emulation Mode" FontSize="13.5" FontWeight="Bold" Foreground="#FFFFFF" Margin="0,0,0,8" />
-                            <WrapPanel Margin="-2">
-                                <Button x:Name="btnModeDesktop" Content="Desktop (Mouse)" MinWidth="130" Height="38" Style="{StaticResource TouchButton}" Click="BtnModeDesktop_Click" />
-                                <Button x:Name="btnModeX360" Content="Xbox 360 (x360)" MinWidth="130" Height="38" Style="{StaticResource TouchButton}" Click="BtnModeX360_Click" />
-                                <Button x:Name="btnModeDS4" Content="DualShock 4 (DS4)" MinWidth="140" Height="38" Style="{StaticResource TouchButton}" Click="BtnModeDS4_Click" />
-                                <Button x:Name="btnModeNative" Content="Native Direct" MinWidth="110" Height="38" Style="{StaticResource TouchButton}" Click="BtnModeNative_Click" />
-                            </WrapPanel>
+                            <Grid Grid.IsSharedSizeScope="True" HorizontalAlignment="Left" Margin="-3,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" SharedSizeGroup="ModeBtn" />
+                                    <ColumnDefinition Width="Auto" SharedSizeGroup="ModeBtn" />
+                                    <ColumnDefinition Width="Auto" SharedSizeGroup="ModeBtn" />
+                                    <ColumnDefinition Width="Auto" SharedSizeGroup="ModeBtn" />
+                                </Grid.ColumnDefinitions>
+                                <Button Grid.Column="0" x:Name="btnModeDesktop" Content="Desktop" Height="38" Padding="16,7" Style="{StaticResource TouchButton}" Click="BtnModeDesktop_Click" />
+                                <Button Grid.Column="1" x:Name="btnModeX360" Content="X360" Height="38" Padding="16,7" Style="{StaticResource TouchButton}" Click="BtnModeX360_Click" />
+                                <Button Grid.Column="2" x:Name="btnModeDS4" Content="DS4" Height="38" Padding="16,7" Style="{StaticResource TouchButton}" Click="BtnModeDS4_Click" />
+                                <Button Grid.Column="3" x:Name="btnModeNative" Content="Native" Height="38" Padding="16,7" Style="{StaticResource TouchButton}" Click="BtnModeNative_Click" />
+                            </Grid>
                             <TextBlock x:Name="txtModeHint" Text="Active Mode: Xbox 360" FontSize="11.5" Foreground="#0090FF" Margin="4,6,0,0" />
                         </StackPanel>
                     </Border>
@@ -374,12 +380,20 @@
                     <Border Background="#1C1F26" BorderBrush="#2D323E" BorderThickness="1" CornerRadius="8" Padding="14,12" Margin="0,0,0,10">
                         <StackPanel>
                             <TextBlock Text="Fan Speed &amp; Curve" FontSize="13.5" FontWeight="Bold" Foreground="#FFFFFF" Margin="0,0,0,8" />
-                            <WrapPanel Margin="-2">
-                                <Button x:Name="btnFanAuto" Content="Auto (Smart Fan)" MinWidth="130" Height="36" Style="{StaticResource ActiveTouchButton}" Click="BtnFanAuto_Click" />
-                                <Button x:Name="btnFanFull" Content="Full Speed (100%)" MinWidth="135" Height="36" Style="{StaticResource TouchButton}" Click="BtnFanFull_Click" />
-                                <Button x:Name="btnFan50" Content="Fixed 50%" MinWidth="85" Height="36" Style="{StaticResource TouchButton}" Click="BtnFanPreset_Click" Tag="50" />
-                                <Button x:Name="btnFan75" Content="Fixed 75%" MinWidth="85" Height="36" Style="{StaticResource TouchButton}" Click="BtnFanPreset_Click" Tag="75" />
-                            </WrapPanel>
+                            <Grid Grid.IsSharedSizeScope="True" HorizontalAlignment="Left" Margin="-3,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" SharedSizeGroup="FanBtn" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" SharedSizeGroup="FanBtn" />
+                                    <ColumnDefinition Width="Auto" SharedSizeGroup="FanBtn" />
+                                    <ColumnDefinition Width="Auto" SharedSizeGroup="FanBtn" />
+                                </Grid.ColumnDefinitions>
+                                <Button Grid.Column="0" x:Name="btnFanAuto" Content="Auto" Height="36" Padding="16,7" Style="{StaticResource ActiveTouchButton}" Click="BtnFanAuto_Click" />
+                                <Border Grid.Column="1" Width="1" Height="22" Background="#383E4C" VerticalAlignment="Center" Margin="6,0" SnapsToDevicePixels="True" />
+                                <Button Grid.Column="2" x:Name="btnFanFull" Content="100" Height="36" Padding="16,7" Style="{StaticResource TouchButton}" Click="BtnFanFull_Click" />
+                                <Button Grid.Column="3" x:Name="btnFan50" Content="50" Height="36" Padding="16,7" Style="{StaticResource TouchButton}" Click="BtnFanPreset_Click" Tag="50" />
+                                <Button Grid.Column="4" x:Name="btnFan70" Content="70" Height="36" Padding="16,7" Style="{StaticResource TouchButton}" Click="BtnFanPreset_Click" Tag="70" />
+                            </Grid>
                         </StackPanel>
                     </Border>
 
@@ -387,13 +401,20 @@
                     <Border Background="#1C1F26" BorderBrush="#2D323E" BorderThickness="1" CornerRadius="8" Padding="14,12" Margin="0,0,0,10">
                         <StackPanel>
                             <TextBlock Text="Display Resolution" FontSize="13.5" FontWeight="Bold" Foreground="#FFFFFF" Margin="0,0,0,8" />
-                            <WrapPanel Margin="-2">
-                                <Button x:Name="btnRes800" Content="1280x800 (800p)" MinWidth="125" Height="36" Style="{StaticResource TouchButton}" Click="BtnRes_Click" Tag="800" />
-                                <Button x:Name="btnRes1000" Content="1600x1000 (1000p)" MinWidth="135" Height="36" Style="{StaticResource TouchButton}" Click="BtnRes_Click" Tag="1000" />
-                                <Button x:Name="btnRes1200" Content="1920x1200 (1200p)" MinWidth="135" Height="36" Style="{StaticResource TouchButton}" Click="BtnRes_Click" Tag="1200" />
-                                <Button x:Name="btnRes1440" Content="2560x1440 (1440p)" MinWidth="135" Height="36" Style="{StaticResource TouchButton}" Click="BtnRes_Click" Tag="1440" />
-                                <Button x:Name="btnRes1600" Content="2560x1600 (1600p)" MinWidth="135" Height="36" Style="{StaticResource TouchButton}" Click="BtnRes_Click" Tag="1600" />
-                            </WrapPanel>
+                            <Grid Grid.IsSharedSizeScope="True" HorizontalAlignment="Left" Margin="-3,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" SharedSizeGroup="ResBtn" />
+                                    <ColumnDefinition Width="Auto" SharedSizeGroup="ResBtn" />
+                                    <ColumnDefinition Width="Auto" SharedSizeGroup="ResBtn" />
+                                    <ColumnDefinition Width="Auto" SharedSizeGroup="ResBtn" />
+                                    <ColumnDefinition Width="Auto" SharedSizeGroup="ResBtn" />
+                                </Grid.ColumnDefinitions>
+                                <Button Grid.Column="0" x:Name="btnRes800" Content="800p" Height="36" Padding="16,7" Style="{StaticResource TouchButton}" Click="BtnRes_Click" Tag="800" />
+                                <Button Grid.Column="1" x:Name="btnRes1000" Content="1000p" Height="36" Padding="16,7" Style="{StaticResource TouchButton}" Click="BtnRes_Click" Tag="1000" />
+                                <Button Grid.Column="2" x:Name="btnRes1200" Content="1200p" Height="36" Padding="16,7" Style="{StaticResource TouchButton}" Click="BtnRes_Click" Tag="1200" />
+                                <Button Grid.Column="3" x:Name="btnRes1440" Content="1440p" Height="36" Padding="16,7" Style="{StaticResource TouchButton}" Click="BtnRes_Click" Tag="1440" />
+                                <Button Grid.Column="4" x:Name="btnRes1600" Content="1600p" Height="36" Padding="16,7" Style="{StaticResource TouchButton}" Click="BtnRes_Click" Tag="1600" />
+                            </Grid>
                             <TextBlock x:Name="txtCurrentRes" Text="Current: Checking..." FontSize="11.5" Foreground="#9EA4B0" Margin="4,6,0,0" />
                         </StackPanel>
                     </Border>

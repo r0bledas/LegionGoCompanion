@@ -379,7 +379,7 @@ namespace HandheldCompanion.Views
                 btnFanAuto.Style = isAuto ? activeStyle : normalStyle;
                 btnFanFull.Style = isFullSpeed ? activeStyle : normalStyle;
                 btnFan50.Style = (!isAuto && !isFullSpeed && percentage == 50) ? activeStyle : normalStyle;
-                btnFan75.Style = (!isAuto && !isFullSpeed && percentage == 75) ? activeStyle : normalStyle;
+                btnFan70.Style = (!isAuto && !isFullSpeed && percentage == 70) ? activeStyle : normalStyle;
 
                 Task.Run(() =>
                 {

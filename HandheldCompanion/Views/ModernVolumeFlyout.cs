@@ -122,8 +122,8 @@ namespace HandheldCompanion.Views
         {
             // Minimal ModernFlyouts VolumeControl dimensions: 354x48 inside compact dark flyout card
             Title = "ModernFlyoutsVolumeOSD";
-            Width = 362;
-            Height = 60;
+            Width = 354;
+            Height = 48;
             WindowStyle = WindowStyle.None;
             ResizeMode = ResizeMode.NoResize;
             AllowsTransparency = true;
@@ -141,7 +141,7 @@ namespace HandheldCompanion.Views
                 BorderThickness = new Thickness(1),
                 CornerRadius = new CornerRadius(8),
                 Height = 48,
-                Margin = new Thickness(8, 6, 6, 6),
+                Margin = new Thickness(0),
                 SnapsToDevicePixels = true
             };
 
@@ -415,8 +415,8 @@ namespace HandheldCompanion.Views
         private void PositionTopLeft()
         {
             var workArea = SystemParameters.WorkArea;
-            Left = workArea.Left;
-            Top = workArea.Top + 16;
+            Left = workArea.Left + 11;
+            Top = workArea.Top + 11;
         }
 
         /// <summary>
