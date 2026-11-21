@@ -167,6 +167,14 @@ public class DesktopScreen : IDisposable
         return screenResolutions.Count(a => a.Width == resolution.Width && a.Height == resolution.Height) > 0;
     }
 
+    public void RefreshDisplayMode()
+    {
+        if (screen != null)
+        {
+            devMode = MultimediaManager.GetDisplay(screen.DeviceName);
+        }
+    }
+
     public ScreenResolution? GetResolution()
     {
         // todo: improve me

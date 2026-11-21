@@ -10,8 +10,10 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
+using Microsoft.Win32;
 using GregsStack.InputSimulatorStandard.Native;
 using HandheldCompanion.Devices;
 using HandheldCompanion.Devices.Lenovo;
@@ -170,6 +172,7 @@ namespace HandheldCompanion.Views
 
             ModernVolumeFlyout.Initialize();
 
+            SystemEvents.DisplaySettingsChanged += SystemEvents_DisplaySettingsChanged;
             this.Loaded += ModernMainWindow_Loaded;
         }
 
@@ -179,6 +182,40 @@ namespace HandheldCompanion.Views
             var currentMode = ControllerModeService.GetCurrentMode();
             UpdateActiveControllerHighlight(currentMode);
             await ControllerModeService.ApplyMode(currentMode);
+        }
+
+        private void BtnWinMinimize_Click(object sender, RoutedEventArgs e)
+        {
+            WindowState = WindowState.Minimized;
+        }
+
+        private void BtnWinMaxRestore_Click(object sender, RoutedEventArgs e)
+        {
+            WindowState = (WindowState == WindowState.Maximized) ? WindowState.Normal : WindowState.Maximized;
+        }
+
+        private void BtnWinClose_Click(object sender, RoutedEventArgs e)
+        {
+            Close();
+        }
+
+        private void Window_StateChanged(object? sender, EventArgs e)
+        {
+            bool isMax = WindowState == WindowState.Maximized;
+            rootGrid.Margin = isMax ? new Thickness(7) : new Thickness(0);
+            windowFrame.BorderThickness = isMax ? new Thickness(0) : new Thickness(1);
+            btnWinMaxRestore.Content = isMax ? "\uE923" : "\uE922";
+            btnWinMaxRestore.ToolTip = isMax ? "Restore" : "Maximize";
+        }
+
+        private void ScrollViewer_ManipulationBoundaryFeedback(object? sender, ManipulationBoundaryFeedbackEventArgs e)
+        {
+            e.Handled = true;
+        }
+
+        private void SystemEvents_DisplaySettingsChanged(object? sender, EventArgs e)
+        {
+            Dispatcher.BeginInvoke(DispatcherPriority.Normal, new Action(() => UpdateResolutionControls()));
         }
 
         #region Navigation
@@ -436,6 +473,12 @@ namespace HandheldCompanion.Views
                 bool ok = ManagerFactory.multimediaManager?.SetResolution(width, height, freq) ?? false;
                 if (ok)
                 {
+                    // Immediately reflect the committed resolution in the UI, then re-verify live OS settings
+                    UpdateResolutionControls(width, height);
+                    Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => UpdateResolutionControls()));
+                }
+                else
+                {
                     UpdateResolutionControls();
                 }
             }
@@ -445,23 +488,45 @@ namespace HandheldCompanion.Views
             }
         }
 
-        private void UpdateResolutionControls()
+        private void UpdateResolutionControls(int? expectedW = null, int? expectedH = null)
         {
             int currentW = 0, currentH = 0;
-            var primary = ManagerFactory.multimediaManager?.PrimaryDesktop;
-            var current = primary?.GetResolution();
-            if (current != null)
+            if (expectedW.HasValue && expectedH.HasValue)
             {
-                currentW = current.Width;
-                currentH = current.Height;
+                currentW = expectedW.Value;
+                currentH = expectedH.Value;
             }
             else
             {
-                var scr = System.Windows.Forms.Screen.PrimaryScreen;
-                if (scr != null)
+                var primary = ManagerFactory.multimediaManager?.PrimaryDesktop;
+                string? deviceName = primary?.screen?.DeviceName ?? System.Windows.Forms.Screen.PrimaryScreen?.DeviceName;
+                if (!string.IsNullOrEmpty(deviceName))
                 {
-                    currentW = scr.Bounds.Width;
-                    currentH = scr.Bounds.Height;
+                    var liveDm = MultimediaManager.GetDisplay(deviceName);
+                    if (liveDm.dmPelsWidth > 0 && liveDm.dmPelsHeight > 0)
+                    {
+                        currentW = liveDm.dmPelsWidth;
+                        currentH = liveDm.dmPelsHeight;
+                    }
+                }
+
+                if (currentW == 0 || currentH == 0)
+                {
+                    var current = primary?.GetResolution();
+                    if (current != null)
+                    {
+                        currentW = current.Width;
+                        currentH = current.Height;
+                    }
+                    else
+                    {
+                        var scr = System.Windows.Forms.Screen.PrimaryScreen;
+                        if (scr != null)
+                        {
+                            currentW = scr.Bounds.Width;
+                            currentH = scr.Bounds.Height;
+                        }
+                    }
                 }
             }
 
@@ -1427,6 +1492,7 @@ namespace HandheldCompanion.Views
         {
             _isExiting = true;
             _isListening = false;
+            try { SystemEvents.DisplaySettingsChanged -= SystemEvents_DisplaySettingsChanged; } catch { }
             _diagnosticsTimer?.Stop();
 
             try { this.Hide(); } catch { }

@@ -664,7 +664,12 @@ public class MultimediaManager : IManager
         if (testResult == DISP_CHANGE_SUCCESSFUL)
         {
             int applyResult = ChangeDisplaySettingsEx(deviceName, ref dm, IntPtr.Zero, CDS_UPDATEREGISTRY, IntPtr.Zero);
-            return applyResult == DISP_CHANGE_SUCCESSFUL;
+            if (applyResult == DISP_CHANGE_SUCCESSFUL)
+            {
+                PrimaryDesktop?.RefreshDisplayMode();
+                return true;
+            }
+            return false;
         }
 
         // On portrait-native rotated displays, try swapped dimensions if unswapped failed
@@ -675,7 +680,12 @@ public class MultimediaManager : IManager
         if (swappedTest == DISP_CHANGE_SUCCESSFUL)
         {
             int applySwapped = ChangeDisplaySettingsEx(deviceName, ref swappedDm, IntPtr.Zero, CDS_UPDATEREGISTRY, IntPtr.Zero);
-            return applySwapped == DISP_CHANGE_SUCCESSFUL;
+            if (applySwapped == DISP_CHANGE_SUCCESSFUL)
+            {
+                PrimaryDesktop?.RefreshDisplayMode();
+                return true;
+            }
+            return false;
         }
 
         LogManager.LogError("SetResolution failed for {0}x{1}@{2}Hz on {3} (Test results: {4}, {5})",
