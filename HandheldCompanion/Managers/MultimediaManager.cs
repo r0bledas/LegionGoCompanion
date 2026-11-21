@@ -635,12 +635,14 @@ public class MultimediaManager : IManager
 
         DisplayDevice currentDm = GetDisplay(deviceName);
 
+        short structSize = (short)Marshal.SizeOf(typeof(DisplayDevice));
         DisplayDevice dm = new DisplayDevice
         {
-            dmSize = (short)Marshal.SizeOf(typeof(DisplayDevice))
+            dmSize = structSize
         };
         EnumDisplaySettings(deviceName, -1, ref dm);
 
+        dm.dmSize = structSize;
         dm.dmDeviceName = deviceName;
         dm.dmPelsWidth = width;
         dm.dmPelsHeight = height;
@@ -686,6 +688,29 @@ public class MultimediaManager : IManager
                 return true;
             }
             return false;
+        }
+
+        // Fallback: try exact enumerated modes matching target dimensions (handles 16:9 modes like 2560x1440 requiring driver fixed-output fields)
+        var exactCandidates = GetResolutions(deviceName)
+            .Where(m => ((m.dmPelsWidth == width && m.dmPelsHeight == height) || (m.dmPelsWidth == height && m.dmPelsHeight == width)) &&
+                        (bitsPerPel <= 0 || m.dmBitsPerPel == bitsPerPel))
+            .OrderByDescending(m => m.dmDisplayOrientation == currentDm.dmDisplayOrientation)
+            .ThenBy(m => displayFrequency > 0 ? Math.Abs(m.dmDisplayFrequency - displayFrequency) : 0)
+            .ThenByDescending(m => m.dmDisplayFrequency);
+
+        foreach (var candidate in exactCandidates)
+        {
+            DisplayDevice exactDm = candidate;
+            exactDm.dmSize = structSize;
+            exactDm.dmDeviceName = deviceName;
+            if (ChangeDisplaySettingsEx(deviceName, ref exactDm, IntPtr.Zero, CDS_TEST, IntPtr.Zero) == DISP_CHANGE_SUCCESSFUL)
+            {
+                if (ChangeDisplaySettingsEx(deviceName, ref exactDm, IntPtr.Zero, CDS_UPDATEREGISTRY, IntPtr.Zero) == DISP_CHANGE_SUCCESSFUL)
+                {
+                    PrimaryDesktop?.RefreshDisplayMode();
+                    return true;
+                }
+            }
         }
 
         LogManager.LogError("SetResolution failed for {0}x{1}@{2}Hz on {3} (Test results: {4}, {5})",

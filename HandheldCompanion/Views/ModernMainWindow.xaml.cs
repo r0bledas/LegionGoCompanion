@@ -147,8 +147,6 @@ namespace HandheldCompanion.Views
                 badgeAdmin.Background = new SolidColorBrush(Color.FromRgb(28, 56, 37));
                 badgeAdmin.BorderBrush = new SolidColorBrush(Color.FromRgb(46, 107, 62));
                 txtAdminStatus.Foreground = new SolidColorBrush(Color.FromRgb(48, 209, 88));
-                lblBottomAdmin.Text = "Admin: Elevated";
-                lblBottomAdmin.Foreground = new SolidColorBrush(Color.FromRgb(48, 209, 88));
                 btnElevate.Visibility = Visibility.Collapsed;
             }
             else
@@ -157,10 +155,10 @@ namespace HandheldCompanion.Views
                 badgeAdmin.Background = new SolidColorBrush(Color.FromRgb(56, 28, 28));
                 badgeAdmin.BorderBrush = new SolidColorBrush(Color.FromRgb(107, 46, 46));
                 txtAdminStatus.Foreground = new SolidColorBrush(Color.FromRgb(255, 69, 58));
-                lblBottomAdmin.Text = "Admin: Standard";
-                lblBottomAdmin.Foreground = new SolidColorBrush(Color.FromRgb(255, 69, 58));
                 btnElevate.Visibility = Visibility.Visible;
             }
+
+            SyncWindowChromeState();
 
             InitializeTrayIcon();
             StartEventListener();
@@ -176,8 +174,28 @@ namespace HandheldCompanion.Views
             this.Loaded += ModernMainWindow_Loaded;
         }
 
+        private WindowState _lastNonMinimizedState = WindowState.Maximized;
+
+        private void SyncWindowChromeState()
+        {
+            if (rootGrid == null || windowFrame == null || btnWinMaxRestore == null)
+                return;
+
+            if (WindowState != WindowState.Minimized)
+            {
+                _lastNonMinimizedState = WindowState;
+            }
+
+            bool isMax = WindowState == WindowState.Maximized;
+            rootGrid.Margin = isMax ? new Thickness(7) : new Thickness(0);
+            windowFrame.BorderThickness = isMax ? new Thickness(0) : new Thickness(1);
+            btnWinMaxRestore.Content = isMax ? "\uE923" : "\uE922";
+            btnWinMaxRestore.ToolTip = isMax ? "Restore" : "Maximize";
+        }
+
         private async void ModernMainWindow_Loaded(object sender, RoutedEventArgs e)
         {
+            SyncWindowChromeState();
             RefreshAllStates();
             var currentMode = ControllerModeService.GetCurrentMode();
             UpdateActiveControllerHighlight(currentMode);
@@ -196,16 +214,16 @@ namespace HandheldCompanion.Views
 
         private void BtnWinClose_Click(object sender, RoutedEventArgs e)
         {
-            Close();
+            // Defer Close until after the current touch/mouse input frame finishes unwinding
+            Dispatcher.BeginInvoke(DispatcherPriority.Normal, new Action(Close));
         }
 
         private void Window_StateChanged(object? sender, EventArgs e)
         {
-            bool isMax = WindowState == WindowState.Maximized;
-            rootGrid.Margin = isMax ? new Thickness(7) : new Thickness(0);
-            windowFrame.BorderThickness = isMax ? new Thickness(0) : new Thickness(1);
-            btnWinMaxRestore.Content = isMax ? "\uE923" : "\uE922";
-            btnWinMaxRestore.ToolTip = isMax ? "Restore" : "Maximize";
+            if (_isExiting)
+                return;
+
+            SyncWindowChromeState();
         }
 
         private void ScrollViewer_ManipulationBoundaryFeedback(object? sender, ManipulationBoundaryFeedbackEventArgs e)
@@ -215,7 +233,18 @@ namespace HandheldCompanion.Views
 
         private void SystemEvents_DisplaySettingsChanged(object? sender, EventArgs e)
         {
-            Dispatcher.BeginInvoke(DispatcherPriority.Normal, new Action(() => UpdateResolutionControls()));
+            if (_isExiting)
+                return;
+
+            var d = Dispatcher;
+            if (d == null || d.HasShutdownStarted || d.HasShutdownFinished)
+                return;
+
+            d.BeginInvoke(DispatcherPriority.Normal, new Action(() =>
+            {
+                if (!_isExiting)
+                    UpdateResolutionControls();
+            }));
         }
 
         #region Navigation
@@ -247,12 +276,17 @@ namespace HandheldCompanion.Views
 
         private void SetNavActive(Button activeBtn)
         {
+            TouchHoverHelper.ClearActiveHover();
             var activeStyle = (Style)FindResource("ActiveTouchButton");
             var normalStyle = (Style)FindResource("TouchButton");
 
             navGeneral.Style = (navGeneral == activeBtn) ? activeStyle : normalStyle;
             navController.Style = (navController == activeBtn) ? activeStyle : normalStyle;
             navSettings.Style = (navSettings == activeBtn) ? activeStyle : normalStyle;
+
+            TouchHoverHelper.SetIsHovered(navGeneral, false);
+            TouchHoverHelper.SetIsHovered(navController, false);
+            TouchHoverHelper.SetIsHovered(navSettings, false);
         }
         #endregion
 
@@ -1292,8 +1326,6 @@ namespace HandheldCompanion.Views
 
                 txtHidHideStatus.Text = hidHideOk ? "HidHide: OK" : "HidHide: Missing";
                 txtHidHideStatus.Foreground = hidHideOk ? new SolidColorBrush(Color.FromRgb(48, 209, 88)) : new SolidColorBrush(Color.FromRgb(255, 69, 58));
-
-                lblBottomHealth.Text = $"ViGEm: {(vigemOk ? "OK" : "Missing")}  |  HidHide: {(hidHideOk ? "OK" : "Missing")}  |  Controller: {(controllerOk ? "OK" : "Disconnected")}";
             }
             catch { }
         }
@@ -1413,9 +1445,11 @@ namespace HandheldCompanion.Views
 
         public void RestoreFromTray()
         {
+            if (_isExiting) return;
+
             if (this.WindowState == WindowState.Minimized)
             {
-                this.WindowState = WindowState.Normal;
+                this.WindowState = _lastNonMinimizedState;
             }
 
             this.Topmost = true;
@@ -1425,11 +1459,16 @@ namespace HandheldCompanion.Views
                 this.Show();
             }
 
+            SyncWindowChromeState();
+
             var helper = new System.Windows.Interop.WindowInteropHelper(this);
             IntPtr hwnd = helper.Handle;
             if (hwnd != IntPtr.Zero)
             {
-                ShowWindow(hwnd, SW_RESTORE);
+                if (_lastNonMinimizedState != WindowState.Maximized)
+                {
+                    ShowWindow(hwnd, SW_RESTORE);
+                }
                 SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
 
                 try
@@ -1462,39 +1501,83 @@ namespace HandheldCompanion.Views
 
         public static void ToggleOrShowWindow()
         {
-            if (Instance == null) return;
-            Instance.Dispatcher.Invoke(() =>
+            var inst = Instance;
+            if (inst == null || inst._isExiting) return;
+            var d = inst.Dispatcher;
+            if (d == null || d.HasShutdownStarted || d.HasShutdownFinished) return;
+            try
             {
-                if (Instance.IsVisible && Instance.WindowState != WindowState.Minimized && Instance.IsActive)
+                d.BeginInvoke(() =>
                 {
-                    Instance.Hide();
-                }
-                else
-                {
-                    Instance.RestoreFromTray();
-                }
-            });
+                    if (inst._isExiting) return;
+                    if (inst.IsVisible && inst.WindowState != WindowState.Minimized && inst.IsActive)
+                    {
+                        inst.Hide();
+                    }
+                    else
+                    {
+                        inst.RestoreFromTray();
+                    }
+                });
+            }
+            catch { }
         }
 
         public static void ShowWindowDirect()
         {
-            if (Instance == null) return;
-            Instance.Dispatcher.Invoke(() => Instance.RestoreFromTray());
+            var inst = Instance;
+            if (inst == null || inst._isExiting) return;
+            var d = inst.Dispatcher;
+            if (d == null || d.HasShutdownStarted || d.HasShutdownFinished) return;
+            try
+            {
+                d.BeginInvoke(() =>
+                {
+                    if (!inst._isExiting) inst.RestoreFromTray();
+                });
+            }
+            catch { }
         }
 
         public static void HideWindowDirect()
         {
-            if (Instance == null) return;
-            Instance.Dispatcher.Invoke(() => Instance.Hide());
+            var inst = Instance;
+            if (inst == null || inst._isExiting) return;
+            var d = inst.Dispatcher;
+            if (d == null || d.HasShutdownStarted || d.HasShutdownFinished) return;
+            try
+            {
+                d.BeginInvoke(() =>
+                {
+                    if (!inst._isExiting) inst.Hide();
+                });
+            }
+            catch { }
         }
+
+        private int _exitStarted = 0;
 
         public void ExitApplication(bool restart = false)
         {
+            if (Interlocked.Exchange(ref _exitStarted, 1) != 0)
+                return;
+
             _isExiting = true;
             _isListening = false;
             try { SystemEvents.DisplaySettingsChanged -= SystemEvents_DisplaySettingsChanged; } catch { }
-            _diagnosticsTimer?.Stop();
 
+            if (Dispatcher != null && !Dispatcher.CheckAccess())
+            {
+                try { Dispatcher.BeginInvoke(() => FinishExitApplication(restart)); } catch { Environment.Exit(0); }
+                return;
+            }
+
+            FinishExitApplication(restart);
+        }
+
+        private void FinishExitApplication(bool restart)
+        {
+            try { _diagnosticsTimer?.Stop(); } catch { }
             try { this.Hide(); } catch { }
             try { Program.SingleInstanceMutex?.ReleaseMutex(); Program.SingleInstanceMutex?.Dispose(); } catch { }
             try { _showWindowEvent?.Set(); _showWindowEvent?.Dispose(); } catch { }
@@ -1502,8 +1585,12 @@ namespace HandheldCompanion.Views
 
             if (_trayIcon != null)
             {
-                _trayIcon.Visible = false;
-                _trayIcon.Dispose();
+                try
+                {
+                    _trayIcon.Visible = false;
+                    _trayIcon.Dispose();
+                }
+                catch { }
             }
 
             try

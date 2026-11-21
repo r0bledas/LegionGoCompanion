@@ -380,13 +380,15 @@ namespace HandheldCompanion
             AppDomain.CurrentDomain.UnhandledException += (s, e) =>
             {
                 var ex = e.ExceptionObject as Exception;
-                MessageBox.Show("Fatal startup error: " + (ex?.Message ?? e.ExceptionObject.ToString()) + "\n\n" + ex?.StackTrace, "LegionGoCompanion Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                try { LogManager.LogCritical("Unhandled exception: {0}\n{1}", ex?.Message ?? e.ExceptionObject.ToString(), ex?.StackTrace ?? ""); } catch { }
+                MessageBox.Show("Unhandled error: " + (ex?.Message ?? e.ExceptionObject.ToString()) + "\n\n" + ex?.StackTrace, "LegionGoCompanion Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 TrayCleaner.Clean();
                 Environment.Exit(1);
             };
 
             Application.ThreadException += (s, e) =>
             {
+                try { LogManager.LogError("UI Thread error: {0}\n{1}", e.Exception.Message, e.Exception.StackTrace ?? ""); } catch { }
                 MessageBox.Show("UI Thread error: " + e.Exception.Message + "\n\n" + e.Exception.StackTrace, "LegionGoCompanion Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             };
 
@@ -440,6 +442,14 @@ namespace HandheldCompanion
 
                 LogManager.LogInformation("Starting Modern UI (WPF)...");
                 var wpfApp = new System.Windows.Application();
+                wpfApp.DispatcherUnhandledException += (s, exArgs) =>
+                {
+                    try { LogManager.LogError("WPF Dispatcher error: {0}\n{1}", exArgs.Exception.Message, exArgs.Exception.StackTrace ?? ""); } catch { }
+                    if (exArgs.Exception is InvalidOperationException || wpfApp.Dispatcher.HasShutdownStarted)
+                    {
+                        exArgs.Handled = true;
+                    }
+                };
                 var modernWindow = new ModernMainWindow();
 
                 bool isSilent = false;
