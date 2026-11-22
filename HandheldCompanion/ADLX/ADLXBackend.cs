@@ -141,6 +141,7 @@ namespace HandheldCompanion.ADLX
         [DllImport(ADLX_Wrapper, CallingConvention = CallingConvention.Cdecl)] public static extern bool GetAdlxTelemetry(int GPU, ref AdlxTelemetryData adlxTelemetryData);
 
         private static StringBuilder displayName = new StringBuilder(256);
+        public static volatile bool IsInitialized = false;
 
         static ADLXBackend() { }
 
@@ -153,9 +154,15 @@ namespace HandheldCompanion.ADLX
                 // its own internal driver compatibility check.  Only fall back to
                 // the incompatible-driver path if the wrapper explicitly returns false.
                 if (IntializeAdlx(displayName, displayName.Capacity))
+                {
+                    IsInitialized = true;
                     return true;
+                }
 
-                return InitializeAdlxWithIncompatibleDriver();
+                bool fallbackOk = InitializeAdlxWithIncompatibleDriver();
+                if (fallbackOk)
+                    IsInitialized = true;
+                return fallbackOk;
             }
             catch { }
 

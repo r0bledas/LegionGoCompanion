@@ -826,8 +826,21 @@ namespace HandheldCompanion.Views
 
         private void RefreshAdlxControlsAsync()
         {
+            if (!ADLXBackend.IsInitialized)
+            {
+                btnAdlxInteger.IsEnabled = false;
+                btnAdlxGpuScale.IsEnabled = false;
+                btnAdlxFsr.IsEnabled = false;
+                btnAdlxAfmf.IsEnabled = false;
+                btnAdlxSharpen.IsEnabled = false;
+                txtAdlxStatus.Text = "ADLX: Initializing AMD Radeon driver...";
+                txtAdlxStatus.Foreground = BrushGray;
+                return;
+            }
+
             Task.Run(() =>
             {
+                if (!ADLXBackend.IsInitialized) return;
                 bool ready = false;
                 bool supInt = false, valInt = false;
                 bool supGpuScale = false, valGpuScale = false;
@@ -893,7 +906,7 @@ namespace HandheldCompanion.Views
 
         private void BtnAdlxToggle_Click(object sender, RoutedEventArgs e)
         {
-            if (sender is not Button b || b.Tag is not string feature)
+            if (!ADLXBackend.IsInitialized || sender is not Button b || b.Tag is not string feature)
                 return;
 
             Task.Run(() =>
