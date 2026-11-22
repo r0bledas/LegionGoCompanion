@@ -156,7 +156,7 @@ namespace HandheldCompanion.Views
             ("Volume Up", VirtualKeyCode.VOLUME_UP)
         };
 
-        private readonly Dictionary<ButtonFlags, (ComboBox typeCombo, ComboBox targetCombo, ComboBox triggerCombo, CheckBox chkRepeat, TextBlock txtRate)> _remappingControls = new();
+        private readonly Dictionary<ButtonFlags, (ComboBox typeCombo, ComboBox targetCombo, ComboBox triggerCombo, CheckBox chkRepeat, TextBlock txtRate, CheckBox chkHaptic)> _remappingControls = new();
 
         public ModernMainWindow()
         {
@@ -2072,11 +2072,21 @@ namespace HandheldCompanion.Views
                 };
                 borderRate.Child = txtRate;
                 var btnPlus = new Button { Content = "+", Width = 26, Height = 26, Style = (Style)FindResource("StepButton") };
+                var chkHaptic = new CheckBox
+                {
+                    Content = "Haptic",
+                    IsChecked = item.HapticEnabled,
+                    Foreground = Brushes.LightGray,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Margin = new Thickness(10, 0, 0, 0),
+                    ToolTip = "Vibrate dynamically matching the Trigger mode (On Down / On Up)"
+                };
 
                 stackTurbo.Children.Add(chkTurbo);
                 stackTurbo.Children.Add(btnMinus);
                 stackTurbo.Children.Add(borderRate);
                 stackTurbo.Children.Add(btnPlus);
+                stackTurbo.Children.Add(chkHaptic);
                 Grid.SetColumn(stackTurbo, 4);
 
                 grid.Children.Add(lblBtn);
@@ -2087,7 +2097,7 @@ namespace HandheldCompanion.Views
                 border.Child = grid;
 
                 stackRemapRows.Children.Add(border);
-                _remappingControls[btn] = (comboType, comboTarget, comboTrigger, chkTurbo, txtRate);
+                _remappingControls[btn] = (comboType, comboTarget, comboTrigger, chkTurbo, txtRate, chkHaptic);
 
                 PopulateTargetDropdown(comboTarget, item.TargetType, item.TargetButton, item.TargetKey, item.TargetAction);
 
@@ -2112,6 +2122,7 @@ namespace HandheldCompanion.Views
                 };
 
                 chkTurbo.Click += (s, e) => SaveRowMapping(btn);
+                chkHaptic.Click += (s, e) => { if (!_updatingUi) SaveRowMapping(btn); };
 
                 btnMinus.Click += (s, e) =>
                 {
@@ -2182,7 +2193,7 @@ namespace HandheldCompanion.Views
         private void SaveRowMapping(ButtonFlags btn, int? overrideDelay = null)
         {
             if (!_remappingControls.TryGetValue(btn, out var row)) return;
-            var (typeCombo, targetCombo, triggerCombo, chkRepeat, txtRate) = row;
+            var (typeCombo, targetCombo, triggerCombo, chkRepeat, txtRate, chkHaptic) = row;
 
             var type = (MappingType)typeCombo.SelectedIndex;
             ButtonFlags targetBtn = ButtonFlags.None;
@@ -2204,7 +2215,7 @@ namespace HandheldCompanion.Views
 
             int delay = overrideDelay ?? int.Parse(txtRate.Text.Replace("ms", ""));
             var triggerMode = triggerCombo.SelectedIndex >= 0 ? (RemapTriggerMode)triggerCombo.SelectedIndex : RemapTriggerMode.Default;
-            CustomMappingService.Instance.SetMapping(btn, type, targetBtn, targetKey, targetAction, chkRepeat.IsChecked ?? false, delay, triggerMode);
+            CustomMappingService.Instance.SetMapping(btn, type, targetBtn, targetKey, targetAction, chkRepeat.IsChecked ?? false, delay, triggerMode, chkHaptic.IsChecked ?? false);
         }
 
         private void BtnResetRemap_Click(object sender, RoutedEventArgs e)

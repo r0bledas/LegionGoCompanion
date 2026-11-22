@@ -67,6 +67,13 @@ namespace HandheldCompanion.Managers
         public bool HasTurbo { get; set; } = false;
         public int TurboDelayMs { get; set; } = 50;
         public RemapTriggerMode TriggerMode { get; set; } = RemapTriggerMode.Default;
+        public bool HapticEnabled { get; set; } = false;
+
+        public HapticMode GetEffectiveHapticMode()
+        {
+            if (!HapticEnabled) return HapticMode.Off;
+            return TriggerMode == RemapTriggerMode.OnUp ? HapticMode.Up : HapticMode.Down;
+        }
     }
 
     public class CustomMappingService
@@ -311,7 +318,7 @@ namespace HandheldCompanion.Managers
 
         public void SetMapping(ButtonFlags button, MappingType type, ButtonFlags targetBtn, VirtualKeyCode targetKey,
             CustomActionType targetAction = CustomActionType.None, bool hasTurbo = false, int turboDelayMs = 50,
-            RemapTriggerMode triggerMode = RemapTriggerMode.Default)
+            RemapTriggerMode triggerMode = RemapTriggerMode.Default, bool hapticEnabled = false)
         {
             lock (_lock)
             {
@@ -324,7 +331,8 @@ namespace HandheldCompanion.Managers
                     TargetAction = targetAction,
                     HasTurbo = hasTurbo,
                     TurboDelayMs = Math.Clamp(turboDelayMs, 10, 1000),
-                    TriggerMode = triggerMode
+                    TriggerMode = triggerMode,
+                    HapticEnabled = hapticEnabled
                 };
             }
             Save();
@@ -379,6 +387,8 @@ namespace HandheldCompanion.Managers
                         action.HasTurbo = item.HasTurbo;
                         action.TurboDelay = Math.Clamp(item.TurboDelayMs, 10, 1000);
                         action.TriggerMode = (int)item.TriggerMode;
+                        action.HapticMode = item.GetEffectiveHapticMode();
+                        action.HapticStrength = HapticStrength.Low;
                         plans[item.PhysicalButton] = new IActions[] { action };
                     }
                     else if (item.TargetType == MappingType.Keyboard && item.TargetKey != VirtualKeyCode.NONAME)
@@ -387,6 +397,8 @@ namespace HandheldCompanion.Managers
                         action.HasTurbo = item.HasTurbo;
                         action.TurboDelay = Math.Clamp(item.TurboDelayMs, 10, 1000);
                         action.TriggerMode = (int)item.TriggerMode;
+                        action.HapticMode = item.GetEffectiveHapticMode();
+                        action.HapticStrength = HapticStrength.Low;
                         plans[item.PhysicalButton] = new IActions[] { action };
                     }
                 }

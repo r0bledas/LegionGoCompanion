@@ -871,6 +871,11 @@ public static class InputsManager
                 bool edgeMatch = fireOnUp ? (!isDown && wasDown) : (isDown && !wasDown);
                 if (edgeMatch)
                 {
+                    if (mapping.HapticEnabled)
+                    {
+                        ControllerManager.GetTarget()?.SetHaptic(Actions.HapticStrength.Low, btn, released: fireOnUp);
+                    }
+
                     if (mapping.TargetType == MappingType.Action)
                     {
                         CustomMappingService.ExecuteAction(mapping.TargetAction);
