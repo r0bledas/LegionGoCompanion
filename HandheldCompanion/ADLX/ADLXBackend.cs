@@ -139,8 +139,37 @@ namespace HandheldCompanion.ADLX
         [DllImport(ADLX_Wrapper, CallingConvention = CallingConvention.Cdecl)] public static extern bool SetScalingMode(int displayIdx, int mode);
 
         [DllImport(ADLX_Wrapper, CallingConvention = CallingConvention.Cdecl)] public static extern bool GetAdlxTelemetry(int GPU, ref AdlxTelemetryData adlxTelemetryData);
-        [DllImport(ADLX_Wrapper, CallingConvention = CallingConvention.Cdecl)] public static extern double GetGPUTemperature(int GPU);
-        [DllImport(ADLX_Wrapper, CallingConvention = CallingConvention.Cdecl)] public static extern int GetGPUFanSpeed(int GPU);
+
+        public static double GetGPUTemperature(int GPU)
+        {
+            try
+            {
+                if (!IsInitialized) return 0;
+                var data = new AdlxTelemetryData();
+                if (GetAdlxTelemetry(GPU, ref data))
+                {
+                    if (data.gpuTemperatureSupported && data.gpuTemperatureValue > 0)
+                        return data.gpuTemperatureValue;
+                    if (data.gpuHotspotTemperatureSupported && data.gpuHotspotTemperatureValue > 0)
+                        return data.gpuHotspotTemperatureValue;
+                }
+            }
+            catch { }
+            return 0;
+        }
+
+        public static int GetGPUFanSpeed(int GPU)
+        {
+            try
+            {
+                if (!IsInitialized) return 0;
+                var data = new AdlxTelemetryData();
+                if (GetAdlxTelemetry(GPU, ref data) && data.gpuFanSpeedSupported && data.gpuFanSpeedValue > 0)
+                    return (int)System.Math.Round(data.gpuFanSpeedValue);
+            }
+            catch { }
+            return 0;
+        }
 
         #region AMD ADL2 (atiadlxx.dll) Direct Driver Bindings for AFMF & Vivid Colors
         private const string ATI_ADL_DLL = "atiadlxx.dll";
