@@ -483,11 +483,12 @@
             <!-- 2. Navigation Tab Bar -->
             <Border Grid.Row="1" Background="#17191F" BorderBrush="#262A34" BorderThickness="0,0,0,1" Padding="12,6">
                 <StackPanel Orientation="Horizontal">
-                    <Button x:Name="navGeneral" Content="General" Width="98" Height="34" Style="{StaticResource ActiveTouchButton}" Click="NavGeneral_Click" />
-                    <Button x:Name="navGraphics" Content="Graphics" Width="98" Height="34" Style="{StaticResource TouchButton}" Click="NavGraphics_Click" />
-                    <Button x:Name="navPerformance" Content="Performance" Width="112" Height="34" Style="{StaticResource TouchButton}" Click="NavPerformance_Click" />
-                    <Button x:Name="navController" Content="Controller" Width="102" Height="34" Style="{StaticResource TouchButton}" Click="NavController_Click" />
-                    <Button x:Name="navSettings" Content="Settings" Width="98" Height="34" Style="{StaticResource TouchButton}" Click="NavSettings_Click" />
+                    <Button x:Name="navGeneral" Content="General" Width="92" Height="34" Style="{StaticResource ActiveTouchButton}" Click="NavGeneral_Click" />
+                    <Button x:Name="navGraphics" Content="Graphics" Width="94" Height="34" Style="{StaticResource TouchButton}" Click="NavGraphics_Click" />
+                    <Button x:Name="navPerformance" Content="Performance" Width="108" Height="34" Style="{StaticResource TouchButton}" Click="NavPerformance_Click" />
+                    <Button x:Name="navController" Content="Controller" Width="98" Height="34" Style="{StaticResource TouchButton}" Click="NavController_Click" />
+                    <Button x:Name="navTuning" Content="Deadzones" Width="100" Height="34" Style="{StaticResource TouchButton}" Click="NavTuning_Click" />
+                    <Button x:Name="navSettings" Content="Settings" Width="92" Height="34" Style="{StaticResource TouchButton}" Click="NavSettings_Click" />
                 </StackPanel>
             </Border>
 
@@ -550,21 +551,19 @@
                     <!-- Fan Mode (NO SLIDERS) -->
                     <Border Background="#1C1F26" BorderBrush="#2D323E" BorderThickness="1" CornerRadius="8" Padding="12,8" Margin="0,0,0,7">
                         <StackPanel>
-                            <TextBlock Text="Fan Speed &amp; Curve" FontSize="13.5" FontWeight="Bold" Foreground="#FFFFFF" Margin="0,0,0,5" />
-                            <Grid Grid.IsSharedSizeScope="True" HorizontalAlignment="Left" Margin="-3,0">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto" SharedSizeGroup="FanBtn" />
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="Auto" SharedSizeGroup="FanBtn" />
-                                    <ColumnDefinition Width="Auto" SharedSizeGroup="FanBtn" />
-                                    <ColumnDefinition Width="Auto" SharedSizeGroup="FanBtn" />
-                                </Grid.ColumnDefinitions>
-                                <Button Grid.Column="0" x:Name="btnFanAuto" Content="Auto" Height="34" Padding="16,5" Style="{StaticResource ActiveTouchButton}" Click="BtnFanAuto_Click" />
-                                <Border Grid.Column="1" Width="1" Height="22" Background="#383E4C" VerticalAlignment="Center" Margin="6,0" SnapsToDevicePixels="True" />
-                                <Button Grid.Column="2" x:Name="btnFanFull" Content="100%" Height="34" Padding="16,5" Style="{StaticResource TouchButton}" Click="BtnFanFull_Click" />
-                                <Button Grid.Column="3" x:Name="btnFan50" Content="50%" Height="34" Padding="16,5" Style="{StaticResource TouchButton}" Click="BtnFanPreset_Click" Tag="50" />
-                                <Button Grid.Column="4" x:Name="btnFan70" Content="70%" Height="34" Padding="16,5" Style="{StaticResource TouchButton}" Click="BtnFanPreset_Click" Tag="70" />
+                            <Grid Margin="0,0,0,5">
+                                <TextBlock Text="Fan Speed, Curves &amp; 90°C Thermal Guard" FontSize="13.5" FontWeight="Bold" Foreground="#FFFFFF" VerticalAlignment="Center" />
+                                <TextBlock x:Name="txtFanLiveTelemetry" Text="Temp &amp; Fan: Reading EC..." FontSize="11.5" FontWeight="SemiBold" Foreground="#0090FF" HorizontalAlignment="Right" VerticalAlignment="Center" />
                             </Grid>
+                            <WrapPanel Margin="-3,0,0,6">
+                                <Button x:Name="btnFanAuto" Content="Auto" MinWidth="72" Height="34" Padding="14,5" Style="{StaticResource ActiveTouchButton}" Click="BtnFanAuto_Click" />
+                                <Button x:Name="btnFanSilent" Content="Silent Curve" MinWidth="104" Height="34" Padding="14,5" Style="{StaticResource TouchButton}" Click="BtnFanCurve_Click" Tag="Silent" />
+                                <Button x:Name="btnFanCool" Content="Cool Curve" MinWidth="98" Height="34" Padding="14,5" Style="{StaticResource TouchButton}" Click="BtnFanCurve_Click" Tag="Cool" />
+                                <Button x:Name="btnFan50" Content="50%" MinWidth="68" Height="34" Padding="14,5" Style="{StaticResource TouchButton}" Click="BtnFanPreset_Click" Tag="50" />
+                                <Button x:Name="btnFan70" Content="70%" MinWidth="68" Height="34" Padding="14,5" Style="{StaticResource TouchButton}" Click="BtnFanPreset_Click" Tag="70" />
+                                <Button x:Name="btnFanFull" Content="100% Full" MinWidth="88" Height="34" Padding="14,5" Style="{StaticResource TouchButton}" Click="BtnFanFull_Click" />
+                            </WrapPanel>
+                            <CheckBox x:Name="chkThermalGuard90" Content="Auto 100% Fan at ≥90°C (Prevents thermal throttling; restores previous fan mode below 82°C)" Click="ChkThermalGuard90_Click" />
                         </StackPanel>
                     </Border>
 
@@ -626,6 +625,33 @@
                                 </Grid>
                             </StackPanel>
                             <TextBlock x:Name="txtAdlxStatus" Text="ADLX: Checking AMD driver..." FontSize="11.5" Foreground="#9EA4B0" Margin="4,4,0,0" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Radeon Chill (Driver-Level FPS Limiter) -->
+                    <Border Background="#1C1F26" BorderBrush="#2D323E" BorderThickness="1" CornerRadius="8" Padding="12,8" Margin="0,0,0,7">
+                        <StackPanel>
+                            <TextBlock Text="Radeon Chill (Driver-Level FPS Limiter)" FontSize="13.5" FontWeight="Bold" Foreground="#FFFFFF" Margin="0,0,0,5" />
+                            <WrapPanel Margin="-3,0">
+                                <Button x:Name="btnChillOff" Content="Off" MinWidth="58" Height="34" Padding="12,5" Style="{StaticResource ActiveTouchButton}" Click="BtnChillPreset_Click" Tag="0" />
+                                <Button x:Name="btnChill30" Content="30 FPS" MinWidth="68" Height="34" Padding="12,5" Style="{StaticResource TouchButton}" Click="BtnChillPreset_Click" Tag="30" />
+                                <Button x:Name="btnChill40" Content="40 FPS" MinWidth="68" Height="34" Padding="12,5" Style="{StaticResource TouchButton}" Click="BtnChillPreset_Click" Tag="40" />
+                                <Button x:Name="btnChill45" Content="45 FPS" MinWidth="68" Height="34" Padding="12,5" Style="{StaticResource TouchButton}" Click="BtnChillPreset_Click" Tag="45" />
+                                <Button x:Name="btnChill60" Content="60 FPS" MinWidth="68" Height="34" Padding="12,5" Style="{StaticResource TouchButton}" Click="BtnChillPreset_Click" Tag="60" />
+                                <Button x:Name="btnChill72" Content="72 FPS" MinWidth="68" Height="34" Padding="12,5" Style="{StaticResource TouchButton}" Click="BtnChillPreset_Click" Tag="72" />
+                                <Button x:Name="btnChill90" Content="90 FPS" MinWidth="68" Height="34" Padding="12,5" Style="{StaticResource TouchButton}" Click="BtnChillPreset_Click" Tag="90" />
+                                <Button x:Name="btnChill120" Content="120 FPS" MinWidth="74" Height="34" Padding="12,5" Style="{StaticResource TouchButton}" Click="BtnChillPreset_Click" Tag="120" />
+                                <Button x:Name="btnChill144" Content="144 FPS" MinWidth="74" Height="34" Padding="12,5" Style="{StaticResource TouchButton}" Click="BtnChillPreset_Click" Tag="144" />
+                            </WrapPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,5,0,0" VerticalAlignment="Center">
+                                <TextBlock Text="Custom Cap:" FontSize="12.5" Foreground="#9EA4B0" VerticalAlignment="Center" Margin="2,0,10,0" />
+                                <Button x:Name="btnChillMinus" Content="-" Height="32" Style="{StaticResource StepButton}" Click="BtnChillMinus_Click" />
+                                <Border Background="#252932" BorderBrush="#383E4C" BorderThickness="1" CornerRadius="6" MinWidth="82" Height="32" Margin="3" Padding="8,0">
+                                    <TextBlock x:Name="txtChillCurrent" Text="Off" FontSize="13" FontWeight="Bold" Foreground="#FFFFFF" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                </Border>
+                                <Button x:Name="btnChillPlus" Content="+" Height="32" Style="{StaticResource StepButton}" Click="BtnChillPlus_Click" />
+                                <TextBlock Text="Locks Min &amp; Max FPS via AMD ADLX IADLX3DChill for smooth frametimes." FontSize="11" Foreground="#888E9E" VerticalAlignment="Center" Margin="12,0,0,0" />
+                            </StackPanel>
                         </StackPanel>
                     </Border>
 
@@ -897,7 +923,119 @@
                     </Border>
                 </StackPanel>
 
-                <!-- TAB 3: SETTINGS VIEW -->
+                <!-- TAB 5: DEADZONES & FIRMWARE TUNING VIEW -->
+                <StackPanel x:Name="panelTuning" Visibility="Collapsed">
+                    <!-- Thumbstick Deadzones & Curves (Controller Firmware) -->
+                    <Border Background="#1C1F26" BorderBrush="#2D323E" BorderThickness="1" CornerRadius="8" Padding="12,8" Margin="0,0,0,7">
+                        <StackPanel>
+                            <TextBlock Text="Thumbstick Deadzones &amp; Response Curves (Firmware)" FontSize="13.5" FontWeight="Bold" Foreground="#FFFFFF" Margin="0,0,0,6" />
+                            <WrapPanel Margin="-2,0,0,4" VerticalAlignment="Center">
+                                <TextBlock Text="Left Stick Deadzone:" Width="138" FontSize="12.5" Foreground="#9EA4B0" VerticalAlignment="Center" Margin="4,0,4,0" />
+                                <Button x:Name="btnLStickDz0" Content="0%" MinWidth="52" Height="30" Padding="10,3" Style="{StaticResource TouchButton}" Click="BtnLStickDzPreset_Click" Tag="0" />
+                                <Button x:Name="btnLStickDz2" Content="2%" MinWidth="52" Height="30" Padding="10,3" Style="{StaticResource TouchButton}" Click="BtnLStickDzPreset_Click" Tag="2" />
+                                <Button x:Name="btnLStickDz4" Content="4%" MinWidth="52" Height="30" Padding="10,3" Style="{StaticResource TouchButton}" Click="BtnLStickDzPreset_Click" Tag="4" />
+                                <Button x:Name="btnLStickDz8" Content="8%" MinWidth="52" Height="30" Padding="10,3" Style="{StaticResource TouchButton}" Click="BtnLStickDzPreset_Click" Tag="8" />
+                                <Button x:Name="btnLStickDz12" Content="12%" MinWidth="56" Height="30" Padding="10,3" Style="{StaticResource TouchButton}" Click="BtnLStickDzPreset_Click" Tag="12" />
+                                <Button Content="-" Width="32" Height="30" Style="{StaticResource StepButton}" Margin="8,2,2,2" Click="BtnLStickDzMinus_Click" />
+                                <Border Background="#252932" BorderBrush="#383E4C" BorderThickness="1" CornerRadius="4" MinWidth="48" Height="30" Margin="2" Padding="6,0">
+                                    <TextBlock x:Name="txtLStickDz" Text="4%" FontSize="12" FontWeight="Bold" Foreground="#FFFFFF" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                </Border>
+                                <Button Content="+" Width="32" Height="30" Style="{StaticResource StepButton}" Click="BtnLStickDzPlus_Click" />
+                            </WrapPanel>
+                            <WrapPanel Margin="-2,0,0,6" VerticalAlignment="Center">
+                                <TextBlock Text="Right Stick Deadzone:" Width="138" FontSize="12.5" Foreground="#9EA4B0" VerticalAlignment="Center" Margin="4,0,4,0" />
+                                <Button x:Name="btnRStickDz0" Content="0%" MinWidth="52" Height="30" Padding="10,3" Style="{StaticResource TouchButton}" Click="BtnRStickDzPreset_Click" Tag="0" />
+                                <Button x:Name="btnRStickDz2" Content="2%" MinWidth="52" Height="30" Padding="10,3" Style="{StaticResource TouchButton}" Click="BtnRStickDzPreset_Click" Tag="2" />
+                                <Button x:Name="btnRStickDz4" Content="4%" MinWidth="52" Height="30" Padding="10,3" Style="{StaticResource TouchButton}" Click="BtnRStickDzPreset_Click" Tag="4" />
+                                <Button x:Name="btnRStickDz8" Content="8%" MinWidth="52" Height="30" Padding="10,3" Style="{StaticResource TouchButton}" Click="BtnRStickDzPreset_Click" Tag="8" />
+                                <Button x:Name="btnRStickDz12" Content="12%" MinWidth="56" Height="30" Padding="10,3" Style="{StaticResource TouchButton}" Click="BtnRStickDzPreset_Click" Tag="12" />
+                                <Button Content="-" Width="32" Height="30" Style="{StaticResource StepButton}" Margin="8,2,2,2" Click="BtnRStickDzMinus_Click" />
+                                <Border Background="#252932" BorderBrush="#383E4C" BorderThickness="1" CornerRadius="4" MinWidth="48" Height="30" Margin="2" Padding="6,0">
+                                    <TextBlock x:Name="txtRStickDz" Text="4%" FontSize="12" FontWeight="Bold" Foreground="#FFFFFF" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                </Border>
+                                <Button Content="+" Width="32" Height="30" Style="{StaticResource StepButton}" Click="BtnRStickDzPlus_Click" />
+                            </WrapPanel>
+                            <WrapPanel Margin="-2,0,0,0" VerticalAlignment="Center">
+                                <TextBlock Text="Stick Response Curve:" Width="138" FontSize="12.5" Foreground="#9EA4B0" VerticalAlignment="Center" Margin="4,0,4,0" />
+                                <Button x:Name="btnCurve1" Content="Standard" MinWidth="82" Height="30" Padding="12,3" Style="{StaticResource ActiveTouchButton}" Click="BtnStickCurve_Click" Tag="1" />
+                                <Button x:Name="btnCurve2" Content="Sensitive (Fast)" MinWidth="108" Height="30" Padding="12,3" Style="{StaticResource TouchButton}" Click="BtnStickCurve_Click" Tag="2" />
+                                <Button x:Name="btnCurve3" Content="Delayed (Precision)" MinWidth="124" Height="30" Padding="12,3" Style="{StaticResource TouchButton}" Click="BtnStickCurve_Click" Tag="3" />
+                                <Button x:Name="btnCurve4" Content="Smooth" MinWidth="78" Height="30" Padding="12,3" Style="{StaticResource TouchButton}" Click="BtnStickCurve_Click" Tag="4" />
+                            </WrapPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Trigger Deadzones & Hair-Trigger Mode (Controller Firmware) -->
+                    <Border Background="#1C1F26" BorderBrush="#2D323E" BorderThickness="1" CornerRadius="8" Padding="12,8" Margin="0,0,0,7">
+                        <StackPanel>
+                            <TextBlock Text="LT &amp; RT Trigger Deadzones (Hair-Trigger Firmware Mode)" FontSize="13.5" FontWeight="Bold" Foreground="#FFFFFF" Margin="0,0,0,6" />
+                            <WrapPanel Margin="-3,0,0,6">
+                                <Button x:Name="btnTrigHair" Content="Hair-Trigger (0-35%)" MinWidth="136" Height="32" Padding="12,4" Style="{StaticResource TouchButton}" Click="BtnTriggerPreset_Click" Tag="0,65" />
+                                <Button x:Name="btnTrigFast" Content="Fast Pull (2-65%)" MinWidth="120" Height="32" Padding="12,4" Style="{StaticResource TouchButton}" Click="BtnTriggerPreset_Click" Tag="2,35" />
+                                <Button x:Name="btnTrigDefault" Content="Default (5-95%)" MinWidth="112" Height="32" Padding="12,4" Style="{StaticResource ActiveTouchButton}" Click="BtnTriggerPreset_Click" Tag="5,5" />
+                                <Button x:Name="btnTrigFull" Content="Full Travel (0-100%)" MinWidth="128" Height="32" Padding="12,4" Style="{StaticResource TouchButton}" Click="BtnTriggerPreset_Click" Tag="0,0" />
+                            </WrapPanel>
+                            <WrapPanel Margin="0,2,0,0" VerticalAlignment="Center">
+                                <TextBlock Text="Start Deadzone:" FontSize="12" Foreground="#9EA4B0" VerticalAlignment="Center" Margin="2,0,6,0" />
+                                <Button Content="-" Width="32" Height="30" Style="{StaticResource StepButton}" Click="BtnTrigDzMinus_Click" />
+                                <Border Background="#252932" BorderBrush="#383E4C" BorderThickness="1" CornerRadius="4" MinWidth="48" Height="30" Margin="2" Padding="6,0">
+                                    <TextBlock x:Name="txtTrigStartDz" Text="5%" FontSize="12" FontWeight="Bold" Foreground="#FFFFFF" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                </Border>
+                                <Button Content="+" Width="32" Height="30" Style="{StaticResource StepButton}" Click="BtnTrigDzPlus_Click" />
+
+                                <TextBlock Text="Full Pull Point:" FontSize="12" Foreground="#9EA4B0" VerticalAlignment="Center" Margin="16,0,6,0" />
+                                <Button Content="-" Width="32" Height="30" Style="{StaticResource StepButton}" Click="BtnTrigMaxMinus_Click" />
+                                <Border Background="#252932" BorderBrush="#383E4C" BorderThickness="1" CornerRadius="4" MinWidth="54" Height="30" Margin="2" Padding="6,0">
+                                    <TextBlock x:Name="txtTrigFullPull" Text="95%" FontSize="12" FontWeight="Bold" Foreground="#FFFFFF" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                </Border>
+                                <Button Content="+" Width="32" Height="30" Style="{StaticResource StepButton}" Click="BtnTrigMaxPlus_Click" />
+                            </WrapPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Trackpad Haptics, FPS Mouse DPI, Auto-Sleep & Button Swap -->
+                    <Border Background="#1C1F26" BorderBrush="#2D323E" BorderThickness="1" CornerRadius="8" Padding="12,8" Margin="0,0,0,7">
+                        <StackPanel>
+                            <TextBlock Text="Trackpad Haptics, FPS Mouse DPI &amp; Controller Options" FontSize="13.5" FontWeight="Bold" Foreground="#FFFFFF" Margin="0,0,0,6" />
+                            <WrapPanel Margin="-3,0,0,6" VerticalAlignment="Center">
+                                <Button x:Name="btnTrackpadToggle" Content="Trackpad: Enabled" MinWidth="132" Height="32" Padding="12,4" Style="{StaticResource ActiveTouchButton}" Click="BtnTrackpadToggle_Click" />
+                                <Button x:Name="btnTrackpadVibToggle" Content="Trackpad Haptics: On" MinWidth="144" Height="32" Padding="12,4" Style="{StaticResource ActiveTouchButton}" Click="BtnTrackpadVibToggle_Click" />
+                                <Button x:Name="btnSwapLegionButtons" Content="Legion L/R Swap: Normal" MinWidth="162" Height="32" Padding="12,4" Style="{StaticResource TouchButton}" Click="BtnSwapLegionButtons_Click" />
+                            </WrapPanel>
+                            <WrapPanel Margin="-2,0,0,6" VerticalAlignment="Center">
+                                <TextBlock Text="FPS Optical Mouse DPI:" Width="145" FontSize="12.5" Foreground="#9EA4B0" VerticalAlignment="Center" Margin="4,0,4,0" />
+                                <Button x:Name="btnDpi500" Content="500" MinWidth="58" Height="30" Padding="10,3" Style="{StaticResource TouchButton}" Click="BtnMouseDpi_Click" Tag="500" />
+                                <Button x:Name="btnDpi800" Content="800" MinWidth="58" Height="30" Padding="10,3" Style="{StaticResource ActiveTouchButton}" Click="BtnMouseDpi_Click" Tag="800" />
+                                <Button x:Name="btnDpi1200" Content="1200" MinWidth="62" Height="30" Padding="10,3" Style="{StaticResource TouchButton}" Click="BtnMouseDpi_Click" Tag="1200" />
+                                <Button x:Name="btnDpi1600" Content="1600" MinWidth="62" Height="30" Padding="10,3" Style="{StaticResource TouchButton}" Click="BtnMouseDpi_Click" Tag="1600" />
+                                <Button x:Name="btnDpi1800" Content="1800" MinWidth="62" Height="30" Padding="10,3" Style="{StaticResource TouchButton}" Click="BtnMouseDpi_Click" Tag="1800" />
+                            </WrapPanel>
+                            <WrapPanel Margin="-2,0,0,0" VerticalAlignment="Center">
+                                <TextBlock Text="Controller Auto-Sleep:" Width="145" FontSize="12.5" Foreground="#9EA4B0" VerticalAlignment="Center" Margin="4,0,4,0" />
+                                <Button x:Name="btnSleep10" Content="10m" MinWidth="58" Height="30" Padding="10,3" Style="{StaticResource TouchButton}" Click="BtnAutoSleep_Click" Tag="10" />
+                                <Button x:Name="btnSleep15" Content="15m" MinWidth="58" Height="30" Padding="10,3" Style="{StaticResource TouchButton}" Click="BtnAutoSleep_Click" Tag="15" />
+                                <Button x:Name="btnSleep30" Content="30m" MinWidth="58" Height="30" Padding="10,3" Style="{StaticResource TouchButton}" Click="BtnAutoSleep_Click" Tag="30" />
+                                <Button x:Name="btnSleep60" Content="60m" MinWidth="58" Height="30" Padding="10,3" Style="{StaticResource ActiveTouchButton}" Click="BtnAutoSleep_Click" Tag="60" />
+                                <Button x:Name="btnSleep0" Content="Never" MinWidth="66" Height="30" Padding="10,3" Style="{StaticResource TouchButton}" Click="BtnAutoSleep_Click" Tag="0" />
+                            </WrapPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Hardware Sensor Calibration -->
+                    <Border Background="#1C1F26" BorderBrush="#2D323E" BorderThickness="1" CornerRadius="8" Padding="12,8" Margin="0,0,0,4">
+                        <StackPanel>
+                            <TextBlock Text="Hardware Sensor Calibration (Firmware)" FontSize="13.5" FontWeight="Bold" Foreground="#FFFFFF" Margin="0,0,0,6" />
+                            <WrapPanel Margin="-3,0,0,4">
+                                <Button x:Name="btnCalSticks" Content="Calibrate Sticks (5s)" Height="32" Padding="14,4" Style="{StaticResource TouchButton}" Click="BtnCalibrateSticks_Click" />
+                                <Button x:Name="btnCalTriggers" Content="Calibrate Triggers (5s)" Height="32" Padding="14,4" Style="{StaticResource TouchButton}" Click="BtnCalibrateTriggers_Click" />
+                                <Button x:Name="btnCalGyro" Content="Calibrate Gyro (3s - Lay Flat)" Height="32" Padding="14,4" Style="{StaticResource TouchButton}" Click="BtnCalibrateGyro_Click" />
+                            </WrapPanel>
+                            <TextBlock x:Name="txtCalibrationStatus" Text="Ready. Rotate sticks or pull triggers fully 3 times during 5s calibration, then release." FontSize="11.5" Foreground="#9EA4B0" Margin="4,2,0,0" />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+
+                <!-- TAB 6: SETTINGS VIEW -->
                 <StackPanel x:Name="panelSettings" Visibility="Collapsed">
                     <!-- Hardware & Battery Options -->
                     <Border Background="#1C1F26" BorderBrush="#2D323E" BorderThickness="1" CornerRadius="8" Padding="14,12" Margin="0,0,0,10">
@@ -905,10 +1043,23 @@
                             <TextBlock Text="Hardware &amp; Battery Options" FontSize="13.5" FontWeight="Bold" Foreground="#FFFFFF" Margin="0,0,0,8" />
                             <CheckBox x:Name="chkBatteryLimit" Content="80% Battery Charge Limit (Protects battery longevity)" Click="ChkBatteryLimit_Click" />
                             <TextBlock x:Name="txtBatteryLimitStatus" Text="Hardware Charge Limit: Checking..." FontSize="11.5" Foreground="#9EA4B0" Margin="26,-2,0,6" />
+                            <CheckBox x:Name="chkPowerLight" Content="Power Button LED Light Enabled (Uncheck to turn off power button LED at night)" IsChecked="True" Click="ChkPowerLight_Click" />
                             <CheckBox x:Name="chkCloseMinimises" Content="Keep running in system tray after closing window" Click="ChkCloseMinimises_Click" />
                             <CheckBox x:Name="chkRunAtStartup" Content="Run at Startup (Elevated via Task Scheduler)" Click="ChkRunAtStartup_Click" />
                             <CheckBox x:Name="chkStartMinimized" Content="Silent Launch on Startup (Start minimized in tray)" Click="ChkStartMinimized_Click" />
                             <CheckBox x:Name="chkDesktopOnStart" Content="Default to Desktop Layout on Startup" Click="ChkDesktopOnStart_Click" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Speaker EQ & Realtek Audio Fix -->
+                    <Border Background="#1C1F26" BorderBrush="#2D323E" BorderThickness="1" CornerRadius="8" Padding="14,12" Margin="0,0,0,10">
+                        <StackPanel>
+                            <Grid Margin="0,0,0,6">
+                                <TextBlock Text="Speaker EQ &amp; Realtek Audio Fix" FontSize="13.5" FontWeight="Bold" Foreground="#FFFFFF" VerticalAlignment="Center" />
+                                <Button x:Name="btnOpenRealtek" Content="Open Realtek Audio Console" Height="30" Padding="14,4" Style="{StaticResource ActiveTouchButton}" HorizontalAlignment="Right" Click="BtnOpenRealtek_Click" />
+                            </Grid>
+                            <TextBlock Text="1. In Realtek Audio Control -> Speakers, turn OFF 'Omni Speaker' (eliminates hollow phase cancellation)." FontSize="11.5" Foreground="#9EA4B0" Margin="0,0,0,3" />
+                            <TextBlock Text="2. Recommended 10-Band EQ:  31Hz: +1  |  62Hz: +2  |  125Hz: +4  |  250Hz: +6  |  500Hz: +4  |  1kHz: 0  |  2kHz: +4  |  4kHz: -5  |  8kHz: +2  |  16kHz: +4" FontSize="11.5" FontWeight="SemiBold" Foreground="#0090FF" TextWrapping="Wrap" />
                         </StackPanel>
                     </Border>
 

@@ -268,6 +268,59 @@ namespace HandheldCompanion.GraphicsProcessingUnit
             return Execute(() => ADLXBackend.SetVividColors(displayIdx, enable), false);
         }
 
+        public bool GetChill()
+        {
+            if (!IsInitialized)
+                return false;
+
+            return Execute(() => ADLXBackend.GetChill(deviceIdx), false);
+        }
+
+        public bool SetChill(bool enable)
+        {
+            if (!IsInitialized)
+                return false;
+
+            return Execute(() => ADLXBackend.SetChill(deviceIdx, enable), false);
+        }
+
+        public int GetChillMinFPS()
+        {
+            if (!IsInitialized)
+                return 0;
+
+            return Execute(() => ADLXBackend.GetChillMinFPS(deviceIdx), 0);
+        }
+
+        public int GetChillMaxFPS()
+        {
+            if (!IsInitialized)
+                return 0;
+
+            return Execute(() => ADLXBackend.GetChillMaxFPS(deviceIdx), 0);
+        }
+
+        public bool ApplyChillFpsCap(int fps)
+        {
+            if (!IsInitialized)
+                return false;
+
+            return Execute(() =>
+            {
+                if (fps <= 0)
+                {
+                    return ADLXBackend.SetChill(deviceIdx, false);
+                }
+
+                int clamped = Math.Clamp(fps, 30, 300);
+                // Safe Min<=Max ordering invariant for IADLX3DChill whether raising or lowering FPS cap
+                ADLXBackend.SetChillMaxFPS(deviceIdx, clamped);
+                ADLXBackend.SetChillMinFPS(deviceIdx, clamped);
+                ADLXBackend.SetChillMaxFPS(deviceIdx, clamped);
+                return ADLXBackend.SetChill(deviceIdx, true);
+            }, false);
+        }
+
         public bool SetAFMFAlgorithm(int algorithm)
         {
             if (!IsInitialized)

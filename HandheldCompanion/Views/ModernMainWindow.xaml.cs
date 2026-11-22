@@ -296,6 +296,7 @@ namespace HandheldCompanion.Views
             panelGraphics.Visibility = Visibility.Collapsed;
             panelPerformance.Visibility = Visibility.Collapsed;
             panelController.Visibility = Visibility.Collapsed;
+            panelTuning.Visibility = Visibility.Collapsed;
             panelSettings.Visibility = Visibility.Collapsed;
         }
 
@@ -306,6 +307,7 @@ namespace HandheldCompanion.Views
             panelGraphics.Visibility = Visibility.Visible;
             panelPerformance.Visibility = Visibility.Collapsed;
             panelController.Visibility = Visibility.Collapsed;
+            panelTuning.Visibility = Visibility.Collapsed;
             panelSettings.Visibility = Visibility.Collapsed;
             UpdateResolutionControls();
             RefreshPerformanceControls();
@@ -320,6 +322,7 @@ namespace HandheldCompanion.Views
             panelGraphics.Visibility = Visibility.Collapsed;
             panelPerformance.Visibility = Visibility.Visible;
             panelController.Visibility = Visibility.Collapsed;
+            panelTuning.Visibility = Visibility.Collapsed;
             panelSettings.Visibility = Visibility.Collapsed;
             RefreshPerformanceControls();
         }
@@ -331,9 +334,22 @@ namespace HandheldCompanion.Views
             panelGraphics.Visibility = Visibility.Collapsed;
             panelPerformance.Visibility = Visibility.Collapsed;
             panelController.Visibility = Visibility.Visible;
+            panelTuning.Visibility = Visibility.Collapsed;
             panelSettings.Visibility = Visibility.Collapsed;
             UpdateGyroStatus();
             UpdateLedControlsFromService();
+        }
+
+        private void NavTuning_Click(object sender, RoutedEventArgs e)
+        {
+            SetNavActive(navTuning);
+            panelGeneral.Visibility = Visibility.Collapsed;
+            panelGraphics.Visibility = Visibility.Collapsed;
+            panelPerformance.Visibility = Visibility.Collapsed;
+            panelController.Visibility = Visibility.Collapsed;
+            panelTuning.Visibility = Visibility.Visible;
+            panelSettings.Visibility = Visibility.Collapsed;
+            RefreshTuningControlsAsync();
         }
 
         private void NavSettings_Click(object sender, RoutedEventArgs e)
@@ -343,6 +359,7 @@ namespace HandheldCompanion.Views
             panelGraphics.Visibility = Visibility.Collapsed;
             panelPerformance.Visibility = Visibility.Collapsed;
             panelController.Visibility = Visibility.Collapsed;
+            panelTuning.Visibility = Visibility.Collapsed;
             panelSettings.Visibility = Visibility.Visible;
             RefreshBatteryLimitStatusAsync();
         }
@@ -357,12 +374,14 @@ namespace HandheldCompanion.Views
             navGraphics.Style = (navGraphics == activeBtn) ? activeStyle : normalStyle;
             navPerformance.Style = (navPerformance == activeBtn) ? activeStyle : normalStyle;
             navController.Style = (navController == activeBtn) ? activeStyle : normalStyle;
+            navTuning.Style = (navTuning == activeBtn) ? activeStyle : normalStyle;
             navSettings.Style = (navSettings == activeBtn) ? activeStyle : normalStyle;
 
             TouchHoverHelper.SetIsHovered(navGeneral, false);
             TouchHoverHelper.SetIsHovered(navGraphics, false);
             TouchHoverHelper.SetIsHovered(navPerformance, false);
             TouchHoverHelper.SetIsHovered(navController, false);
+            TouchHoverHelper.SetIsHovered(navTuning, false);
             TouchHoverHelper.SetIsHovered(navSettings, false);
         }
         #endregion
@@ -397,7 +416,103 @@ namespace HandheldCompanion.Views
                 if (!_isExiting)
                     Dispatcher.BeginInvoke(() => ApplyTdp(_currentTdp));
             };
+
+            // Real-time Legion L + Y hardware thermal mode shortcut listener (LENOVO_GAMEZONE_THERMAL_MODE_EVENT)
+            LegionGo.HardwareThermalModeChanged += (oemMode) =>
+            {
+                if (_isExiting) return;
+                Dispatcher.BeginInvoke(() =>
+                {
+                    int mappedTdp = oemMode switch
+                    {
+                        (int)LegionGo.LegionMode.Quiet => 10,
+                        (int)LegionGo.LegionMode.Balanced => 15,
+                        (int)LegionGo.LegionMode.Performance => 25,
+                        _ => _currentTdp
+                    };
+                    _currentTdp = mappedTdp;
+                    ManagerFactory.settingsManager.SetProperty("SelectedTdp", mappedTdp);
+                    UpdateTdpUi(mappedTdp);
+                });
+            };
+
+            chkThermalGuard90.IsChecked = ManagerFactory.settingsManager.GetBoolean("ThermalGuard90");
+            StartThermalGuardMonitor();
             SyncHardwareOnStartupAsync();
+        }
+
+        private System.Threading.Timer? _thermalGuardTimer;
+        private volatile bool _thermalGuardTriggered = false;
+        private string _fanModeBeforeThermalGuard = "Auto";
+
+        private void StartThermalGuardMonitor()
+        {
+            if (_thermalGuardTimer != null) return;
+            _thermalGuardTimer = new System.Threading.Timer(_ => PollThermalAndFanTelemetry(), null, 2500, 4000);
+        }
+
+        private void PollThermalAndFanTelemetry()
+        {
+            if (_isExiting) return;
+            try
+            {
+                if (IDevice.GetCurrent() is not LegionGo lego)
+                    return;
+
+                int cpuTemp = lego.GetCpuTemperature();
+                int gpuTemp = lego.GetGpuTemperature();
+                int fanRpm = lego.GetCpuFanSpeed();
+                int maxTemp = Math.Max(cpuTemp, gpuTemp);
+                bool guardEnabled = ManagerFactory.settingsManager.GetBoolean("ThermalGuard90");
+
+                if (guardEnabled && maxTemp >= 90 && !_thermalGuardTriggered)
+                {
+                    _thermalGuardTriggered = true;
+                    _fanModeBeforeThermalGuard = _currentFanMode;
+                    lego.SetFanFullSpeed(true);
+                    Dispatcher.BeginInvoke(() =>
+                    {
+                        if (!_isExiting)
+                            UpdateFanUi(isAuto: false, isFullSpeed: true, percentage: 100);
+                    });
+                }
+                else if (_thermalGuardTriggered && (!guardEnabled || (maxTemp > 0 && maxTemp <= 82)))
+                {
+                    _thermalGuardTriggered = false;
+                    string restore = _fanModeBeforeThermalGuard;
+                    Dispatcher.BeginInvoke(() =>
+                    {
+                        if (_isExiting) return;
+                        if (restore == "100") ApplyFanMode(false, true, 100);
+                        else if (restore == "Silent" || restore == "Cool") ApplyFanCurvePreset(restore);
+                        else if (int.TryParse(restore, out int p) && p > 0) ApplyFanMode(false, false, p);
+                        else ApplyFanMode(true, false, 0);
+                    });
+                }
+
+                if (IsVisible && WindowState != WindowState.Minimized && panelGeneral.Visibility == Visibility.Visible)
+                {
+                    Dispatcher.BeginInvoke(() =>
+                    {
+                        if (_isExiting) return;
+                        string tempStr = cpuTemp > 0
+                            ? (gpuTemp > 0 ? $"CPU: {cpuTemp}°C  |  GPU: {gpuTemp}°C" : $"APU Temp: {cpuTemp}°C")
+                            : "Temp: --";
+                        string rpmStr = fanRpm > 0 ? $"  |  Fan: {fanRpm} RPM" : "";
+                        string guardTag = _thermalGuardTriggered ? "  [90°C GUARD ACTIVE: 100%]" : "";
+                        txtFanLiveTelemetry.Text = tempStr + rpmStr + guardTag;
+                        txtFanLiveTelemetry.Foreground = (maxTemp >= 90 || _thermalGuardTriggered) ? BrushRed : BrushGreen;
+                    });
+                }
+            }
+            catch { }
+        }
+
+        private void ChkThermalGuard90_Click(object sender, RoutedEventArgs e)
+        {
+            bool enabled = chkThermalGuard90.IsChecked ?? false;
+            ManagerFactory.settingsManager.SetProperty("ThermalGuard90", enabled);
+            Task.Run(PollThermalAndFanTelemetry);
         }
 
         private void SyncHardwareOnStartupAsync()
@@ -575,6 +690,52 @@ namespace HandheldCompanion.Views
             }
         }
 
+        private void BtnFanCurve_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button b && b.Tag is string curveName)
+            {
+                ApplyFanCurvePreset(curveName);
+            }
+        }
+
+        private void ApplyFanCurvePreset(string curveName)
+        {
+            try
+            {
+                var activeStyle = (Style)FindResource("ActiveTouchButton");
+                var normalStyle = (Style)FindResource("TouchButton");
+
+                btnFanAuto.Style = normalStyle;
+                btnFanFull.Style = normalStyle;
+                btnFan50.Style = normalStyle;
+                btnFan70.Style = normalStyle;
+                btnFanSilent.Style = (curveName == "Silent") ? activeStyle : normalStyle;
+                btnFanCool.Style = (curveName == "Cool") ? activeStyle : normalStyle;
+                _currentFanMode = curveName;
+                ManagerFactory.settingsManager.SetProperty("FanMode", _currentFanMode);
+
+                Task.Run(() =>
+                {
+                    try
+                    {
+                        if (IDevice.GetCurrent() is LegionGo lego)
+                        {
+                            lego.SetFanFullSpeed(false);
+                            ushort[] table = curveName == "Silent"
+                                ? new ushort[] { 30, 35, 40, 45, 52, 60, 70, 82, 100, 100 }
+                                : new ushort[] { 50, 58, 65, 72, 80, 88, 95, 100, 100, 100 };
+                            lego.SetFanTable(new FanTable(table));
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        LogManager.LogError("Failed to apply Fan curve '{0}': {1}", curveName, ex.Message);
+                    }
+                });
+            }
+            catch { }
+        }
+
         private void UpdateFanUi(bool isAuto, bool isFullSpeed, int percentage)
         {
             var activeStyle = (Style)FindResource("ActiveTouchButton");
@@ -584,6 +745,8 @@ namespace HandheldCompanion.Views
             btnFanFull.Style = isFullSpeed ? activeStyle : normalStyle;
             btnFan50.Style = (!isAuto && !isFullSpeed && percentage == 50) ? activeStyle : normalStyle;
             btnFan70.Style = (!isAuto && !isFullSpeed && percentage == 70) ? activeStyle : normalStyle;
+            if (btnFanSilent != null) btnFanSilent.Style = normalStyle;
+            if (btnFanCool != null) btnFanCool.Style = normalStyle;
             _currentFanMode = isAuto ? "Auto" : (isFullSpeed ? "100" : percentage.ToString());
         }
 
@@ -958,6 +1121,10 @@ namespace HandheldCompanion.Views
                     supVivid = gpu.HasVividColorSupport();
                     if (supVivid) valVivid = gpu.GetVividColors();
 
+                    bool chillOn = gpu.GetChill();
+                    int chillFps = chillOn ? gpu.GetChillMaxFPS() : 0;
+                    _currentChillFps = chillOn && chillFps >= 30 ? chillFps : 0;
+
                     ready = supInt || supGpuScale || supScaleMode || supRsr || supAfmf || supSharp || supVivid;
                 }
                 catch { }
@@ -968,6 +1135,8 @@ namespace HandheldCompanion.Views
                     if (_isExiting) return;
                     var activeStyle = (Style)FindResource("ActiveTouchButton");
                     var normalStyle = (Style)FindResource("TouchButton");
+
+                    UpdateChillUi(_currentChillFps);
 
                     btnAdlxInteger.IsEnabled = supInt;
                     btnAdlxInteger.Content = valInt ? "Integer Scaling: On" : "Integer Scaling: Off";
@@ -1014,6 +1183,65 @@ namespace HandheldCompanion.Views
                     txtAdlxStatus.Foreground = ready ? BrushGreen : BrushGray;
                 });
             });
+        }
+
+        private int _currentChillFps = 0;
+
+        private void UpdateChillUi(int fps)
+        {
+            var activeStyle = (Style)FindResource("ActiveTouchButton");
+            var normalStyle = (Style)FindResource("TouchButton");
+
+            btnChillOff.Style = (fps <= 0) ? activeStyle : normalStyle;
+            btnChill30.Style = (fps == 30) ? activeStyle : normalStyle;
+            btnChill40.Style = (fps == 40) ? activeStyle : normalStyle;
+            btnChill45.Style = (fps == 45) ? activeStyle : normalStyle;
+            btnChill60.Style = (fps == 60) ? activeStyle : normalStyle;
+            btnChill72.Style = (fps == 72) ? activeStyle : normalStyle;
+            btnChill90.Style = (fps == 90) ? activeStyle : normalStyle;
+            btnChill120.Style = (fps == 120) ? activeStyle : normalStyle;
+            btnChill144.Style = (fps == 144) ? activeStyle : normalStyle;
+            txtChillCurrent.Text = fps <= 0 ? "Off" : $"{fps} FPS";
+        }
+
+        private void ApplyChillCap(int fps)
+        {
+            _currentChillFps = fps <= 0 ? 0 : Math.Clamp(fps, 30, 300);
+            UpdateChillUi(_currentChillFps);
+            int target = _currentChillFps;
+            GPUManager.ManualGraphicsOverride = true;
+            Task.Run(() =>
+            {
+                try
+                {
+                    if (GPUManager.GetCurrent() is AMDGPU gpu && gpu.IsInitialized)
+                    {
+                        gpu.ApplyChillFpsCap(target);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    LogManager.LogError("ApplyChillCap failed: {0}", ex.Message);
+                }
+            });
+        }
+
+        private void BtnChillPreset_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button b && b.Tag is string s && int.TryParse(s, out int fps))
+                ApplyChillCap(fps);
+        }
+
+        private void BtnChillMinus_Click(object sender, RoutedEventArgs e)
+        {
+            int next = _currentChillFps <= 30 ? 0 : _currentChillFps - 5;
+            ApplyChillCap(next);
+        }
+
+        private void BtnChillPlus_Click(object sender, RoutedEventArgs e)
+        {
+            int next = _currentChillFps <= 0 ? 60 : Math.Min(240, _currentChillFps + 5);
+            ApplyChillCap(next);
         }
 
         private volatile bool _adlxBusy = false;
@@ -1968,6 +2196,384 @@ namespace HandheldCompanion.Views
         }
         #endregion
 
+        #region Deadzones & Firmware Tuning View
+        private int _lStickDz = 4;
+        private int _rStickDz = 4;
+        private int _stickCurve = 1;
+        private int _trigStartDz = 5;
+        private int _trigMargin = 5;
+        private bool _trackpadEnabled = true;
+        private bool _trackpadVibEnabled = true;
+        private int _legionLrSwapMode = 1;
+        private int _mouseDpi = 800;
+        private int _autoSleepMins = 60;
+
+        private void RefreshTuningControlsAsync()
+        {
+            Task.Run(() =>
+            {
+                try
+                {
+                    Devices.Lenovo.SapientiaUsb.Init();
+                    int lDz = Math.Clamp(Devices.Lenovo.SapientiaUsb.GetStickCustomDeadzone(3), 0, 50);
+                    int rDz = Math.Clamp(Devices.Lenovo.SapientiaUsb.GetStickCustomDeadzone(4), 0, 50);
+                    int curve = Devices.Lenovo.SapientiaUsb.GetStickPresetCurve(3);
+                    if (curve < 1 || curve > 4) curve = 1;
+
+                    var trig = Devices.Lenovo.SapientiaUsb.GetTriggerDeadzoneAndMargin(4);
+                    int tDz = Math.Clamp(trig.Deadzone, 0, 80);
+                    int tMar = Math.Clamp(trig.Margin, 0, 80);
+
+                    int tpState = Devices.Lenovo.SapientiaUsb.GetTouchPadStatus();
+                    int tpVib = Devices.Lenovo.SapientiaUsb.GetTouchpadVibrateState(4);
+                    int lrSwap = Devices.Lenovo.SapientiaUsb.GetLegionLRAndMenuViewMode(3);
+                    int dpi = Devices.Lenovo.SapientiaUsb.GetMouseCurrentDPI(4);
+                    int sleep = Devices.Lenovo.SapientiaUsb.GetAutoSleepTime(3);
+
+                    _lStickDz = lDz;
+                    _rStickDz = rDz;
+                    _stickCurve = curve;
+                    _trigStartDz = tDz;
+                    _trigMargin = tMar;
+                    _trackpadEnabled = tpState != 0 || !(IDevice.GetCurrent() is LegionGo lg && lg.ToString().Length < 0);
+                    _trackpadVibEnabled = tpVib != 0;
+                    _legionLrSwapMode = lrSwap == 2 ? 2 : 1;
+                    if (dpi >= 400 && dpi <= 3200) _mouseDpi = dpi;
+                    if (sleep >= 0 && sleep <= 120) _autoSleepMins = sleep;
+
+                    if (_isExiting) return;
+                    Dispatcher.BeginInvoke(UpdateTuningUi);
+                }
+                catch { }
+            });
+        }
+
+        private void UpdateTuningUi()
+        {
+            var activeStyle = (Style)FindResource("ActiveTouchButton");
+            var normalStyle = (Style)FindResource("TouchButton");
+
+            // Left Stick Deadzone
+            btnLStickDz0.Style = (_lStickDz == 0) ? activeStyle : normalStyle;
+            btnLStickDz2.Style = (_lStickDz == 2) ? activeStyle : normalStyle;
+            btnLStickDz4.Style = (_lStickDz == 4) ? activeStyle : normalStyle;
+            btnLStickDz8.Style = (_lStickDz == 8) ? activeStyle : normalStyle;
+            btnLStickDz12.Style = (_lStickDz == 12) ? activeStyle : normalStyle;
+            txtLStickDz.Text = $"{_lStickDz}%";
+
+            // Right Stick Deadzone
+            btnRStickDz0.Style = (_rStickDz == 0) ? activeStyle : normalStyle;
+            btnRStickDz2.Style = (_rStickDz == 2) ? activeStyle : normalStyle;
+            btnRStickDz4.Style = (_rStickDz == 4) ? activeStyle : normalStyle;
+            btnRStickDz8.Style = (_rStickDz == 8) ? activeStyle : normalStyle;
+            btnRStickDz12.Style = (_rStickDz == 12) ? activeStyle : normalStyle;
+            txtRStickDz.Text = $"{_rStickDz}%";
+
+            // Stick Curve
+            btnCurve1.Style = (_stickCurve == 1) ? activeStyle : normalStyle;
+            btnCurve2.Style = (_stickCurve == 2) ? activeStyle : normalStyle;
+            btnCurve3.Style = (_stickCurve == 3) ? activeStyle : normalStyle;
+            btnCurve4.Style = (_stickCurve == 4) ? activeStyle : normalStyle;
+
+            // Triggers
+            int fullPullPct = Math.Clamp(100 - _trigMargin, 20, 100);
+            txtTrigStartDz.Text = $"{_trigStartDz}%";
+            txtTrigFullPull.Text = $"{fullPullPct}%";
+            btnTrigHair.Style = (_trigStartDz == 0 && _trigMargin == 65) ? activeStyle : normalStyle;
+            btnTrigFast.Style = (_trigStartDz == 2 && _trigMargin == 35) ? activeStyle : normalStyle;
+            btnTrigDefault.Style = (_trigStartDz == 5 && _trigMargin == 5) ? activeStyle : normalStyle;
+            btnTrigFull.Style = (_trigStartDz == 0 && _trigMargin == 0) ? activeStyle : normalStyle;
+
+            // Trackpad & Button Swap
+            btnTrackpadToggle.Content = _trackpadEnabled ? "Trackpad: Enabled" : "Trackpad: Disabled";
+            btnTrackpadToggle.Style = _trackpadEnabled ? activeStyle : normalStyle;
+
+            btnTrackpadVibToggle.Content = _trackpadVibEnabled ? "Trackpad Haptics: On" : "Trackpad Haptics: Off";
+            btnTrackpadVibToggle.Style = _trackpadVibEnabled ? activeStyle : normalStyle;
+
+            bool swapped = _legionLrSwapMode == 2;
+            btnSwapLegionButtons.Content = swapped ? "Legion L/R Swap: Swapped" : "Legion L/R Swap: Normal";
+            btnSwapLegionButtons.Style = swapped ? activeStyle : normalStyle;
+
+            // FPS Mouse DPI
+            btnDpi500.Style = (_mouseDpi == 500) ? activeStyle : normalStyle;
+            btnDpi800.Style = (_mouseDpi == 800) ? activeStyle : normalStyle;
+            btnDpi1200.Style = (_mouseDpi == 1200) ? activeStyle : normalStyle;
+            btnDpi1600.Style = (_mouseDpi == 1600) ? activeStyle : normalStyle;
+            btnDpi1800.Style = (_mouseDpi == 1800) ? activeStyle : normalStyle;
+
+            // Auto-Sleep
+            btnSleep10.Style = (_autoSleepMins >= 8 && _autoSleepMins <= 12) ? activeStyle : normalStyle;
+            btnSleep15.Style = (_autoSleepMins >= 13 && _autoSleepMins <= 20) ? activeStyle : normalStyle;
+            btnSleep30.Style = (_autoSleepMins >= 25 && _autoSleepMins <= 35) ? activeStyle : normalStyle;
+            btnSleep60.Style = (_autoSleepMins >= 50) ? activeStyle : normalStyle;
+            btnSleep0.Style = (_autoSleepMins == 0) ? activeStyle : normalStyle;
+        }
+
+        private void ApplyLeftStickDeadzone(int dz)
+        {
+            _lStickDz = Math.Clamp(dz, 0, 40);
+            UpdateTuningUi();
+            int target = _lStickDz;
+            Task.Run(() =>
+            {
+                try
+                {
+                    Devices.Lenovo.SapientiaUsb.Init();
+                    Devices.Lenovo.SapientiaUsb.SetStickCustomDeadzone(3, target);
+                }
+                catch { }
+            });
+        }
+
+        private void ApplyRightStickDeadzone(int dz)
+        {
+            _rStickDz = Math.Clamp(dz, 0, 40);
+            UpdateTuningUi();
+            int target = _rStickDz;
+            Task.Run(() =>
+            {
+                try
+                {
+                    Devices.Lenovo.SapientiaUsb.Init();
+                    Devices.Lenovo.SapientiaUsb.SetStickCustomDeadzone(4, target);
+                }
+                catch { }
+            });
+        }
+
+        private void BtnLStickDzPreset_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button b && b.Tag is string s && int.TryParse(s, out int dz))
+                ApplyLeftStickDeadzone(dz);
+        }
+        private void BtnLStickDzMinus_Click(object sender, RoutedEventArgs e) => ApplyLeftStickDeadzone(_lStickDz - 1);
+        private void BtnLStickDzPlus_Click(object sender, RoutedEventArgs e) => ApplyLeftStickDeadzone(_lStickDz + 1);
+
+        private void BtnRStickDzPreset_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button b && b.Tag is string s && int.TryParse(s, out int dz))
+                ApplyRightStickDeadzone(dz);
+        }
+        private void BtnRStickDzMinus_Click(object sender, RoutedEventArgs e) => ApplyRightStickDeadzone(_rStickDz - 1);
+        private void BtnRStickDzPlus_Click(object sender, RoutedEventArgs e) => ApplyRightStickDeadzone(_rStickDz + 1);
+
+        private void BtnStickCurve_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button b && b.Tag is string s && int.TryParse(s, out int preset))
+            {
+                _stickCurve = Math.Clamp(preset, 1, 4);
+                UpdateTuningUi();
+                int target = _stickCurve;
+                Task.Run(() =>
+                {
+                    try
+                    {
+                        Devices.Lenovo.SapientiaUsb.Init();
+                        Devices.Lenovo.SapientiaUsb.SetStickPresetCurve(3, target);
+                        Devices.Lenovo.SapientiaUsb.SetStickPresetCurve(4, target);
+                    }
+                    catch { }
+                });
+            }
+        }
+
+        private void ApplyTriggerDeadzones(int startDz, int margin)
+        {
+            _trigStartDz = Math.Clamp(startDz, 0, 60);
+            _trigMargin = Math.Clamp(margin, 0, 75);
+            if (_trigStartDz + _trigMargin > 80)
+                _trigMargin = 80 - _trigStartDz;
+            UpdateTuningUi();
+
+            var cfg = new Devices.Lenovo.SapientiaUsb.LegionTriggerDeadzone
+            {
+                Deadzone = _trigStartDz,
+                Margin = _trigMargin
+            };
+            Task.Run(() =>
+            {
+                try
+                {
+                    Devices.Lenovo.SapientiaUsb.Init();
+                    Devices.Lenovo.SapientiaUsb.SetTriggerDeadzoneAndMargin(3, cfg);
+                    Devices.Lenovo.SapientiaUsb.SetTriggerDeadzoneAndMargin(4, cfg);
+                }
+                catch { }
+            });
+        }
+
+        private void BtnTriggerPreset_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button b && b.Tag is string s)
+            {
+                var parts = s.Split(',');
+                if (parts.Length == 2 && int.TryParse(parts[0], out int dz) && int.TryParse(parts[1], out int mar))
+                    ApplyTriggerDeadzones(dz, mar);
+            }
+        }
+
+        private void BtnTrigDzMinus_Click(object sender, RoutedEventArgs e) => ApplyTriggerDeadzones(_trigStartDz - 1, _trigMargin);
+        private void BtnTrigDzPlus_Click(object sender, RoutedEventArgs e) => ApplyTriggerDeadzones(_trigStartDz + 1, _trigMargin);
+        private void BtnTrigMaxMinus_Click(object sender, RoutedEventArgs e) => ApplyTriggerDeadzones(_trigStartDz, _trigMargin + 5);
+        private void BtnTrigMaxPlus_Click(object sender, RoutedEventArgs e) => ApplyTriggerDeadzones(_trigStartDz, _trigMargin - 5);
+
+        private void BtnTrackpadToggle_Click(object sender, RoutedEventArgs e)
+        {
+            _trackpadEnabled = !_trackpadEnabled;
+            UpdateTuningUi();
+            bool en = _trackpadEnabled;
+            Task.Run(() =>
+            {
+                try
+                {
+                    if (IDevice.GetCurrent() is LegionGo lego)
+                        lego.SetPassthrough(!en);
+                    Devices.Lenovo.SapientiaUsb.Init();
+                    Devices.Lenovo.SapientiaUsb.SetTouchPadStatus(en ? 1 : 0);
+                    Devices.Lenovo.SapientiaUsb.SetTrackpadStatus(4, en ? 1 : 0);
+                }
+                catch { }
+            });
+        }
+
+        private void BtnTrackpadVibToggle_Click(object sender, RoutedEventArgs e)
+        {
+            _trackpadVibEnabled = !_trackpadVibEnabled;
+            UpdateTuningUi();
+            int state = _trackpadVibEnabled ? 1 : 0;
+            Task.Run(() =>
+            {
+                try
+                {
+                    Devices.Lenovo.SapientiaUsb.Init();
+                    Devices.Lenovo.SapientiaUsb.SetTouchpadVibrateState(4, state);
+                }
+                catch { }
+            });
+        }
+
+        private void BtnSwapLegionButtons_Click(object sender, RoutedEventArgs e)
+        {
+            _legionLrSwapMode = (_legionLrSwapMode == 2) ? 1 : 2;
+            UpdateTuningUi();
+            int mode = _legionLrSwapMode;
+            Task.Run(() =>
+            {
+                try
+                {
+                    Devices.Lenovo.SapientiaUsb.Init();
+                    Devices.Lenovo.SapientiaUsb.SetLegionLRAndMenuViewMode(3, mode);
+                    Devices.Lenovo.SapientiaUsb.SetLegionLRAndMenuViewMode(4, mode);
+                }
+                catch { }
+            });
+        }
+
+        private void BtnMouseDpi_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button b && b.Tag is string s && int.TryParse(s, out int dpi))
+            {
+                _mouseDpi = dpi;
+                UpdateTuningUi();
+                Task.Run(() =>
+                {
+                    try
+                    {
+                        Devices.Lenovo.SapientiaUsb.Init();
+                        Devices.Lenovo.SapientiaUsb.SetMouseDPI(4, dpi);
+                    }
+                    catch { }
+                });
+            }
+        }
+
+        private void BtnAutoSleep_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button b && b.Tag is string s && int.TryParse(s, out int mins))
+            {
+                _autoSleepMins = mins;
+                UpdateTuningUi();
+                Task.Run(() =>
+                {
+                    try
+                    {
+                        Devices.Lenovo.SapientiaUsb.Init();
+                        Devices.Lenovo.SapientiaUsb.SetAutoSleepTime(3, mins);
+                        Devices.Lenovo.SapientiaUsb.SetAutoSleepTime(4, mins);
+                    }
+                    catch { }
+                });
+            }
+        }
+
+        private async void BtnCalibrateSticks_Click(object sender, RoutedEventArgs e)
+        {
+            btnCalSticks.IsEnabled = false;
+            txtCalibrationStatus.Text = "Calibrating Sticks (5s): Rotate both thumbsticks in full circles 3 times, then release...";
+            txtCalibrationStatus.Foreground = BrushGreen;
+            await Task.Run(() =>
+            {
+                try
+                {
+                    Devices.Lenovo.SapientiaUsb.Init();
+                    Devices.Lenovo.SapientiaUsb.StartStickCalibration(3);
+                    Devices.Lenovo.SapientiaUsb.StartStickCalibration(4);
+                    Thread.Sleep(5000);
+                    Devices.Lenovo.SapientiaUsb.StopStickCalibration(3);
+                    Devices.Lenovo.SapientiaUsb.StopStickCalibration(4);
+                }
+                catch { }
+            });
+            txtCalibrationStatus.Text = "Thumbstick calibration complete!";
+            btnCalSticks.IsEnabled = true;
+        }
+
+        private async void BtnCalibrateTriggers_Click(object sender, RoutedEventArgs e)
+        {
+            btnCalTriggers.IsEnabled = false;
+            txtCalibrationStatus.Text = "Calibrating Triggers (5s): Press LT and RT all the way down 3 times, then release...";
+            txtCalibrationStatus.Foreground = BrushGreen;
+            await Task.Run(() =>
+            {
+                try
+                {
+                    Devices.Lenovo.SapientiaUsb.Init();
+                    Devices.Lenovo.SapientiaUsb.StartTriggerCalibration(3);
+                    Devices.Lenovo.SapientiaUsb.StartTriggerCalibration(4);
+                    Thread.Sleep(5000);
+                    Devices.Lenovo.SapientiaUsb.StopTriggerCalibration(3);
+                    Devices.Lenovo.SapientiaUsb.StopTriggerCalibration(4);
+                }
+                catch { }
+            });
+            txtCalibrationStatus.Text = "Trigger calibration complete!";
+            btnCalTriggers.IsEnabled = true;
+        }
+
+        private async void BtnCalibrateGyro_Click(object sender, RoutedEventArgs e)
+        {
+            btnCalGyro.IsEnabled = false;
+            txtCalibrationStatus.Text = "Calibrating Gyro (3s): Keep the device completely still on a flat surface...";
+            txtCalibrationStatus.Foreground = BrushGreen;
+            await Task.Run(() =>
+            {
+                try
+                {
+                    Devices.Lenovo.SapientiaUsb.Init();
+                    Devices.Lenovo.SapientiaUsb.StartGyroCalibration(3);
+                    Devices.Lenovo.SapientiaUsb.StartGyroCalibration(4);
+                    Thread.Sleep(3000);
+                    Devices.Lenovo.SapientiaUsb.StopGyroCalibration(3);
+                    Devices.Lenovo.SapientiaUsb.StopGyroCalibration(4);
+                }
+                catch { }
+            });
+            txtCalibrationStatus.Text = "Gyroscope calibration complete!";
+            btnCalGyro.IsEnabled = true;
+        }
+        #endregion
+
         #region Settings View (Hardware, Utilities, Updates)
         private void InitializeSettingsView()
         {
@@ -1976,6 +2582,37 @@ namespace HandheldCompanion.Views
             chkRunAtStartup.IsChecked = ManagerFactory.settingsManager.GetBoolean("RunAtStartup");
             chkStartMinimized.IsChecked = ManagerFactory.settingsManager.GetBoolean("StartMinimized");
             chkDesktopOnStart.IsChecked = ManagerFactory.settingsManager.GetBoolean("DesktopLayoutOnStart");
+        }
+
+        private void ChkPowerLight_Click(object sender, RoutedEventArgs e)
+        {
+            bool enabled = chkPowerLight.IsChecked ?? true;
+            Task.Run(() =>
+            {
+                try
+                {
+                    if (IDevice.GetCurrent() is LegionGo lego)
+                        lego.SetPowerLightStatus(enabled);
+                }
+                catch { }
+            });
+        }
+
+        private void BtnOpenRealtek_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = "explorer.exe",
+                    Arguments = @"shell:AppsFolder\RealtekSemiconductorCorp.RealtekAudioControl_dt26b99r8h8gj!App",
+                    UseShellExecute = true
+                });
+            }
+            catch (Exception ex)
+            {
+                LogManager.LogError("Failed to open Realtek Audio Control: {0}", ex.Message);
+            }
         }
 
         private void ChkBatteryLimit_Click(object sender, RoutedEventArgs e)
@@ -2007,10 +2644,12 @@ namespace HandheldCompanion.Views
                     if (IDevice.GetCurrent() is LegionGo lego)
                     {
                         bool active = lego.GetBatteryChargeLimit();
+                        bool pwrLight = lego.GetPowerLightStatus();
                         Dispatcher.BeginInvoke(() =>
                         {
                             if (_isExiting) return;
                             chkBatteryLimit.IsChecked = active;
+                            if (chkPowerLight != null) chkPowerLight.IsChecked = pwrLight;
                             txtBatteryLimitStatus.Text = active
                                 ? "Hardware Status: Active (Charging capped at 80%)"
                                 : "Hardware Status: Inactive (Charges to 100%)";
@@ -2418,6 +3057,7 @@ namespace HandheldCompanion.Views
         private void FinishExitApplication(bool restart)
         {
             try { _diagnosticsTimer?.Stop(); } catch { }
+            try { _thermalGuardTimer?.Dispose(); _thermalGuardTimer = null; } catch { }
             try { this.Hide(); } catch { }
             try { Program.SingleInstanceMutex?.ReleaseMutex(); Program.SingleInstanceMutex?.Dispose(); } catch { }
             try { _showWindowEvent?.Set(); _showWindowEvent?.Dispose(); } catch { }

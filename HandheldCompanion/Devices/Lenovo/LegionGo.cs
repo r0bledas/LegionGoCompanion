@@ -222,6 +222,143 @@ public class LegionGo : IDevice
             LogManager.LogError("Error in SetBatteryChargeLimit: {0}, Enabled: {1}", ex.Message, enabled);
         }
     }
+
+    public int GetCpuTemperature()
+    {
+        try
+        {
+            int val = WMI.Call<int>("root\\WMI",
+                "SELECT * FROM LENOVO_OTHER_METHOD",
+                "GetFeatureValue",
+                new() { { "IDs", (int)CapabilityID.CpuCurrentTemperature } },
+                pdc => Convert.ToInt32(pdc["Value"].Value));
+            if (val > 0 && val < 130) return val;
+        }
+        catch { }
+
+        try
+        {
+            using var searcher = new System.Management.ManagementObjectSearcher("root\\WMI", "SELECT CurrentTemperature FROM MSAcpi_ThermalZoneTemperature");
+            foreach (System.Management.ManagementObject obj in searcher.Get())
+            {
+                int raw = Convert.ToInt32(obj["CurrentTemperature"]);
+                int c = (raw - 2732) / 10;
+                if (c > 0 && c < 130) return c;
+            }
+        }
+        catch { }
+        return 0;
+    }
+
+    public int GetGpuTemperature()
+    {
+        try
+        {
+            int val = WMI.Call<int>("root\\WMI",
+                "SELECT * FROM LENOVO_OTHER_METHOD",
+                "GetFeatureValue",
+                new() { { "IDs", (int)CapabilityID.GpuCurrentTemperature } },
+                pdc => Convert.ToInt32(pdc["Value"].Value));
+            if (val > 0 && val < 130) return val;
+        }
+        catch { }
+        return 0;
+    }
+
+    public int GetCpuFanSpeed()
+    {
+        try
+        {
+            int val = WMI.Call<int>("root\\WMI",
+                "SELECT * FROM LENOVO_OTHER_METHOD",
+                "GetFeatureValue",
+                new() { { "IDs", (int)CapabilityID.CpuCurrentFanSpeed } },
+                pdc => Convert.ToInt32(pdc["Value"].Value));
+            if (val >= 0) return val;
+        }
+        catch { }
+        return 0;
+    }
+
+    public bool GetPowerLightStatus()
+    {
+        try
+        {
+            return WMI.Call<bool>("root\\WMI",
+                "SELECT * FROM LENOVO_LIGHTING_METHOD",
+                "Get_Lighting_Current_Status",
+                new() { { "Lighting_ID", 1 } },
+                pdc => Convert.ToInt32(pdc["Current_State_Type"].Value) != 0);
+        }
+        catch { return true; }
+    }
+
+    public void SetPowerLightStatus(bool enabled)
+    {
+        try
+        {
+            WMI.Call("root\\WMI",
+                "SELECT * FROM LENOVO_LIGHTING_METHOD",
+                "Set_Lighting_Current_Status",
+                new()
+                {
+                    { "Lighting_ID", 1 },
+                    { "Current_State_Type", enabled ? 1 : 0 },
+                    { "Current_Brightness_Level", enabled ? 100 : 0 }
+                });
+        }
+        catch (Exception ex)
+        {
+            LogManager.LogError("Error in SetPowerLightStatus: {0}", ex.Message);
+        }
+    }
+
+    public static event Action<int>? HardwareThermalModeChanged;
+    private System.Management.ManagementEventWatcher? _thermalEventWatcher;
+
+    private void StartThermalEventWatcher()
+    {
+        if (_thermalEventWatcher != null) return;
+        try
+        {
+            var query = new System.Management.WqlEventQuery("SELECT * FROM LENOVO_GAMEZONE_THERMAL_MODE_EVENT");
+            _thermalEventWatcher = new System.Management.ManagementEventWatcher(new System.Management.ManagementScope("root\\WMI"), query);
+            _thermalEventWatcher.EventArrived += (_, e) =>
+            {
+                try
+                {
+                    int mode = -1;
+                    try
+                    {
+                        if (e.NewEvent?.Properties["mode"]?.Value != null)
+                            mode = Convert.ToInt32(e.NewEvent.Properties["mode"].Value);
+                    }
+                    catch { }
+                    if (mode <= 0)
+                        mode = GetSmartFanMode();
+                    if (mode > 0)
+                        HardwareThermalModeChanged?.Invoke(mode);
+                }
+                catch { }
+            };
+            _thermalEventWatcher.Start();
+        }
+        catch (Exception ex)
+        {
+            LogManager.LogWarning("Could not start LENOVO_GAMEZONE_THERMAL_MODE_EVENT watcher: {0}", ex.Message);
+        }
+    }
+
+    private void StopThermalEventWatcher()
+    {
+        try
+        {
+            _thermalEventWatcher?.Stop();
+            _thermalEventWatcher?.Dispose();
+        }
+        catch { }
+        _thermalEventWatcher = null;
+    }
     #endregion
 
     protected byte ClampByte(int v) => (byte)Math.Max(0, Math.Min(255, v));
@@ -328,12 +465,15 @@ public class LegionGo : IDevice
     {
         // initialize SapientiaUsb
         Init();
+        StartThermalEventWatcher();
 
         return base.Open();
     }
 
     public override void Close()
     {
+        StopThermalEventWatcher();
+
         // Restore default touchpad behavior BEFORE disposing HID handles so the write succeeds
         try { SetPassthrough(false); } catch { }
 
