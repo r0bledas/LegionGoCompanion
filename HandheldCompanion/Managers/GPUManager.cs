@@ -490,7 +490,7 @@ namespace HandheldCompanion.Managers
 
         private void CurrentGPU_RSRStateChanged(bool Supported, bool Enabled, int Sharpness)
         {
-            if (!IsReady || !_gpuManagementEnabled)
+            if (!IsReady || !_gpuManagementEnabled || ManualGraphicsOverride)
                 return;
 
             // todo: use ProfileManager events
@@ -506,7 +506,7 @@ namespace HandheldCompanion.Managers
 
         private void CurrentGPU_AFMFStateChanged(bool Supported, bool Enabled)
         {
-            if (!IsReady || !_gpuManagementEnabled)
+            if (!IsReady || !_gpuManagementEnabled || ManualGraphicsOverride)
                 return;
 
             // todo: use ProfileManager events
@@ -520,7 +520,7 @@ namespace HandheldCompanion.Managers
 
         private void CurrentGPU_AFMF21StateChanged(bool AlgorithmSupported, int Algorithm, int SearchMode, int PerformanceMode, int FastMotionResponse)
         {
-            if (!IsReady || !_gpuManagementEnabled)
+            if (!IsReady || !_gpuManagementEnabled || ManualGraphicsOverride)
                 return;
 
             // todo: use ProfileManager events
@@ -540,7 +540,7 @@ namespace HandheldCompanion.Managers
 
         private void CurrentGPU_IntegerScalingChanged(bool Supported, bool Enabled)
         {
-            if (!IsReady || !_gpuManagementEnabled)
+            if (!IsReady || !_gpuManagementEnabled || ManualGraphicsOverride)
                 return;
 
             // todo: use ProfileManager events
@@ -554,7 +554,7 @@ namespace HandheldCompanion.Managers
 
         private void CurrentGPU_GPUScalingChanged(bool Supported, bool Enabled, int Mode)
         {
-            if (!IsReady || !_gpuManagementEnabled)
+            if (!IsReady || !_gpuManagementEnabled || ManualGraphicsOverride)
                 return;
 
             // todo: use ProfileManager events
@@ -585,7 +585,7 @@ namespace HandheldCompanion.Managers
 
         private void CurrentGPU_ImageSharpeningChanged(bool Enabled, int Sharpness)
         {
-            if (!IsReady || !_gpuManagementEnabled)
+            if (!IsReady || !_gpuManagementEnabled || ManualGraphicsOverride)
                 return;
 
             // todo: use ProfileManager events
@@ -599,7 +599,7 @@ namespace HandheldCompanion.Managers
                 currentGPU.SetImageSharpeningSharpness(Sharpness);
         }
 
-        public static volatile bool ManualGraphicsOverride = false;
+        public static volatile bool ManualGraphicsOverride = true;
 
         private void ProfileManager_Applied(Profile? profile, UpdateSource source)
         {
@@ -702,7 +702,7 @@ namespace HandheldCompanion.Managers
             if (!IsReady || currentGPU is null || profile is null)
                 return;
 
-            if (!_gpuManagementEnabled)
+            if (!_gpuManagementEnabled || ManualGraphicsOverride)
                 return;
 
             // don't bother discarding settings, new one will be enforce shortly

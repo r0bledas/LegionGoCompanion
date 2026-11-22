@@ -927,28 +927,47 @@ namespace HandheldCompanion.Views
             });
         }
 
+        private volatile bool _adlxBusy = false;
+
         private void BtnScalingMode_Click(object sender, RoutedEventArgs e)
         {
+            if (_adlxBusy)
+                return;
             if (!ADLXBackend.IsInitialized || GPUManager.GetCurrent() is not AMDGPU gpu || !gpu.IsInitialized)
                 return;
             if (sender is not Button b || b.Tag is not string s || !int.TryParse(s, out int mode))
                 return;
 
             GPUManager.ManualGraphicsOverride = true;
+            _adlxBusy = true;
             Task.Run(() =>
             {
                 try
                 {
+                    var profile = ManagerFactory.profileManager?.GetCurrent();
                     if (gpu.HasIntegerScalingSupport() && gpu.GetIntegerScaling())
+                    {
                         gpu.SetIntegerScaling(false);
+                        if (profile is not null) profile.IntegerScalingEnabled = false;
+                        Thread.Sleep(200);
+                    }
                     if (gpu.HasGPUScalingSupport() && !gpu.GetGPUScaling())
+                    {
                         gpu.SetGPUScaling(true);
+                        if (profile is not null) profile.GPUScaling = true;
+                        Thread.Sleep(200);
+                    }
                     gpu.SetScalingMode(mode);
-                    Thread.Sleep(150);
+                    if (profile is not null) profile.ScalingMode = mode;
+                    Thread.Sleep(350);
                 }
                 catch (Exception ex)
                 {
                     LogManager.LogError("ADLX SetScalingMode({0}) failed: {1}", mode, ex.Message);
+                }
+                finally
+                {
+                    _adlxBusy = false;
                 }
                 RefreshAdlxControlsAsync();
             });
@@ -956,16 +975,20 @@ namespace HandheldCompanion.Views
 
         private void BtnAdlxToggle_Click(object sender, RoutedEventArgs e)
         {
+            if (_adlxBusy)
+                return;
             if (!ADLXBackend.IsInitialized || GPUManager.GetCurrent() is not AMDGPU gpu || !gpu.IsInitialized)
                 return;
             if (sender is not Button b || b.Tag is not string feature)
                 return;
 
             GPUManager.ManualGraphicsOverride = true;
+            _adlxBusy = true;
             Task.Run(() =>
             {
                 try
                 {
+                    var profile = ManagerFactory.profileManager?.GetCurrent();
                     switch (feature)
                     {
                         case "IntegerScaling":
@@ -974,13 +997,23 @@ namespace HandheldCompanion.Views
                             {
                                 // Turning ON: disable mutually-exclusive RSR and ensure GPU Scaling is ON first
                                 if (gpu.HasRSRSupport() && gpu.GetRSR())
+                                {
                                     gpu.SetRSR(false);
+                                    if (profile is not null) profile.RSREnabled = false;
+                                    Thread.Sleep(150);
+                                }
                                 if (gpu.HasGPUScalingSupport() && !gpu.GetGPUScaling())
+                                {
                                     gpu.SetGPUScaling(true);
+                                    if (profile is not null) profile.GPUScaling = true;
+                                    Thread.Sleep(250);
+                                }
+                                if (profile is not null) profile.IntegerScalingEnabled = true;
                                 gpu.SetIntegerScaling(true);
                             }
                             else
                             {
+                                if (profile is not null) profile.IntegerScalingEnabled = false;
                                 gpu.SetIntegerScaling(false);
                             }
                             break;
@@ -990,32 +1023,51 @@ namespace HandheldCompanion.Views
                             {
                                 // Turning OFF: must disable Integer Scaling first or AMD rejects disabling GPU Scaling
                                 if (gpu.HasIntegerScalingSupport() && gpu.GetIntegerScaling())
+                                {
+                                    if (profile is not null) profile.IntegerScalingEnabled = false;
                                     gpu.SetIntegerScaling(false);
+                                    Thread.Sleep(200);
+                                }
+                                if (profile is not null) profile.GPUScaling = false;
                                 gpu.SetGPUScaling(false);
                             }
                             else
                             {
+                                if (profile is not null) profile.GPUScaling = true;
                                 gpu.SetGPUScaling(true);
                             }
                             break;
                         case "FSR":
                             bool curRsr = gpu.GetRSR();
                             if (!curRsr && gpu.HasIntegerScalingSupport() && gpu.GetIntegerScaling())
+                            {
+                                if (profile is not null) profile.IntegerScalingEnabled = false;
                                 gpu.SetIntegerScaling(false);
+                                Thread.Sleep(200);
+                            }
+                            if (profile is not null) profile.RSREnabled = !curRsr;
                             gpu.SetRSR(!curRsr);
                             break;
                         case "AFMF":
-                            gpu.SetAFMF(!gpu.GetAFMF());
+                            bool nextAfmf = !gpu.GetAFMF();
+                            if (profile is not null) profile.AFMFEnabled = nextAfmf;
+                            gpu.SetAFMF(nextAfmf);
                             break;
                         case "Sharpen":
-                            gpu.SetImageSharpening(!gpu.GetImageSharpening());
+                            bool nextSharp = !gpu.GetImageSharpening();
+                            if (profile is not null) profile.RISEnabled = nextSharp;
+                            gpu.SetImageSharpening(nextSharp);
                             break;
                     }
-                    Thread.Sleep(150);
+                    Thread.Sleep(350);
                 }
                 catch (Exception ex)
                 {
                     LogManager.LogError("ADLX toggle '{0}' failed: {1}", feature, ex.Message);
+                }
+                finally
+                {
+                    _adlxBusy = false;
                 }
 
                 RefreshAdlxControlsAsync();
@@ -1915,6 +1967,11 @@ namespace HandheldCompanion.Views
 
                 txtHidHideStatus.Text = hidHideOk ? "HidHide: OK" : "HidHide: Missing";
                 txtHidHideStatus.Foreground = hidHideOk ? BrushGreen : BrushRed;
+
+                if (panelGraphics.Visibility == Visibility.Visible && !_adlxBusy)
+                {
+                    RefreshAdlxControlsAsync();
+                }
             }
             catch { }
         }
