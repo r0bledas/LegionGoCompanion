@@ -18,6 +18,7 @@ using GregsStack.InputSimulatorStandard.Native;
 using HandheldCompanion.ADLX;
 using HandheldCompanion.Devices;
 using HandheldCompanion.Devices.Lenovo;
+using HandheldCompanion.GraphicsProcessingUnit;
 using HandheldCompanion.Inputs;
 using HandheldCompanion.Managers;
 using HandheldCompanion.Shared;
@@ -829,7 +830,7 @@ namespace HandheldCompanion.Views
 
         private void RefreshAdlxControlsAsync()
         {
-            if (!ADLXBackend.IsInitialized)
+            if (!ADLXBackend.IsInitialized || GPUManager.GetCurrent() is not AMDGPU amdGpu || !amdGpu.IsInitialized)
             {
                 btnAdlxInteger.IsEnabled = false;
                 btnAdlxGpuScale.IsEnabled = false;
@@ -846,37 +847,39 @@ namespace HandheldCompanion.Views
 
             Task.Run(() =>
             {
-                if (!ADLXBackend.IsInitialized) return;
+                if (!ADLXBackend.IsInitialized || GPUManager.GetCurrent() is not AMDGPU gpu || !gpu.IsInitialized)
+                    return;
+
                 bool ready = false;
                 bool supInt = false, valInt = false;
                 bool supGpuScale = false, valGpuScale = false;
                 bool supScaleMode = false;
                 int valScaleMode = -1;
-                bool supFsr = false, valFsr = false;
+                bool supRsr = false, valRsr = false;
                 bool supAfmf = false, valAfmf = false;
                 bool supSharp = false, valSharp = false;
 
                 try
                 {
-                    supInt = ADLXBackend.HasIntegerScalingSupport(0);
-                    if (supInt) valInt = ADLXBackend.GetIntegerScaling(0);
+                    supInt = gpu.HasIntegerScalingSupport();
+                    if (supInt) valInt = gpu.GetIntegerScaling();
 
-                    supGpuScale = ADLXBackend.HasGPUScalingSupport(0);
-                    if (supGpuScale) valGpuScale = ADLXBackend.GetGPUScaling(0);
+                    supGpuScale = gpu.HasGPUScalingSupport();
+                    if (supGpuScale) valGpuScale = gpu.GetGPUScaling();
 
-                    supScaleMode = ADLXBackend.HasScalingModeSupport(0);
-                    if (supScaleMode) valScaleMode = ADLXBackend.GetScalingMode(0);
+                    supScaleMode = gpu.HasScalingModeSupport();
+                    if (supScaleMode) valScaleMode = gpu.GetScalingMode();
 
-                    supFsr = ADLXBackend.HasFSRSupport(0);
-                    if (supFsr) valFsr = ADLXBackend.GetFSR(0);
+                    supRsr = gpu.HasRSRSupport();
+                    if (supRsr) valRsr = gpu.GetRSR();
 
-                    supAfmf = ADLXBackend.HasFFXFrameGenSupport(0);
-                    if (supAfmf) valAfmf = ADLXBackend.GetFFXFrameGen(0);
+                    supAfmf = gpu.HasAFMFSupport();
+                    if (supAfmf) valAfmf = gpu.GetAFMF();
 
-                    supSharp = ADLXBackend.HasSharpenDesktopSupport(0);
-                    if (supSharp) valSharp = ADLXBackend.GetSharpenDesktop(0);
+                    supSharp = gpu.GetImageSharpeningSharpness() >= 0;
+                    if (supSharp) valSharp = gpu.GetImageSharpening();
 
-                    ready = supInt || supGpuScale || supScaleMode || supFsr || supAfmf || supSharp;
+                    ready = supInt || supGpuScale || supScaleMode || supRsr || supAfmf || supSharp;
                 }
                 catch { }
 
@@ -895,16 +898,18 @@ namespace HandheldCompanion.Views
                     btnAdlxGpuScale.Content = valGpuScale ? "GPU Scaling: On" : "GPU Scaling: Off";
                     btnAdlxGpuScale.Style = valGpuScale ? activeStyle : normalStyle;
 
-                    btnScalePreserve.IsEnabled = supScaleMode;
-                    btnScaleFull.IsEnabled = supScaleMode;
-                    btnScaleCenter.IsEnabled = supScaleMode;
-                    btnScalePreserve.Style = (supScaleMode && valScaleMode == 0) ? activeStyle : normalStyle;
-                    btnScaleFull.Style = (supScaleMode && valScaleMode == 1) ? activeStyle : normalStyle;
-                    btnScaleCenter.Style = (supScaleMode && valScaleMode == 2) ? activeStyle : normalStyle;
+                    // Scaling Mode only applies when GPU Scaling is ON and Integer Scaling is OFF
+                    bool scaleModeActive = supScaleMode && valGpuScale && !valInt;
+                    btnScalePreserve.IsEnabled = scaleModeActive;
+                    btnScaleFull.IsEnabled = scaleModeActive;
+                    btnScaleCenter.IsEnabled = scaleModeActive;
+                    btnScalePreserve.Style = (scaleModeActive && valScaleMode == 0) ? activeStyle : normalStyle;
+                    btnScaleFull.Style = (scaleModeActive && valScaleMode == 1) ? activeStyle : normalStyle;
+                    btnScaleCenter.Style = (scaleModeActive && valScaleMode == 2) ? activeStyle : normalStyle;
 
-                    btnAdlxFsr.IsEnabled = supFsr;
-                    btnAdlxFsr.Content = valFsr ? "RSR / FSR: On" : "RSR / FSR: Off";
-                    btnAdlxFsr.Style = valFsr ? activeStyle : normalStyle;
+                    btnAdlxFsr.IsEnabled = supRsr;
+                    btnAdlxFsr.Content = valRsr ? "RSR / FSR: On" : "RSR / FSR: Off";
+                    btnAdlxFsr.Style = valRsr ? activeStyle : normalStyle;
 
                     btnAdlxAfmf.IsEnabled = supAfmf;
                     btnAdlxAfmf.Content = valAfmf ? "Frame Gen (AFMF): On" : "Frame Gen (AFMF): Off";
@@ -915,7 +920,7 @@ namespace HandheldCompanion.Views
                     btnAdlxSharpen.Style = valSharp ? activeStyle : normalStyle;
 
                     txtAdlxStatus.Text = ready
-                        ? "ADLX: Connected to AMD Radeon driver"
+                        ? (valInt ? "ADLX: Connected  |  Integer Scaling overrides Scaling Mode" : "ADLX: Connected to AMD Radeon driver")
                         : "ADLX: Waiting for AMD Radeon driver (or unsupported on current display)";
                     txtAdlxStatus.Foreground = ready ? BrushGreen : BrushGray;
                 });
@@ -924,7 +929,9 @@ namespace HandheldCompanion.Views
 
         private void BtnScalingMode_Click(object sender, RoutedEventArgs e)
         {
-            if (!ADLXBackend.IsInitialized || sender is not Button b || b.Tag is not string s || !int.TryParse(s, out int mode))
+            if (!ADLXBackend.IsInitialized || GPUManager.GetCurrent() is not AMDGPU gpu || !gpu.IsInitialized)
+                return;
+            if (sender is not Button b || b.Tag is not string s || !int.TryParse(s, out int mode))
                 return;
 
             GPUManager.ManualGraphicsOverride = true;
@@ -932,9 +939,12 @@ namespace HandheldCompanion.Views
             {
                 try
                 {
-                    if (ADLXBackend.HasGPUScalingSupport(0) && !ADLXBackend.GetGPUScaling(0))
-                        ADLXBackend.SetGPUScaling(0, true);
-                    ADLXBackend.SetScalingMode(0, mode);
+                    if (gpu.HasIntegerScalingSupport() && gpu.GetIntegerScaling())
+                        gpu.SetIntegerScaling(false);
+                    if (gpu.HasGPUScalingSupport() && !gpu.GetGPUScaling())
+                        gpu.SetGPUScaling(true);
+                    gpu.SetScalingMode(mode);
+                    Thread.Sleep(150);
                 }
                 catch (Exception ex)
                 {
@@ -946,7 +956,9 @@ namespace HandheldCompanion.Views
 
         private void BtnAdlxToggle_Click(object sender, RoutedEventArgs e)
         {
-            if (!ADLXBackend.IsInitialized || sender is not Button b || b.Tag is not string feature)
+            if (!ADLXBackend.IsInitialized || GPUManager.GetCurrent() is not AMDGPU gpu || !gpu.IsInitialized)
+                return;
+            if (sender is not Button b || b.Tag is not string feature)
                 return;
 
             GPUManager.ManualGraphicsOverride = true;
@@ -957,24 +969,49 @@ namespace HandheldCompanion.Views
                     switch (feature)
                     {
                         case "IntegerScaling":
-                            bool curInt = ADLXBackend.GetIntegerScaling(0);
-                            if (!curInt && ADLXBackend.HasGPUScalingSupport(0) && !ADLXBackend.GetGPUScaling(0))
-                                ADLXBackend.SetGPUScaling(0, true);
-                            ADLXBackend.SetIntegerScaling(0, !curInt);
+                            bool curInt = gpu.GetIntegerScaling();
+                            if (!curInt)
+                            {
+                                // Turning ON: disable mutually-exclusive RSR and ensure GPU Scaling is ON first
+                                if (gpu.HasRSRSupport() && gpu.GetRSR())
+                                    gpu.SetRSR(false);
+                                if (gpu.HasGPUScalingSupport() && !gpu.GetGPUScaling())
+                                    gpu.SetGPUScaling(true);
+                                gpu.SetIntegerScaling(true);
+                            }
+                            else
+                            {
+                                gpu.SetIntegerScaling(false);
+                            }
                             break;
                         case "GPUScaling":
-                            ADLXBackend.SetGPUScaling(0, !ADLXBackend.GetGPUScaling(0));
+                            bool curGpu = gpu.GetGPUScaling();
+                            if (curGpu)
+                            {
+                                // Turning OFF: must disable Integer Scaling first or AMD rejects disabling GPU Scaling
+                                if (gpu.HasIntegerScalingSupport() && gpu.GetIntegerScaling())
+                                    gpu.SetIntegerScaling(false);
+                                gpu.SetGPUScaling(false);
+                            }
+                            else
+                            {
+                                gpu.SetGPUScaling(true);
+                            }
                             break;
                         case "FSR":
-                            ADLXBackend.SetFSR(0, !ADLXBackend.GetFSR(0));
+                            bool curRsr = gpu.GetRSR();
+                            if (!curRsr && gpu.HasIntegerScalingSupport() && gpu.GetIntegerScaling())
+                                gpu.SetIntegerScaling(false);
+                            gpu.SetRSR(!curRsr);
                             break;
                         case "AFMF":
-                            ADLXBackend.SetFFXFrameGen(0, !ADLXBackend.GetFFXFrameGen(0));
+                            gpu.SetAFMF(!gpu.GetAFMF());
                             break;
                         case "Sharpen":
-                            ADLXBackend.SetSharpenDesktop(0, !ADLXBackend.GetSharpenDesktop(0));
+                            gpu.SetImageSharpening(!gpu.GetImageSharpening());
                             break;
                     }
+                    Thread.Sleep(150);
                 }
                 catch (Exception ex)
                 {
