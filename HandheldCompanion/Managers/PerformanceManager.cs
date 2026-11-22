@@ -1110,6 +1110,8 @@ public static class PerformanceManager
 
     public static int GetManualGpuClock()
     {
+        if (StoredGfxClock <= 0 || StoredGfxClock >= 10000)
+            return 0;
         return (int)Math.Round(StoredGfxClock);
     }
 
@@ -1117,7 +1119,7 @@ public static class PerformanceManager
     {
         try
         {
-            double target = mhz <= 0 ? 0 : Math.Clamp(mhz, 400, 3000);
+            double target = mhz <= 0 ? 12750 : Math.Clamp(mhz, 400, 3000);
             RequestGPUClock(target, immediate: true);
         }
         catch (Exception ex)

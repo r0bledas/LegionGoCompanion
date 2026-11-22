@@ -757,10 +757,13 @@ namespace HandheldCompanion.Views
 
         private void UpdateGpuClockVisuals()
         {
+            if (_currentGpuClockMhz >= 10000) _currentGpuClockMhz = 0;
+
             var activeStyle = (Style)FindResource("ActiveTouchButton");
             var normalStyle = (Style)FindResource("TouchButton");
 
             btnGpuAuto.Style = (_currentGpuClockMhz <= 0) ? activeStyle : normalStyle;
+            btnGpu800.Style = (_currentGpuClockMhz == 800) ? activeStyle : normalStyle;
             btnGpu1200.Style = (_currentGpuClockMhz == 1200) ? activeStyle : normalStyle;
             btnGpu1600.Style = (_currentGpuClockMhz == 1600) ? activeStyle : normalStyle;
             btnGpu2000.Style = (_currentGpuClockMhz == 2000) ? activeStyle : normalStyle;
@@ -833,6 +836,9 @@ namespace HandheldCompanion.Views
                 btnAdlxFsr.IsEnabled = false;
                 btnAdlxAfmf.IsEnabled = false;
                 btnAdlxSharpen.IsEnabled = false;
+                btnScalePreserve.IsEnabled = false;
+                btnScaleFull.IsEnabled = false;
+                btnScaleCenter.IsEnabled = false;
                 txtAdlxStatus.Text = "ADLX: Initializing AMD Radeon driver...";
                 txtAdlxStatus.Foreground = BrushGray;
                 return;
@@ -844,6 +850,8 @@ namespace HandheldCompanion.Views
                 bool ready = false;
                 bool supInt = false, valInt = false;
                 bool supGpuScale = false, valGpuScale = false;
+                bool supScaleMode = false;
+                int valScaleMode = -1;
                 bool supFsr = false, valFsr = false;
                 bool supAfmf = false, valAfmf = false;
                 bool supSharp = false, valSharp = false;
@@ -856,6 +864,9 @@ namespace HandheldCompanion.Views
                     supGpuScale = ADLXBackend.HasGPUScalingSupport(0);
                     if (supGpuScale) valGpuScale = ADLXBackend.GetGPUScaling(0);
 
+                    supScaleMode = ADLXBackend.HasScalingModeSupport(0);
+                    if (supScaleMode) valScaleMode = ADLXBackend.GetScalingMode(0);
+
                     supFsr = ADLXBackend.HasFSRSupport(0);
                     if (supFsr) valFsr = ADLXBackend.GetFSR(0);
 
@@ -865,7 +876,7 @@ namespace HandheldCompanion.Views
                     supSharp = ADLXBackend.HasSharpenDesktopSupport(0);
                     if (supSharp) valSharp = ADLXBackend.GetSharpenDesktop(0);
 
-                    ready = supInt || supGpuScale || supFsr || supAfmf || supSharp;
+                    ready = supInt || supGpuScale || supScaleMode || supFsr || supAfmf || supSharp;
                 }
                 catch { }
 
@@ -883,6 +894,13 @@ namespace HandheldCompanion.Views
                     btnAdlxGpuScale.IsEnabled = supGpuScale;
                     btnAdlxGpuScale.Content = valGpuScale ? "GPU Scaling: On" : "GPU Scaling: Off";
                     btnAdlxGpuScale.Style = valGpuScale ? activeStyle : normalStyle;
+
+                    btnScalePreserve.IsEnabled = supScaleMode;
+                    btnScaleFull.IsEnabled = supScaleMode;
+                    btnScaleCenter.IsEnabled = supScaleMode;
+                    btnScalePreserve.Style = (supScaleMode && valScaleMode == 0) ? activeStyle : normalStyle;
+                    btnScaleFull.Style = (supScaleMode && valScaleMode == 1) ? activeStyle : normalStyle;
+                    btnScaleCenter.Style = (supScaleMode && valScaleMode == 2) ? activeStyle : normalStyle;
 
                     btnAdlxFsr.IsEnabled = supFsr;
                     btnAdlxFsr.Content = valFsr ? "RSR / FSR: On" : "RSR / FSR: Off";
@@ -904,11 +922,34 @@ namespace HandheldCompanion.Views
             });
         }
 
+        private void BtnScalingMode_Click(object sender, RoutedEventArgs e)
+        {
+            if (!ADLXBackend.IsInitialized || sender is not Button b || b.Tag is not string s || !int.TryParse(s, out int mode))
+                return;
+
+            GPUManager.ManualGraphicsOverride = true;
+            Task.Run(() =>
+            {
+                try
+                {
+                    if (ADLXBackend.HasGPUScalingSupport(0) && !ADLXBackend.GetGPUScaling(0))
+                        ADLXBackend.SetGPUScaling(0, true);
+                    ADLXBackend.SetScalingMode(0, mode);
+                }
+                catch (Exception ex)
+                {
+                    LogManager.LogError("ADLX SetScalingMode({0}) failed: {1}", mode, ex.Message);
+                }
+                RefreshAdlxControlsAsync();
+            });
+        }
+
         private void BtnAdlxToggle_Click(object sender, RoutedEventArgs e)
         {
             if (!ADLXBackend.IsInitialized || sender is not Button b || b.Tag is not string feature)
                 return;
 
+            GPUManager.ManualGraphicsOverride = true;
             Task.Run(() =>
             {
                 try
@@ -917,7 +958,7 @@ namespace HandheldCompanion.Views
                     {
                         case "IntegerScaling":
                             bool curInt = ADLXBackend.GetIntegerScaling(0);
-                            if (!curInt && ADLXBackend.HasGPUScalingSupport(0))
+                            if (!curInt && ADLXBackend.HasGPUScalingSupport(0) && !ADLXBackend.GetGPUScaling(0))
                                 ADLXBackend.SetGPUScaling(0, true);
                             ADLXBackend.SetIntegerScaling(0, !curInt);
                             break;

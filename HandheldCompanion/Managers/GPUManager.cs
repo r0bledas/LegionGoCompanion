@@ -599,12 +599,14 @@ namespace HandheldCompanion.Managers
                 currentGPU.SetImageSharpeningSharpness(Sharpness);
         }
 
+        public static volatile bool ManualGraphicsOverride = false;
+
         private void ProfileManager_Applied(Profile? profile, UpdateSource source)
         {
             if (!IsReady || currentGPU is null || profile is null)
                 return;
 
-            if (!_gpuManagementEnabled)
+            if (!_gpuManagementEnabled || ManualGraphicsOverride)
                 return;
 
             try
