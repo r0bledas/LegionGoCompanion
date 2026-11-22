@@ -140,6 +140,186 @@ namespace HandheldCompanion.ADLX
 
         [DllImport(ADLX_Wrapper, CallingConvention = CallingConvention.Cdecl)] public static extern bool GetAdlxTelemetry(int GPU, ref AdlxTelemetryData adlxTelemetryData);
 
+        #region AMD ADL2 (atiadlxx.dll) Direct Driver Bindings for AFMF & Vivid Colors
+        private const string ATI_ADL_DLL = "atiadlxx.dll";
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate System.IntPtr ADL_Main_Memory_Alloc_Delegate(int size);
+
+        private static readonly ADL_Main_Memory_Alloc_Delegate AdlAllocCallback = size => Marshal.AllocHGlobal(size);
+
+        [DllImport(ATI_ADL_DLL, CallingConvention = CallingConvention.Cdecl)]
+        private static extern int ADL2_Main_Control_Create(ADL_Main_Memory_Alloc_Delegate callback, int iEnumConnectedAdapters, out System.IntPtr context);
+
+        [DllImport(ATI_ADL_DLL, CallingConvention = CallingConvention.Cdecl)]
+        private static extern int ADL2_Main_Control_Destroy(System.IntPtr context);
+
+        [DllImport(ATI_ADL_DLL, CallingConvention = CallingConvention.Cdecl)]
+        private static extern int ADL2_DriverFrameGenerationSupport_Get(System.IntPtr context, int iAdapterIndex, out int lpSupported);
+
+        [DllImport(ATI_ADL_DLL, CallingConvention = CallingConvention.Cdecl)]
+        private static extern int ADL2_DriverFrameGeneration_Settings_Get(System.IntPtr context, int iAdapterIndex, out int lpEnabled);
+
+        [DllImport(ATI_ADL_DLL, CallingConvention = CallingConvention.Cdecl)]
+        private static extern int ADL2_DriverFrameGeneration_Settings_Set(System.IntPtr context, int iAdapterIndex, int iEnabled);
+
+        [DllImport(ATI_ADL_DLL, CallingConvention = CallingConvention.Cdecl)]
+        private static extern int ADL2_Display_SCE_Supported(System.IntPtr context, int iAdapterIndex, int iDisplayIndex, out int lpSupported);
+
+        [DllImport(ATI_ADL_DLL, CallingConvention = CallingConvention.Cdecl)]
+        private static extern int ADL2_Display_SCE_State_Get(System.IntPtr context, int iAdapterIndex, int iDisplayIndex, out int lpState, out int lpDefState);
+
+        [DllImport(ATI_ADL_DLL, CallingConvention = CallingConvention.Cdecl)]
+        private static extern int ADL2_Display_SCE_State_Set(System.IntPtr context, int iAdapterIndex, int iDisplayIndex, int iState);
+
+        // ADL_COLOR_BRIGHTNESS = 1, ADL_COLOR_CONTRAST = 2, ADL_COLOR_HUE = 3, ADL_COLOR_SATURATION = 4, ADL_COLOR_TEMPERATURE = 5
+        [DllImport(ATI_ADL_DLL, CallingConvention = CallingConvention.Cdecl)]
+        private static extern int ADL2_Display_Color_Get(System.IntPtr context, int iAdapterIndex, int iDisplayIndex, int iColorType, out int lpCur, out int lpDef, out int lpMin, out int lpMax, out int lpStep);
+
+        [DllImport(ATI_ADL_DLL, CallingConvention = CallingConvention.Cdecl)]
+        private static extern int ADL2_Display_Color_Set(System.IntPtr context, int iAdapterIndex, int iDisplayIndex, int iColorType, int iValue);
+
+        public static bool HasAdl2AFMF()
+        {
+            System.IntPtr ctx = System.IntPtr.Zero;
+            try
+            {
+                if (ADL2_Main_Control_Create(AdlAllocCallback, 1, out ctx) == 0 && ctx != System.IntPtr.Zero)
+                {
+                    if (ADL2_DriverFrameGenerationSupport_Get(ctx, 0, out int sup) == 0 && (sup & 0xFF) != 0)
+                        return true;
+                }
+            }
+            catch { }
+            finally
+            {
+                if (ctx != System.IntPtr.Zero)
+                {
+                    try { ADL2_Main_Control_Destroy(ctx); } catch { }
+                }
+            }
+            try { return HasAFMFSupport(); } catch { return false; }
+        }
+
+        public static bool GetAdl2AFMF()
+        {
+            System.IntPtr ctx = System.IntPtr.Zero;
+            try
+            {
+                if (ADL2_Main_Control_Create(AdlAllocCallback, 1, out ctx) == 0 && ctx != System.IntPtr.Zero)
+                {
+                    if (ADL2_DriverFrameGeneration_Settings_Get(ctx, 0, out int en) == 0)
+                        return en != 0;
+                }
+            }
+            catch { }
+            finally
+            {
+                if (ctx != System.IntPtr.Zero)
+                {
+                    try { ADL2_Main_Control_Destroy(ctx); } catch { }
+                }
+            }
+            try { return GetAFMF(); } catch { return false; }
+        }
+
+        public static bool SetAdl2AFMF(bool enable)
+        {
+            System.IntPtr ctx = System.IntPtr.Zero;
+            try
+            {
+                if (ADL2_Main_Control_Create(AdlAllocCallback, 1, out ctx) == 0 && ctx != System.IntPtr.Zero)
+                {
+                    if (ADL2_DriverFrameGeneration_Settings_Set(ctx, 0, enable ? 1 : 0) == 0)
+                        return true;
+                }
+            }
+            catch { }
+            finally
+            {
+                if (ctx != System.IntPtr.Zero)
+                {
+                    try { ADL2_Main_Control_Destroy(ctx); } catch { }
+                }
+            }
+            try { return SetAFMF(enable); } catch { return false; }
+        }
+
+        public static bool HasVividColorSupport(int displayIdx = 0)
+        {
+            System.IntPtr ctx = System.IntPtr.Zero;
+            try
+            {
+                if (ADL2_Main_Control_Create(AdlAllocCallback, 1, out ctx) == 0 && ctx != System.IntPtr.Zero)
+                {
+                    if (ADL2_Display_SCE_Supported(ctx, 0, displayIdx, out int sup) == 0 && sup != 0)
+                        return true;
+                    if (ADL2_Display_Color_Get(ctx, 0, displayIdx, 4, out _, out _, out _, out _, out _) == 0)
+                        return true;
+                }
+            }
+            catch { }
+            finally
+            {
+                if (ctx != System.IntPtr.Zero)
+                {
+                    try { ADL2_Main_Control_Destroy(ctx); } catch { }
+                }
+            }
+            return false;
+        }
+
+        public static bool GetVividColors(int displayIdx = 0)
+        {
+            System.IntPtr ctx = System.IntPtr.Zero;
+            try
+            {
+                if (ADL2_Main_Control_Create(AdlAllocCallback, 1, out ctx) == 0 && ctx != System.IntPtr.Zero)
+                {
+                    if (ADL2_Display_SCE_State_Get(ctx, 0, displayIdx, out int st, out _) == 0 && st == 2)
+                        return true;
+                    if (ADL2_Display_Color_Get(ctx, 0, displayIdx, 4, out int sat, out int defSat, out _, out _, out _) == 0 && sat > defSat + 5)
+                        return true;
+                }
+            }
+            catch { }
+            finally
+            {
+                if (ctx != System.IntPtr.Zero)
+                {
+                    try { ADL2_Main_Control_Destroy(ctx); } catch { }
+                }
+            }
+            return false;
+        }
+
+        public static bool SetVividColors(int displayIdx, bool enable)
+        {
+            System.IntPtr ctx = System.IntPtr.Zero;
+            try
+            {
+                if (ADL2_Main_Control_Create(AdlAllocCallback, 1, out ctx) == 0 && ctx != System.IntPtr.Zero)
+                {
+                    // Set AMD Vivid Gaming hardware profile (SCE state 2 = Vivid Gaming, 1 = Default)
+                    int rSce = ADL2_Display_SCE_State_Set(ctx, 0, displayIdx, enable ? 2 : 1);
+                    // Also set Display Color Saturation (type 4: 135 when Vivid On, 100 when Off) & Contrast (type 2: 110 when Vivid On, 100 when Off)
+                    int rSat = ADL2_Display_Color_Set(ctx, 0, displayIdx, 4, enable ? 135 : 100);
+                    int rCon = ADL2_Display_Color_Set(ctx, 0, displayIdx, 2, enable ? 110 : 100);
+                    return rSce == 0 || rSat == 0 || rCon == 0;
+                }
+            }
+            catch { }
+            finally
+            {
+                if (ctx != System.IntPtr.Zero)
+                {
+                    try { ADL2_Main_Control_Destroy(ctx); } catch { }
+                }
+            }
+            return false;
+        }
+        #endregion
+
         private static StringBuilder displayName = new StringBuilder(256);
         public static volatile bool IsInitialized = false;
 

@@ -837,6 +837,7 @@ namespace HandheldCompanion.Views
                 btnAdlxFsr.IsEnabled = false;
                 btnAdlxAfmf.IsEnabled = false;
                 btnAdlxSharpen.IsEnabled = false;
+                btnAdlxVivid.IsEnabled = false;
                 btnScalePreserve.IsEnabled = false;
                 btnScaleFull.IsEnabled = false;
                 btnScaleCenter.IsEnabled = false;
@@ -858,6 +859,7 @@ namespace HandheldCompanion.Views
                 bool supRsr = false, valRsr = false;
                 bool supAfmf = false, valAfmf = false;
                 bool supSharp = false, valSharp = false;
+                bool supVivid = false, valVivid = false;
 
                 try
                 {
@@ -879,7 +881,10 @@ namespace HandheldCompanion.Views
                     supSharp = gpu.GetImageSharpeningSharpness() >= 0;
                     if (supSharp) valSharp = gpu.GetImageSharpening();
 
-                    ready = supInt || supGpuScale || supScaleMode || supRsr || supAfmf || supSharp;
+                    supVivid = gpu.HasVividColorSupport();
+                    if (supVivid) valVivid = gpu.GetVividColors();
+
+                    ready = supInt || supGpuScale || supScaleMode || supRsr || supAfmf || supSharp || supVivid;
                 }
                 catch { }
 
@@ -919,9 +924,19 @@ namespace HandheldCompanion.Views
                     btnAdlxSharpen.Content = valSharp ? "Sharpening: On" : "Sharpening: Off";
                     btnAdlxSharpen.Style = valSharp ? activeStyle : normalStyle;
 
-                    txtAdlxStatus.Text = ready
-                        ? (valInt ? "ADLX: Connected  |  Integer Scaling overrides Scaling Mode" : "ADLX: Connected to AMD Radeon driver")
-                        : "ADLX: Waiting for AMD Radeon driver (or unsupported on current display)";
+                    btnAdlxVivid.IsEnabled = supVivid;
+                    btnAdlxVivid.Content = valVivid ? "Vivid Colors: On" : "Vivid Colors: Off";
+                    btnAdlxVivid.Style = valVivid ? activeStyle : normalStyle;
+
+                    if (ready)
+                    {
+                        string intDetail = valInt ? "ON (2x Pixel Doubling @ 800p)" : "OFF";
+                        txtAdlxStatus.Text = $"Driver Active  |  GPU Scale: {(valGpuScale ? "ON" : "OFF")}  |  Integer: {intDetail}  |  AFMF: {(valAfmf ? "ON" : "OFF")}  |  Vivid: {(valVivid ? "ON" : "OFF")}";
+                    }
+                    else
+                    {
+                        txtAdlxStatus.Text = "ADLX: Waiting for AMD Radeon driver (or unsupported on current display)";
+                    }
                     txtAdlxStatus.Foreground = ready ? BrushGreen : BrushGray;
                 });
             });
@@ -1058,8 +1073,12 @@ namespace HandheldCompanion.Views
                             if (profile is not null) profile.RISEnabled = nextSharp;
                             gpu.SetImageSharpening(nextSharp);
                             break;
+                        case "Vivid":
+                            bool nextVivid = !gpu.GetVividColors();
+                            gpu.SetVividColors(nextVivid);
+                            break;
                     }
-                    Thread.Sleep(350);
+                    Thread.Sleep(feature == "Vivid" || feature == "AFMF" || feature == "Sharpen" ? 120 : 350);
                 }
                 catch (Exception ex)
                 {

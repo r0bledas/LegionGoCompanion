@@ -85,7 +85,7 @@ namespace HandheldCompanion.GraphicsProcessingUnit
             if (!IsInitialized)
                 return false;
 
-            return Execute(ADLXBackend.HasAFMFSupport, false);
+            return Execute(ADLXBackend.HasAdl2AFMF, false);
         }
 
         public bool GetAFMF()
@@ -93,7 +93,23 @@ namespace HandheldCompanion.GraphicsProcessingUnit
             if (!IsInitialized)
                 return false;
 
-            return Execute(ADLXBackend.GetAFMF, false);
+            return Execute(ADLXBackend.GetAdl2AFMF, false);
+        }
+
+        public bool HasVividColorSupport()
+        {
+            if (!IsInitialized)
+                return false;
+
+            return Execute(() => ADLXBackend.HasVividColorSupport(displayIdx), false);
+        }
+
+        public bool GetVividColors()
+        {
+            if (!IsInitialized)
+                return false;
+
+            return Execute(() => ADLXBackend.GetVividColors(displayIdx), false);
         }
 
         public bool GetAFMFAlgorithmSupport()
@@ -241,7 +257,15 @@ namespace HandheldCompanion.GraphicsProcessingUnit
             if (!IsInitialized)
                 return false;
 
-            return Execute(() => ADLXBackend.SetAFMF(enable), false);
+            return Execute(() => ADLXBackend.SetAdl2AFMF(enable), false);
+        }
+
+        public bool SetVividColors(bool enable)
+        {
+            if (!IsInitialized)
+                return false;
+
+            return Execute(() => ADLXBackend.SetVividColors(displayIdx, enable), false);
         }
 
         public bool SetAFMFAlgorithm(int algorithm)

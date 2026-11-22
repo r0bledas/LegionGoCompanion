@@ -610,6 +610,7 @@
                                 <Button x:Name="btnAdlxFsr" Content="RSR / FSR: Off" Height="34" Padding="14,5" Style="{StaticResource TouchButton}" Click="BtnAdlxToggle_Click" Tag="FSR" />
                                 <Button x:Name="btnAdlxAfmf" Content="Frame Gen (AFMF): Off" Height="34" Padding="14,5" Style="{StaticResource TouchButton}" Click="BtnAdlxToggle_Click" Tag="AFMF" />
                                 <Button x:Name="btnAdlxSharpen" Content="Sharpening: Off" Height="34" Padding="14,5" Style="{StaticResource TouchButton}" Click="BtnAdlxToggle_Click" Tag="Sharpen" />
+                                <Button x:Name="btnAdlxVivid" Content="Vivid Colors: Off" Height="34" Padding="14,5" Style="{StaticResource TouchButton}" Click="BtnAdlxToggle_Click" Tag="Vivid" />
                             </WrapPanel>
                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,6,0,0">
                                 <TextBlock Text="Scaling Mode:" FontSize="12.5" Foreground="#9EA4B0" VerticalAlignment="Center" Margin="2,0,10,0" />
