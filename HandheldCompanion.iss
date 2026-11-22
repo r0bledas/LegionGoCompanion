@@ -15,7 +15,7 @@
 #define UsePawnIO
 #define UseUSBip
 
-#define InstallerVersion        "1.6.3"
+#define InstallerVersion        "1.6.4"
 #define MyAppSetupName         "Legion Go Companion"
 #define MyBuildId              "LegionGoCompanion"
 #define MyAppVersion           "1.5.8"

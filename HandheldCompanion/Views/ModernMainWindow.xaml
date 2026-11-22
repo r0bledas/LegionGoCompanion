@@ -584,7 +584,6 @@
                                     <ColumnDefinition Width="Auto" SharedSizeGroup="ResBtn" />
                                     <ColumnDefinition Width="Auto" SharedSizeGroup="ResBtn" />
                                     <ColumnDefinition Width="Auto" SharedSizeGroup="ResBtn" />
-                                    <ColumnDefinition Width="Auto" SharedSizeGroup="ResBtn" />
                                     <ColumnDefinition Width="Auto" />
                                     <ColumnDefinition Width="Auto" SharedSizeGroup="HzBtn" />
                                     <ColumnDefinition Width="Auto" SharedSizeGroup="HzBtn" />
@@ -592,11 +591,10 @@
                                 <Button Grid.Column="0" x:Name="btnRes800" Content="800p" Height="34" Padding="16,5" Style="{StaticResource TouchButton}" Click="BtnRes_Click" Tag="800" />
                                 <Button Grid.Column="1" x:Name="btnRes1000" Content="1000p" Height="34" Padding="16,5" Style="{StaticResource TouchButton}" Click="BtnRes_Click" Tag="1000" />
                                 <Button Grid.Column="2" x:Name="btnRes1200" Content="1200p" Height="34" Padding="16,5" Style="{StaticResource TouchButton}" Click="BtnRes_Click" Tag="1200" />
-                                <Button Grid.Column="3" x:Name="btnRes1440" Content="1440p" Height="34" Padding="16,5" Style="{StaticResource TouchButton}" Click="BtnRes_Click" Tag="1440" />
-                                <Button Grid.Column="4" x:Name="btnRes1600" Content="1600p" Height="34" Padding="16,5" Style="{StaticResource TouchButton}" Click="BtnRes_Click" Tag="1600" />
-                                <Border Grid.Column="5" Width="1" Height="22" Background="#383E4C" VerticalAlignment="Center" Margin="6,0" SnapsToDevicePixels="True" />
-                                <Button Grid.Column="6" x:Name="btnHz60" Content="60Hz" Height="34" Padding="14,5" Style="{StaticResource TouchButton}" Click="BtnRefreshRate_Click" Tag="60" />
-                                <Button Grid.Column="7" x:Name="btnHz144" Content="144Hz" Height="34" Padding="14,5" Style="{StaticResource TouchButton}" Click="BtnRefreshRate_Click" Tag="144" />
+                                <Button Grid.Column="3" x:Name="btnRes1600" Content="1600p" Height="34" Padding="16,5" Style="{StaticResource TouchButton}" Click="BtnRes_Click" Tag="1600" />
+                                <Border Grid.Column="4" Width="1" Height="22" Background="#383E4C" VerticalAlignment="Center" Margin="6,0" SnapsToDevicePixels="True" />
+                                <Button Grid.Column="5" x:Name="btnHz60" Content="60Hz" Height="34" Padding="14,5" Style="{StaticResource TouchButton}" Click="BtnRefreshRate_Click" Tag="60" />
+                                <Button Grid.Column="6" x:Name="btnHz144" Content="144Hz" Height="34" Padding="14,5" Style="{StaticResource TouchButton}" Click="BtnRefreshRate_Click" Tag="144" />
                             </Grid>
                             <TextBlock x:Name="txtCurrentRes" Text="Current: Checking..." FontSize="11.5" Foreground="#9EA4B0" Margin="4,4,0,0" />
                         </StackPanel>
@@ -1005,6 +1003,7 @@
                                 <Button x:Name="btnTrackpadVibToggle" Content="Trackpad Haptics: On" MinWidth="144" Height="32" Padding="12,4" Style="{StaticResource ActiveTouchButton}" Click="BtnTrackpadVibToggle_Click" />
                                 <Button x:Name="btnSwapLegionButtons" Content="Legion L/R Swap: Normal" MinWidth="162" Height="32" Padding="12,4" Style="{StaticResource TouchButton}" Click="BtnSwapLegionButtons_Click" />
                             </WrapPanel>
+                            <CheckBox x:Name="chkKeepTrackpadOnExit" Content="Keep Trackpad Working When App Is Closed" Foreground="#E0E4EC" FontSize="12" Margin="4,0,0,6" Click="ChkKeepTrackpadOnExit_Click" ToolTip="Restores hardware Windows mouse mode and enables the trackpad on exit so it keeps working after closing the app." />
                             <WrapPanel Margin="-2,0,0,6" VerticalAlignment="Center">
                                 <TextBlock Text="FPS Optical Mouse DPI:" Width="145" FontSize="12.5" Foreground="#9EA4B0" VerticalAlignment="Center" Margin="4,0,4,0" />
                                 <Button x:Name="btnDpi500" Content="500" MinWidth="58" Height="30" Padding="10,3" Style="{StaticResource TouchButton}" Click="BtnMouseDpi_Click" Tag="500" />

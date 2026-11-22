@@ -629,20 +629,19 @@ namespace HandheldCompanion.Views
                 {
                     try
                     {
-                        PerformanceManager.SetTDP(targetTdp, true);
-
                         if (IDevice.GetCurrent() is LegionGo lego)
                         {
                             int oemMode = (int)LegionGo.LegionMode.Custom;
                             if (targetTdp <= 10) oemMode = (int)LegionGo.LegionMode.Quiet;
                             else if (targetTdp == 15) oemMode = (int)LegionGo.LegionMode.Balanced;
-                            else if (targetTdp == 25 || targetTdp == 30) oemMode = (int)LegionGo.LegionMode.Performance;
+                            else if (targetTdp == 25) oemMode = (int)LegionGo.LegionMode.Performance;
 
                             lego.SetSmartFanMode(oemMode);
                             lego.set_long_limit(targetTdp);
                             lego.set_short_limit(targetTdp);
                         }
 
+                        PerformanceManager.SetTDP(targetTdp, true);
                         JoystickLedService.Instance.ApplyToHardware();
                     }
                     catch (Exception ex)
@@ -681,7 +680,7 @@ namespace HandheldCompanion.Views
                 txtTdpModeDesc.Text = "Balanced Mode (White Power LED)";
                 txtTdpModeDesc.Foreground = new SolidColorBrush(Color.FromRgb(240, 240, 240));
             }
-            else if (tdp == 25 || tdp == 30)
+            else if (tdp == 25)
             {
                 txtTdpModeDesc.Text = "Performance Mode (Red Power LED)";
                 txtTdpModeDesc.Foreground = new SolidColorBrush(Color.FromRgb(255, 59, 48));
@@ -812,7 +811,6 @@ namespace HandheldCompanion.Views
                 if (s == "800") ApplyResolution(1280, 800);
                 else if (s == "1000") ApplyResolution(1600, 1000);
                 else if (s == "1200") ApplyResolution(1920, 1200);
-                else if (s == "1440") ApplyResolution(2304, 1440);
                 else if (s == "1600") ApplyResolution(2560, 1600);
             }
         }
@@ -932,7 +930,6 @@ namespace HandheldCompanion.Views
             btnRes800.Style = (w == 1280 && h == 800) ? activeStyle : normalStyle;
             btnRes1000.Style = (w == 1600 && h == 1000) ? activeStyle : normalStyle;
             btnRes1200.Style = (w == 1920 && h == 1200) ? activeStyle : normalStyle;
-            btnRes1440.Style = (w == 2304 && h == 1440) ? activeStyle : normalStyle;
             btnRes1600.Style = (w == 2560 && h == 1600) ? activeStyle : normalStyle;
 
             btnHz60.Style = (currentHz >= 58 && currentHz <= 62) ? activeStyle : normalStyle;
@@ -2327,6 +2324,7 @@ namespace HandheldCompanion.Views
             // Trackpad & Button Swap
             btnTrackpadToggle.Content = _trackpadEnabled ? "Trackpad: Enabled" : "Trackpad: Disabled";
             btnTrackpadToggle.Style = _trackpadEnabled ? activeStyle : normalStyle;
+            chkKeepTrackpadOnExit.IsChecked = ManagerFactory.settingsManager.GetBoolean("KeepTrackpadOnExit");
 
             btnTrackpadVibToggle.Content = _trackpadVibEnabled ? "Trackpad Haptics: On" : "Trackpad Haptics: Off";
             btnTrackpadVibToggle.Style = _trackpadVibEnabled ? activeStyle : normalStyle;
@@ -2491,6 +2489,11 @@ namespace HandheldCompanion.Views
                 }
                 catch { }
             });
+        }
+
+        private void ChkKeepTrackpadOnExit_Click(object sender, RoutedEventArgs e)
+        {
+            ManagerFactory.settingsManager.SetProperty("KeepTrackpadOnExit", chkKeepTrackpadOnExit.IsChecked ?? false);
         }
 
         private void BtnSwapLegionButtons_Click(object sender, RoutedEventArgs e)
@@ -3123,6 +3126,19 @@ namespace HandheldCompanion.Views
             {
                 // Uncloak HidHide so Windows and other apps immediately regain access to physical controller & trackpad
                 HidHide.SetCloaking(false);
+            }
+            catch { }
+
+            try
+            {
+                if (ManagerFactory.settingsManager.GetBoolean("KeepTrackpadOnExit"))
+                {
+                    if (IDevice.GetCurrent() is LegionGo legoDevice)
+                        legoDevice.SetPassthrough(false);
+                    Devices.Lenovo.SapientiaUsb.Init();
+                    Devices.Lenovo.SapientiaUsb.SetTouchPadStatus(1);
+                    Devices.Lenovo.SapientiaUsb.SetTrackpadStatus(4, 1);
+                }
             }
             catch { }
 
