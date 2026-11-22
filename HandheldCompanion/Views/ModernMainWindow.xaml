@@ -3,6 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:HandheldCompanion.Views"
         Title="Legion Go Companion"
+        Icon="/HandheldCompanion;component/Resources/icon.png"
         Height="620" Width="720"
         MinHeight="500" MinWidth="580"
         WindowStartupLocation="CenterScreen"
@@ -451,9 +452,10 @@
                     </Grid.ColumnDefinitions>
 
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <Image Source="/HandheldCompanion;component/Resources/icon.png" Width="24" Height="24" Margin="0,0,9,0" RenderOptions.BitmapScalingMode="HighQuality" VerticalAlignment="Center" />
                         <TextBlock Text="Legion Go Companion" FontSize="14.5" FontWeight="Bold" Foreground="#FFFFFF" VerticalAlignment="Center" />
                         <Border Background="#252932" CornerRadius="4" Padding="6,2" Margin="10,0,0,0" VerticalAlignment="Center">
-                            <TextBlock x:Name="txtVersionTag" Text="v1.4.3" FontSize="11" Foreground="#9EA4B0" />
+                            <TextBlock x:Name="txtVersionTag" Text="v1.5.6" FontSize="11" Foreground="#9EA4B0" />
                         </Border>
                     </StackPanel>
 

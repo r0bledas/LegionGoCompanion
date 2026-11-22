@@ -397,7 +397,7 @@ namespace HandheldCompanion.GraphicsProcessingUnit
 
         static AMDGPU()
         {
-            ProcessTargets = new HashSet<string> { "RadeonSoftware", "cncmd" };
+            ProcessTargets = new HashSet<string>();
         }
 
         public AMDGPU(AdapterInformation adapterInformation) : base(adapterInformation)
@@ -503,6 +503,9 @@ namespace HandheldCompanion.GraphicsProcessingUnit
 
         protected override void UpdateSettings()
         {
+            if (HandheldCompanion.Managers.GPUManager.ManualGraphicsOverride)
+                return;
+
             if (Monitor.TryEnter(updateLock))
             {
                 try

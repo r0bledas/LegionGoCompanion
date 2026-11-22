@@ -2026,6 +2026,14 @@ namespace HandheldCompanion.Views
                 {
                     appIcon = new System.Drawing.Icon(icoPath);
                 }
+                if (appIcon == null)
+                {
+                    string? exePath = Environment.ProcessPath ?? Process.GetCurrentProcess().MainModule?.FileName;
+                    if (!string.IsNullOrEmpty(exePath) && File.Exists(exePath))
+                    {
+                        appIcon = System.Drawing.Icon.ExtractAssociatedIcon(exePath);
+                    }
+                }
             }
             catch { }
 
