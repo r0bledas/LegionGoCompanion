@@ -2493,7 +2493,10 @@ namespace HandheldCompanion.Views
 
         private void ChkKeepTrackpadOnExit_Click(object sender, RoutedEventArgs e)
         {
-            ManagerFactory.settingsManager.SetProperty("KeepTrackpadOnExit", chkKeepTrackpadOnExit.IsChecked ?? false);
+            bool enabled = (sender as CheckBox)?.IsChecked ?? false;
+            ManagerFactory.settingsManager.SetProperty("KeepTrackpadOnExit", enabled);
+            chkKeepTrackpadOnExit.IsChecked = enabled;
+            chkKeepTrackpadOnExitSettings.IsChecked = enabled;
         }
 
         private void BtnSwapLegionButtons_Click(object sender, RoutedEventArgs e)
@@ -2622,6 +2625,7 @@ namespace HandheldCompanion.Views
         {
             chkBatteryLimit.IsChecked = ManagerFactory.settingsManager.GetBoolean("BatteryChargeLimit");
             chkCloseMinimises.IsChecked = ManagerFactory.settingsManager.GetBoolean("CloseMinimises");
+            chkKeepTrackpadOnExitSettings.IsChecked = ManagerFactory.settingsManager.GetBoolean("KeepTrackpadOnExit");
             chkRunAtStartup.IsChecked = ManagerFactory.settingsManager.GetBoolean("RunAtStartup");
             chkStartMinimized.IsChecked = ManagerFactory.settingsManager.GetBoolean("StartMinimized");
             chkDesktopOnStart.IsChecked = ManagerFactory.settingsManager.GetBoolean("DesktopLayoutOnStart");
@@ -3124,8 +3128,13 @@ namespace HandheldCompanion.Views
 
             try
             {
-                // Uncloak HidHide so Windows and other apps immediately regain access to physical controller & trackpad
+                // Uncloak HidHide and unhide registered physical devices so Windows immediately regains access to controller & trackpad
                 HidHide.SetCloaking(false);
+                foreach (string instanceId in HidHide.GetRegisteredDevices())
+                {
+                    if (!string.IsNullOrWhiteSpace(instanceId))
+                        HidHide.UnhidePath(instanceId);
+                }
             }
             catch { }
 

@@ -1003,7 +1003,7 @@
                                 <Button x:Name="btnTrackpadVibToggle" Content="Trackpad Haptics: On" MinWidth="144" Height="32" Padding="12,4" Style="{StaticResource ActiveTouchButton}" Click="BtnTrackpadVibToggle_Click" />
                                 <Button x:Name="btnSwapLegionButtons" Content="Legion L/R Swap: Normal" MinWidth="162" Height="32" Padding="12,4" Style="{StaticResource TouchButton}" Click="BtnSwapLegionButtons_Click" />
                             </WrapPanel>
-                            <CheckBox x:Name="chkKeepTrackpadOnExit" Content="Keep Trackpad Working When App Is Closed" Foreground="#E0E4EC" FontSize="12" Margin="4,0,0,6" Click="ChkKeepTrackpadOnExit_Click" ToolTip="Restores hardware Windows mouse mode and enables the trackpad on exit so it keeps working after closing the app." />
+                            <CheckBox x:Name="chkKeepTrackpadOnExit" Content="Keep Trackpad Working When App Is Closed" Margin="4,0,0,6" Click="ChkKeepTrackpadOnExit_Click" ToolTip="Restores hardware Windows mouse mode and enables the trackpad on exit so it keeps working after closing the app." />
                             <WrapPanel Margin="-2,0,0,6" VerticalAlignment="Center">
                                 <TextBlock Text="FPS Optical Mouse DPI:" Width="145" FontSize="12.5" Foreground="#9EA4B0" VerticalAlignment="Center" Margin="4,0,4,0" />
                                 <Button x:Name="btnDpi500" Content="500" MinWidth="58" Height="30" Padding="10,3" Style="{StaticResource TouchButton}" Click="BtnMouseDpi_Click" Tag="500" />
@@ -1047,6 +1047,7 @@
                             <TextBlock x:Name="txtBatteryLimitStatus" Text="Hardware Charge Limit: Checking..." FontSize="11.5" Foreground="#9EA4B0" Margin="26,-2,0,6" />
                             <CheckBox x:Name="chkPowerLight" Content="Power Button LED Light Enabled (Uncheck to turn off power button LED at night)" IsChecked="True" Click="ChkPowerLight_Click" />
                             <CheckBox x:Name="chkCloseMinimises" Content="Keep running in system tray after closing window" Click="ChkCloseMinimises_Click" />
+                            <CheckBox x:Name="chkKeepTrackpadOnExitSettings" Content="Keep trackpad working when app is closed" Click="ChkKeepTrackpadOnExit_Click" ToolTip="Restores hardware Windows mouse mode and enables the trackpad on exit so it keeps working after closing the app." />
                             <CheckBox x:Name="chkRunAtStartup" Content="Run at Startup (Elevated via Task Scheduler)" Click="ChkRunAtStartup_Click" />
                             <CheckBox x:Name="chkStartMinimized" Content="Silent Launch on Startup (Start minimized in tray)" Click="ChkStartMinimized_Click" />
                             <CheckBox x:Name="chkDesktopOnStart" Content="Default to Desktop Layout on Startup" Click="ChkDesktopOnStart_Click" />
