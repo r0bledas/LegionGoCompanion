@@ -380,6 +380,10 @@ namespace HandheldCompanion
         [STAThread]
         static void Main(string[] args)
         {
+            // Use modern Windows WM_POINTER touch stack instead of legacy WISP PenThreadWorker
+            // (eliminates cross-thread HwndTarget.TransformToDevice VerifyAccess crashes on DPI/resolution changes)
+            AppContext.SetSwitch("Switch.System.Windows.Input.Stylus.EnablePointerSupport", true);
+
             // If another instance is already running, signal it to restore its window and exit immediately!
             if (CheckExistingInstanceAndSignal(args))
                 return;
