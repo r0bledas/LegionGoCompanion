@@ -872,6 +872,13 @@ namespace HandheldCompanion.Views
                     supScaleMode = gpu.HasScalingModeSupport();
                     if (supScaleMode) valScaleMode = gpu.GetScalingMode();
 
+                    if (ManagerFactory.multimediaManager is not null)
+                    {
+                        ManagerFactory.multimediaManager.PreferredIntegerScaling = valInt;
+                        if (valScaleMode == 1 && ManagerFactory.multimediaManager.PreferredScalingMode != 1)
+                            valScaleMode = ManagerFactory.multimediaManager.PreferredScalingMode;
+                    }
+
                     supRsr = gpu.HasRSRSupport();
                     if (supRsr) valRsr = gpu.GetRSR();
 
@@ -974,6 +981,7 @@ namespace HandheldCompanion.Views
                     }
                     gpu.SetScalingMode(mode);
                     if (profile is not null) profile.ScalingMode = mode;
+                    ManagerFactory.multimediaManager?.CommitDisplayScalingMode(false, mode);
                     Thread.Sleep(350);
                 }
                 catch (Exception ex)
@@ -1025,11 +1033,13 @@ namespace HandheldCompanion.Views
                                 }
                                 if (profile is not null) profile.IntegerScalingEnabled = true;
                                 gpu.SetIntegerScaling(true);
+                                ManagerFactory.multimediaManager?.CommitDisplayScalingMode(true, ManagerFactory.multimediaManager?.PreferredScalingMode ?? 0);
                             }
                             else
                             {
                                 if (profile is not null) profile.IntegerScalingEnabled = false;
                                 gpu.SetIntegerScaling(false);
+                                ManagerFactory.multimediaManager?.CommitDisplayScalingMode(false, ManagerFactory.multimediaManager?.PreferredScalingMode ?? 0);
                             }
                             break;
                         case "GPUScaling":

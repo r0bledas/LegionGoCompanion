@@ -649,6 +649,15 @@ public class MultimediaManager : IManager
         dm.dmDisplayFrequency = displayFrequency;
         dm.dmFields = DisplayDevice.DM_PELSWIDTH | DisplayDevice.DM_PELSHEIGHT | DisplayDevice.DM_DISPLAYFREQUENCY;
 
+        bool isNonNative = Math.Max(width, height) < 2560 || Math.Min(width, height) < 1600;
+        if (isNonNative)
+        {
+            dm.dmDisplayFixedOutput = (PreferredIntegerScaling || PreferredScalingMode != 1)
+                ? DisplayDevice.DMDFO_CENTER
+                : DisplayDevice.DMDFO_STRETCH;
+            dm.dmFields |= DisplayDevice.DM_DISPLAYFIXEDOUTPUT;
+        }
+
         if (bitsPerPel > 0)
         {
             dm.dmBitsPerPel = bitsPerPel;
@@ -663,9 +672,15 @@ public class MultimediaManager : IManager
 
         // Test with specified width x height
         int testResult = ChangeDisplaySettingsEx(deviceName, ref dm, IntPtr.Zero, CDS_TEST, IntPtr.Zero);
+        if (testResult != DISP_CHANGE_SUCCESSFUL && (dm.dmFields & DisplayDevice.DM_DISPLAYFIXEDOUTPUT) != 0)
+        {
+            dm.dmFields &= ~DisplayDevice.DM_DISPLAYFIXEDOUTPUT;
+            dm.dmDisplayFixedOutput = DisplayDevice.DMDFO_DEFAULT;
+            testResult = ChangeDisplaySettingsEx(deviceName, ref dm, IntPtr.Zero, CDS_TEST, IntPtr.Zero);
+        }
         if (testResult == DISP_CHANGE_SUCCESSFUL)
         {
-            int applyResult = ChangeDisplaySettingsEx(deviceName, ref dm, IntPtr.Zero, CDS_UPDATEREGISTRY, IntPtr.Zero);
+            int applyResult = ChangeDisplaySettingsEx(deviceName, ref dm, IntPtr.Zero, CDS_UPDATEREGISTRY | CDS_RESET, IntPtr.Zero);
             if (applyResult == DISP_CHANGE_SUCCESSFUL)
             {
                 PrimaryDesktop?.RefreshDisplayMode();
@@ -679,9 +694,15 @@ public class MultimediaManager : IManager
         swappedDm.dmPelsWidth = height;
         swappedDm.dmPelsHeight = width;
         int swappedTest = ChangeDisplaySettingsEx(deviceName, ref swappedDm, IntPtr.Zero, CDS_TEST, IntPtr.Zero);
+        if (swappedTest != DISP_CHANGE_SUCCESSFUL && (swappedDm.dmFields & DisplayDevice.DM_DISPLAYFIXEDOUTPUT) != 0)
+        {
+            swappedDm.dmFields &= ~DisplayDevice.DM_DISPLAYFIXEDOUTPUT;
+            swappedDm.dmDisplayFixedOutput = DisplayDevice.DMDFO_DEFAULT;
+            swappedTest = ChangeDisplaySettingsEx(deviceName, ref swappedDm, IntPtr.Zero, CDS_TEST, IntPtr.Zero);
+        }
         if (swappedTest == DISP_CHANGE_SUCCESSFUL)
         {
-            int applySwapped = ChangeDisplaySettingsEx(deviceName, ref swappedDm, IntPtr.Zero, CDS_UPDATEREGISTRY, IntPtr.Zero);
+            int applySwapped = ChangeDisplaySettingsEx(deviceName, ref swappedDm, IntPtr.Zero, CDS_UPDATEREGISTRY | CDS_RESET, IntPtr.Zero);
             if (applySwapped == DISP_CHANGE_SUCCESSFUL)
             {
                 PrimaryDesktop?.RefreshDisplayMode();
@@ -705,7 +726,7 @@ public class MultimediaManager : IManager
             exactDm.dmDeviceName = deviceName;
             if (ChangeDisplaySettingsEx(deviceName, ref exactDm, IntPtr.Zero, CDS_TEST, IntPtr.Zero) == DISP_CHANGE_SUCCESSFUL)
             {
-                if (ChangeDisplaySettingsEx(deviceName, ref exactDm, IntPtr.Zero, CDS_UPDATEREGISTRY, IntPtr.Zero) == DISP_CHANGE_SUCCESSFUL)
+                if (ChangeDisplaySettingsEx(deviceName, ref exactDm, IntPtr.Zero, CDS_UPDATEREGISTRY | CDS_RESET, IntPtr.Zero) == DISP_CHANGE_SUCCESSFUL)
                 {
                     PrimaryDesktop?.RefreshDisplayMode();
                     return true;
@@ -715,6 +736,63 @@ public class MultimediaManager : IManager
 
         LogManager.LogError("SetResolution failed for {0}x{1}@{2}Hz on {3} (Test results: {4}, {5})",
             width, height, displayFrequency, deviceName, testResult, swappedTest);
+        return false;
+    }
+
+    public int PreferredScalingMode { get; set; } = 0;
+    public bool PreferredIntegerScaling { get; set; } = false;
+
+    /// <summary>
+    /// Re-commits the active display mode with CDS_RESET and the appropriate DM_DISPLAYFIXEDOUTPUT
+    /// (DMDFO_CENTER = 2 for Integer Scaling / Preserve Aspect / Center, DMDFO_STRETCH = 1 for Full Panel)
+    /// so the AMD DAL3 kernel driver (amdkmdag.sys) re-programs the hardware DCN scaler pipe immediately.
+    /// </summary>
+    public bool CommitDisplayScalingMode(bool integerScaling, int scalingMode)
+    {
+        PreferredIntegerScaling = integerScaling;
+        PreferredScalingMode = scalingMode;
+
+        string? deviceName = PrimaryDesktop?.screen?.DeviceName ?? Screen.PrimaryScreen?.DeviceName;
+        if (string.IsNullOrEmpty(deviceName))
+            return false;
+
+        short structSize = (short)Marshal.SizeOf(typeof(DisplayDevice));
+        DisplayDevice dm = new DisplayDevice { dmSize = structSize };
+        if (!EnumDisplaySettings(deviceName, -1, ref dm))
+            return false;
+
+        dm.dmSize = structSize;
+        dm.dmDeviceName = deviceName;
+        dm.dmFields = DisplayDevice.DM_PELSWIDTH | DisplayDevice.DM_PELSHEIGHT | DisplayDevice.DM_DISPLAYFREQUENCY;
+        if (dm.dmDisplayOrientation != 0)
+            dm.dmFields |= DisplayDevice.DM_DISPLAYORIENTATION;
+
+        bool isNonNative = Math.Max(dm.dmPelsWidth, dm.dmPelsHeight) < 2560 || Math.Min(dm.dmPelsWidth, dm.dmPelsHeight) < 1600;
+        if (isNonNative)
+        {
+            int targetFixed = (integerScaling || scalingMode != 1)
+                ? DisplayDevice.DMDFO_CENTER
+                : DisplayDevice.DMDFO_STRETCH;
+            dm.dmDisplayFixedOutput = targetFixed;
+            dm.dmFields |= DisplayDevice.DM_DISPLAYFIXEDOUTPUT;
+
+            if (ChangeDisplaySettingsEx(deviceName, ref dm, IntPtr.Zero, CDS_TEST, IntPtr.Zero) == DISP_CHANGE_SUCCESSFUL)
+            {
+                if (ChangeDisplaySettingsEx(deviceName, ref dm, IntPtr.Zero, CDS_UPDATEREGISTRY | CDS_RESET, IntPtr.Zero) == DISP_CHANGE_SUCCESSFUL)
+                {
+                    PrimaryDesktop?.RefreshDisplayMode();
+                    return true;
+                }
+            }
+        }
+
+        // Fallback: force CDS_RESET commit with current fields so DAL3 re-reads integerScaling from registry
+        dm.dmFields &= ~DisplayDevice.DM_DISPLAYFIXEDOUTPUT;
+        if (ChangeDisplaySettingsEx(deviceName, ref dm, IntPtr.Zero, CDS_UPDATEREGISTRY | CDS_RESET, IntPtr.Zero) == DISP_CHANGE_SUCCESSFUL)
+        {
+            PrimaryDesktop?.RefreshDisplayMode();
+            return true;
+        }
         return false;
     }
 
@@ -980,6 +1058,7 @@ public class MultimediaManager : IManager
 
     public const int CDS_UPDATEREGISTRY = 0x01;
     public const int CDS_TEST = 0x02;
+    public const int CDS_RESET = 0x40000000;
     public const int DISP_CHANGE_SUCCESSFUL = 0;
     public const int DISP_CHANGE_RESTART = 1;
     public const int DISP_CHANGE_FAILED = -1;
