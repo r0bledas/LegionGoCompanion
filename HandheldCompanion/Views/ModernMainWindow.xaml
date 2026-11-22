@@ -481,9 +481,11 @@
             <!-- 2. Navigation Tab Bar -->
             <Border Grid.Row="1" Background="#17191F" BorderBrush="#262A34" BorderThickness="0,0,0,1" Padding="12,6">
                 <StackPanel Orientation="Horizontal">
-                    <Button x:Name="navGeneral" Content="General" Width="105" Height="34" Style="{StaticResource ActiveTouchButton}" Click="NavGeneral_Click" />
-                    <Button x:Name="navController" Content="Controller" Width="105" Height="34" Style="{StaticResource TouchButton}" Click="NavController_Click" />
-                    <Button x:Name="navSettings" Content="Settings" Width="105" Height="34" Style="{StaticResource TouchButton}" Click="NavSettings_Click" />
+                    <Button x:Name="navGeneral" Content="General" Width="98" Height="34" Style="{StaticResource ActiveTouchButton}" Click="NavGeneral_Click" />
+                    <Button x:Name="navGraphics" Content="Graphics" Width="98" Height="34" Style="{StaticResource TouchButton}" Click="NavGraphics_Click" />
+                    <Button x:Name="navPerformance" Content="Performance" Width="112" Height="34" Style="{StaticResource TouchButton}" Click="NavPerformance_Click" />
+                    <Button x:Name="navController" Content="Controller" Width="102" Height="34" Style="{StaticResource TouchButton}" Click="NavController_Click" />
+                    <Button x:Name="navSettings" Content="Settings" Width="98" Height="34" Style="{StaticResource TouchButton}" Click="NavSettings_Click" />
                 </StackPanel>
             </Border>
 
@@ -564,10 +566,14 @@
                         </StackPanel>
                     </Border>
 
-                    <!-- Display Resolution -->
-                    <Border Background="#1C1F26" BorderBrush="#2D323E" BorderThickness="1" CornerRadius="8" Padding="12,8" Margin="0,0,0,4">
+                </StackPanel>
+
+                <!-- TAB 2: GRAPHICS VIEW (Resolution, Refresh Rate, AMD ADLX, GPU Clock) -->
+                <StackPanel x:Name="panelGraphics" Visibility="Collapsed">
+                    <!-- Display Resolution & Refresh Rate -->
+                    <Border Background="#1C1F26" BorderBrush="#2D323E" BorderThickness="1" CornerRadius="8" Padding="12,8" Margin="0,0,0,7">
                         <StackPanel>
-                            <TextBlock Text="Display Resolution" FontSize="13.5" FontWeight="Bold" Foreground="#FFFFFF" Margin="0,0,0,5" />
+                            <TextBlock Text="Display Resolution &amp; Refresh Rate" FontSize="13.5" FontWeight="Bold" Foreground="#FFFFFF" Margin="0,0,0,5" />
                             <Grid Grid.IsSharedSizeScope="True" HorizontalAlignment="Left" Margin="-3,0">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto" SharedSizeGroup="ResBtn" />
@@ -575,14 +581,115 @@
                                     <ColumnDefinition Width="Auto" SharedSizeGroup="ResBtn" />
                                     <ColumnDefinition Width="Auto" SharedSizeGroup="ResBtn" />
                                     <ColumnDefinition Width="Auto" SharedSizeGroup="ResBtn" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" SharedSizeGroup="HzBtn" />
+                                    <ColumnDefinition Width="Auto" SharedSizeGroup="HzBtn" />
                                 </Grid.ColumnDefinitions>
                                 <Button Grid.Column="0" x:Name="btnRes800" Content="800p" Height="34" Padding="16,5" Style="{StaticResource TouchButton}" Click="BtnRes_Click" Tag="800" />
                                 <Button Grid.Column="1" x:Name="btnRes1000" Content="1000p" Height="34" Padding="16,5" Style="{StaticResource TouchButton}" Click="BtnRes_Click" Tag="1000" />
                                 <Button Grid.Column="2" x:Name="btnRes1200" Content="1200p" Height="34" Padding="16,5" Style="{StaticResource TouchButton}" Click="BtnRes_Click" Tag="1200" />
                                 <Button Grid.Column="3" x:Name="btnRes1440" Content="1440p" Height="34" Padding="16,5" Style="{StaticResource TouchButton}" Click="BtnRes_Click" Tag="1440" />
                                 <Button Grid.Column="4" x:Name="btnRes1600" Content="1600p" Height="34" Padding="16,5" Style="{StaticResource TouchButton}" Click="BtnRes_Click" Tag="1600" />
+                                <Border Grid.Column="5" Width="1" Height="22" Background="#383E4C" VerticalAlignment="Center" Margin="6,0" SnapsToDevicePixels="True" />
+                                <Button Grid.Column="6" x:Name="btnHz60" Content="60Hz" Height="34" Padding="14,5" Style="{StaticResource TouchButton}" Click="BtnRefreshRate_Click" Tag="60" />
+                                <Button Grid.Column="7" x:Name="btnHz144" Content="144Hz" Height="34" Padding="14,5" Style="{StaticResource TouchButton}" Click="BtnRefreshRate_Click" Tag="144" />
                             </Grid>
                             <TextBlock x:Name="txtCurrentRes" Text="Current: Checking..." FontSize="11.5" Foreground="#9EA4B0" Margin="4,4,0,0" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- AMD Radeon Graphics (ADLX) -->
+                    <Border Background="#1C1F26" BorderBrush="#2D323E" BorderThickness="1" CornerRadius="8" Padding="12,8" Margin="0,0,0,7">
+                        <StackPanel>
+                            <TextBlock Text="AMD Radeon Graphics (ADLX)" FontSize="13.5" FontWeight="Bold" Foreground="#FFFFFF" Margin="0,0,0,5" />
+                            <WrapPanel Margin="-3,0">
+                                <Button x:Name="btnAdlxInteger" Content="Integer Scaling: Off" Height="34" Padding="14,5" Style="{StaticResource TouchButton}" Click="BtnAdlxToggle_Click" Tag="IntegerScaling" />
+                                <Button x:Name="btnAdlxGpuScale" Content="GPU Scaling: Off" Height="34" Padding="14,5" Style="{StaticResource TouchButton}" Click="BtnAdlxToggle_Click" Tag="GPUScaling" />
+                                <Button x:Name="btnAdlxFsr" Content="RSR / FSR: Off" Height="34" Padding="14,5" Style="{StaticResource TouchButton}" Click="BtnAdlxToggle_Click" Tag="FSR" />
+                                <Button x:Name="btnAdlxAfmf" Content="Frame Gen (AFMF): Off" Height="34" Padding="14,5" Style="{StaticResource TouchButton}" Click="BtnAdlxToggle_Click" Tag="AFMF" />
+                                <Button x:Name="btnAdlxSharpen" Content="Sharpening: Off" Height="34" Padding="14,5" Style="{StaticResource TouchButton}" Click="BtnAdlxToggle_Click" Tag="Sharpen" />
+                            </WrapPanel>
+                            <TextBlock x:Name="txtAdlxStatus" Text="ADLX: Checking AMD driver..." FontSize="11.5" Foreground="#9EA4B0" Margin="4,4,0,0" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Manual GPU Clock Lock (Radeon 780M) -->
+                    <Border Background="#1C1F26" BorderBrush="#2D323E" BorderThickness="1" CornerRadius="8" Padding="12,8" Margin="0,0,0,4">
+                        <StackPanel>
+                            <TextBlock Text="GPU Clock Lock (Radeon 780M)" FontSize="13.5" FontWeight="Bold" Foreground="#FFFFFF" Margin="0,0,0,5" />
+                            <Grid Grid.IsSharedSizeScope="True" HorizontalAlignment="Left" Margin="-3,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" SharedSizeGroup="GpuClkBtn" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" SharedSizeGroup="GpuClkBtn" />
+                                    <ColumnDefinition Width="Auto" SharedSizeGroup="GpuClkBtn" />
+                                    <ColumnDefinition Width="Auto" SharedSizeGroup="GpuClkBtn" />
+                                    <ColumnDefinition Width="Auto" SharedSizeGroup="GpuClkBtn" />
+                                    <ColumnDefinition Width="Auto" SharedSizeGroup="GpuClkBtn" />
+                                </Grid.ColumnDefinitions>
+                                <Button Grid.Column="0" x:Name="btnGpuAuto" Content="Auto" Height="34" Padding="14,5" Style="{StaticResource ActiveTouchButton}" Click="BtnGpuClockPreset_Click" Tag="0" />
+                                <Border Grid.Column="1" Width="1" Height="22" Background="#383E4C" VerticalAlignment="Center" Margin="6,0" SnapsToDevicePixels="True" />
+                                <Button Grid.Column="2" x:Name="btnGpu1200" Content="1200" Height="34" Padding="14,5" Style="{StaticResource TouchButton}" Click="BtnGpuClockPreset_Click" Tag="1200" />
+                                <Button Grid.Column="3" x:Name="btnGpu1600" Content="1600" Height="34" Padding="14,5" Style="{StaticResource TouchButton}" Click="BtnGpuClockPreset_Click" Tag="1600" />
+                                <Button Grid.Column="4" x:Name="btnGpu2000" Content="2000" Height="34" Padding="14,5" Style="{StaticResource TouchButton}" Click="BtnGpuClockPreset_Click" Tag="2000" />
+                                <Button Grid.Column="5" x:Name="btnGpu2400" Content="2400" Height="34" Padding="14,5" Style="{StaticResource TouchButton}" Click="BtnGpuClockPreset_Click" Tag="2400" />
+                                <Button Grid.Column="6" x:Name="btnGpu2700" Content="2700" Height="34" Padding="14,5" Style="{StaticResource TouchButton}" Click="BtnGpuClockPreset_Click" Tag="2700" />
+                            </Grid>
+                            <StackPanel Orientation="Horizontal" Margin="0,5,0,0" VerticalAlignment="Center">
+                                <TextBlock Text="Custom MHz:" FontSize="12.5" Foreground="#9EA4B0" VerticalAlignment="Center" Margin="2,0,10,0" />
+                                <Button x:Name="btnGpuMinus" Content="-" Height="32" Style="{StaticResource StepButton}" Click="BtnGpuClockMinus_Click" />
+                                <Border Background="#252932" BorderBrush="#383E4C" BorderThickness="1" CornerRadius="6" MinWidth="92" Height="32" Margin="3" Padding="8,0">
+                                    <TextBlock x:Name="txtGpuClockCurrent" Text="Auto" FontSize="13" FontWeight="Bold" Foreground="#FFFFFF" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                </Border>
+                                <Button x:Name="btnGpuPlus" Content="+" Height="32" Style="{StaticResource StepButton}" Click="BtnGpuClockPlus_Click" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+
+                <!-- TAB 3: PERFORMANCE VIEW (CPU Boost, EPP, Per-Game Profiles) -->
+                <StackPanel x:Name="panelPerformance" Visibility="Collapsed">
+                    <!-- CPU Boost & Power Bias (EPP) -->
+                    <Border Background="#1C1F26" BorderBrush="#2D323E" BorderThickness="1" CornerRadius="8" Padding="12,8" Margin="0,0,0,7">
+                        <StackPanel>
+                            <TextBlock Text="CPU Turbo Boost &amp; Power Bias (EPP)" FontSize="13.5" FontWeight="Bold" Foreground="#FFFFFF" Margin="0,0,0,5" />
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,6">
+                                <TextBlock Text="CPU Boost:" FontSize="12.5" Foreground="#9EA4B0" VerticalAlignment="Center" Margin="2,0,10,0" />
+                                <Button x:Name="btnCpuBoostOn" Content="On" Width="76" Height="34" Style="{StaticResource TouchButton}" Click="BtnCpuBoost_Click" Tag="1" />
+                                <Button x:Name="btnCpuBoostOff" Content="Off" Width="76" Height="34" Style="{StaticResource TouchButton}" Click="BtnCpuBoost_Click" Tag="0" />
+                                <TextBlock Text="Turn Off in GPU-bound games to give more TDP headroom to the 780M iGPU." FontSize="11" Foreground="#888E9E" VerticalAlignment="Center" Margin="10,0,0,0" TextWrapping="Wrap" />
+                            </StackPanel>
+                            <Grid Grid.IsSharedSizeScope="True" HorizontalAlignment="Left" Margin="-3,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" SharedSizeGroup="EppBtn" />
+                                    <ColumnDefinition Width="Auto" SharedSizeGroup="EppBtn" />
+                                    <ColumnDefinition Width="Auto" SharedSizeGroup="EppBtn" />
+                                    <ColumnDefinition Width="Auto" SharedSizeGroup="EppBtn" />
+                                </Grid.ColumnDefinitions>
+                                <Button Grid.Column="0" x:Name="btnEpp80" Content="Battery (80)" Height="34" Padding="14,5" Style="{StaticResource TouchButton}" Click="BtnEpp_Click" Tag="80" />
+                                <Button Grid.Column="1" x:Name="btnEpp50" Content="Balanced (50)" Height="34" Padding="14,5" Style="{StaticResource TouchButton}" Click="BtnEpp_Click" Tag="50" />
+                                <Button Grid.Column="2" x:Name="btnEpp20" Content="Perf (20)" Height="34" Padding="14,5" Style="{StaticResource TouchButton}" Click="BtnEpp_Click" Tag="20" />
+                                <Button Grid.Column="3" x:Name="btnEpp0" Content="Max (0)" Height="34" Padding="14,5" Style="{StaticResource TouchButton}" Click="BtnEpp_Click" Tag="0" />
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Per-Game Auto Profiles -->
+                    <Border Background="#1C1F26" BorderBrush="#2D323E" BorderThickness="1" CornerRadius="8" Padding="12,8" Margin="0,0,0,4">
+                        <StackPanel>
+                            <TextBlock Text="Per-Game Auto Profiles" FontSize="13.5" FontWeight="Bold" Foreground="#FFFFFF" Margin="0,0,0,5" />
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,6">
+                                <TextBlock Text="Auto-Apply:" FontSize="12.5" Foreground="#9EA4B0" VerticalAlignment="Center" Margin="2,0,10,0" />
+                                <Button x:Name="btnProfilesOn" Content="On" Width="70" Height="32" Style="{StaticResource ActiveTouchButton}" Click="BtnProfilesToggle_Click" Tag="1" />
+                                <Button x:Name="btnProfilesOff" Content="Off" Width="70" Height="32" Style="{StaticResource TouchButton}" Click="BtnProfilesToggle_Click" Tag="0" />
+                                <TextBlock x:Name="txtActiveGameProfile" Text="Active Profile: None (Desktop)" FontSize="11.5" Foreground="#0090FF" VerticalAlignment="Center" Margin="12,0,0,0" />
+                            </StackPanel>
+                            <WrapPanel Margin="-3,0,0,6" VerticalAlignment="Center">
+                                <Button x:Name="btnRefreshApps" Content="Refresh Apps" Height="32" Padding="12,4" Style="{StaticResource TouchButton}" Click="BtnRefreshApps_Click" />
+                                <ComboBox x:Name="cmbRunningApps" Width="230" Height="32" Margin="4,3" IsEditable="True" ToolTip="Select a running game or type its process name (without .exe)" />
+                                <Button x:Name="btnSaveGameProfile" Content="Save Current Settings for App" Height="32" Padding="12,4" Style="{StaticResource ActiveTouchButton}" Click="BtnSaveGameProfile_Click" />
+                            </WrapPanel>
+                            <StackPanel x:Name="panelGameProfilesList" />
                         </StackPanel>
                     </Border>
                 </StackPanel>

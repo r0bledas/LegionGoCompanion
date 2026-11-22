@@ -15,6 +15,7 @@ using System.Windows.Media;
 using System.Windows.Threading;
 using Microsoft.Win32;
 using GregsStack.InputSimulatorStandard.Native;
+using HandheldCompanion.ADLX;
 using HandheldCompanion.Devices;
 using HandheldCompanion.Devices.Lenovo;
 using HandheldCompanion.Inputs;
@@ -69,7 +70,29 @@ namespace HandheldCompanion.Views
         private Thread? _eventListenerThread;
         private volatile bool _isListening = true;
 
+        private static readonly SolidColorBrush BrushGreen = CreateFrozenBrush(48, 209, 88);
+        private static readonly SolidColorBrush BrushRed = CreateFrozenBrush(255, 69, 58);
+        private static readonly SolidColorBrush BrushGray = CreateFrozenBrush(158, 164, 176);
+        private static readonly SolidColorBrush BrushBlue = CreateFrozenBrush(0, 145, 255);
+        private static readonly SolidColorBrush BrushWhite = CreateFrozenBrush(240, 240, 240);
+        private static readonly SolidColorBrush BrushPurple = CreateFrozenBrush(175, 82, 222);
+        private static readonly SolidColorBrush BrushAdminGreenBg = CreateFrozenBrush(28, 56, 37);
+        private static readonly SolidColorBrush BrushAdminGreenBorder = CreateFrozenBrush(46, 107, 62);
+        private static readonly SolidColorBrush BrushAdminRedBg = CreateFrozenBrush(56, 28, 28);
+        private static readonly SolidColorBrush BrushAdminRedBorder = CreateFrozenBrush(107, 46, 46);
+        private static readonly SolidColorBrush BrushProfileCardBg = CreateFrozenBrush(37, 41, 50);
+        private static readonly SolidColorBrush BrushProfileCardBorder = CreateFrozenBrush(56, 62, 76);
+
+        private static SolidColorBrush CreateFrozenBrush(byte r, byte g, byte b)
+        {
+            var brush = new SolidColorBrush(Color.FromRgb(r, g, b));
+            brush.Freeze();
+            return brush;
+        }
+
         private int _currentTdp = 15;
+        private string _currentFanMode = "Auto";
+        private int _currentGpuClockMhz = 0;
         private bool _updatingUi = false;
         private ReleaseInfo? _foundRelease;
 
@@ -146,17 +169,17 @@ namespace HandheldCompanion.Views
             if (isAdmin)
             {
                 txtAdminStatus.Text = "Admin: Elevated";
-                badgeAdmin.Background = new SolidColorBrush(Color.FromRgb(28, 56, 37));
-                badgeAdmin.BorderBrush = new SolidColorBrush(Color.FromRgb(46, 107, 62));
-                txtAdminStatus.Foreground = new SolidColorBrush(Color.FromRgb(48, 209, 88));
+                badgeAdmin.Background = BrushAdminGreenBg;
+                badgeAdmin.BorderBrush = BrushAdminGreenBorder;
+                txtAdminStatus.Foreground = BrushGreen;
                 btnElevate.Visibility = Visibility.Collapsed;
             }
             else
             {
                 txtAdminStatus.Text = "Admin: Standard";
-                badgeAdmin.Background = new SolidColorBrush(Color.FromRgb(56, 28, 28));
-                badgeAdmin.BorderBrush = new SolidColorBrush(Color.FromRgb(107, 46, 46));
-                txtAdminStatus.Foreground = new SolidColorBrush(Color.FromRgb(255, 69, 58));
+                badgeAdmin.Background = BrushAdminRedBg;
+                badgeAdmin.BorderBrush = BrushAdminRedBorder;
+                txtAdminStatus.Foreground = BrushRed;
                 btnElevate.Visibility = Visibility.Visible;
             }
 
@@ -167,6 +190,7 @@ namespace HandheldCompanion.Views
             StartDiagnosticsTimer();
 
             InitializeGeneralView();
+            InitializePerformanceView();
             InitializeControllerView();
             InitializeSettingsView();
 
@@ -227,6 +251,19 @@ namespace HandheldCompanion.Views
                 return;
 
             SyncWindowChromeState();
+
+            if (WindowState == WindowState.Minimized)
+            {
+                _diagnosticsTimer?.Stop();
+            }
+            else if (IsVisible)
+            {
+                if (_diagnosticsTimer != null && !_diagnosticsTimer.IsEnabled)
+                {
+                    _diagnosticsTimer.Start();
+                    UpdateDiagnostics();
+                }
+            }
         }
 
         private void ScrollViewer_ManipulationBoundaryFeedback(object? sender, ManipulationBoundaryFeedbackEventArgs e)
@@ -255,14 +292,41 @@ namespace HandheldCompanion.Views
         {
             SetNavActive(navGeneral);
             panelGeneral.Visibility = Visibility.Visible;
+            panelGraphics.Visibility = Visibility.Collapsed;
+            panelPerformance.Visibility = Visibility.Collapsed;
             panelController.Visibility = Visibility.Collapsed;
             panelSettings.Visibility = Visibility.Collapsed;
+        }
+
+        private void NavGraphics_Click(object sender, RoutedEventArgs e)
+        {
+            SetNavActive(navGraphics);
+            panelGeneral.Visibility = Visibility.Collapsed;
+            panelGraphics.Visibility = Visibility.Visible;
+            panelPerformance.Visibility = Visibility.Collapsed;
+            panelController.Visibility = Visibility.Collapsed;
+            panelSettings.Visibility = Visibility.Collapsed;
+            UpdateResolutionControls();
+            RefreshPerformanceControls();
+        }
+
+        private void NavPerformance_Click(object sender, RoutedEventArgs e)
+        {
+            SetNavActive(navPerformance);
+            panelGeneral.Visibility = Visibility.Collapsed;
+            panelGraphics.Visibility = Visibility.Collapsed;
+            panelPerformance.Visibility = Visibility.Visible;
+            panelController.Visibility = Visibility.Collapsed;
+            panelSettings.Visibility = Visibility.Collapsed;
+            RefreshPerformanceControls();
         }
 
         private void NavController_Click(object sender, RoutedEventArgs e)
         {
             SetNavActive(navController);
             panelGeneral.Visibility = Visibility.Collapsed;
+            panelGraphics.Visibility = Visibility.Collapsed;
+            panelPerformance.Visibility = Visibility.Collapsed;
             panelController.Visibility = Visibility.Visible;
             panelSettings.Visibility = Visibility.Collapsed;
             UpdateGyroStatus();
@@ -273,6 +337,8 @@ namespace HandheldCompanion.Views
         {
             SetNavActive(navSettings);
             panelGeneral.Visibility = Visibility.Collapsed;
+            panelGraphics.Visibility = Visibility.Collapsed;
+            panelPerformance.Visibility = Visibility.Collapsed;
             panelController.Visibility = Visibility.Collapsed;
             panelSettings.Visibility = Visibility.Visible;
         }
@@ -284,10 +350,14 @@ namespace HandheldCompanion.Views
             var normalStyle = (Style)FindResource("TouchButton");
 
             navGeneral.Style = (navGeneral == activeBtn) ? activeStyle : normalStyle;
+            navGraphics.Style = (navGraphics == activeBtn) ? activeStyle : normalStyle;
+            navPerformance.Style = (navPerformance == activeBtn) ? activeStyle : normalStyle;
             navController.Style = (navController == activeBtn) ? activeStyle : normalStyle;
             navSettings.Style = (navSettings == activeBtn) ? activeStyle : normalStyle;
 
             TouchHoverHelper.SetIsHovered(navGeneral, false);
+            TouchHoverHelper.SetIsHovered(navGraphics, false);
+            TouchHoverHelper.SetIsHovered(navPerformance, false);
             TouchHoverHelper.SetIsHovered(navController, false);
             TouchHoverHelper.SetIsHovered(navSettings, false);
         }
@@ -454,6 +524,7 @@ namespace HandheldCompanion.Views
                 btnFanFull.Style = isFullSpeed ? activeStyle : normalStyle;
                 btnFan50.Style = (!isAuto && !isFullSpeed && percentage == 50) ? activeStyle : normalStyle;
                 btnFan70.Style = (!isAuto && !isFullSpeed && percentage == 70) ? activeStyle : normalStyle;
+                _currentFanMode = isAuto ? "Auto" : (isFullSpeed ? "100" : percentage.ToString());
 
                 Task.Run(() =>
                 {
@@ -502,6 +573,42 @@ namespace HandheldCompanion.Views
             }
         }
 
+        private void BtnRefreshRate_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button b && b.Tag is string s && int.TryParse(s, out int hz))
+            {
+                try
+                {
+                    var mm = ManagerFactory.multimediaManager;
+                    var dev = mm?.PrimaryDesktop?.screen?.DeviceName ?? System.Windows.Forms.Screen.PrimaryScreen?.DeviceName;
+                    int w = 0, h = 0;
+                    if (!string.IsNullOrEmpty(dev))
+                    {
+                        var curDm = MultimediaManager.GetDisplay(dev);
+                        w = Math.Max(curDm.dmPelsWidth, curDm.dmPelsHeight);
+                        h = Math.Min(curDm.dmPelsWidth, curDm.dmPelsHeight);
+                    }
+                    if (w > 0 && h > 0 && mm != null)
+                    {
+                        bool ok = mm.SetResolution(w, h, hz);
+                        if (ok)
+                        {
+                            UpdateResolutionControls(w, h, hz);
+                            Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => UpdateResolutionControls()));
+                        }
+                        else
+                        {
+                            UpdateResolutionControls();
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    LogManager.LogError("BtnRefreshRate_Click error: {0}", ex.Message);
+                }
+            }
+        }
+
         private void ApplyResolution(int width, int height)
         {
             try
@@ -511,7 +618,7 @@ namespace HandheldCompanion.Views
                 if (ok)
                 {
                     // Immediately reflect the committed resolution in the UI, then re-verify live OS settings
-                    UpdateResolutionControls(width, height);
+                    UpdateResolutionControls(width, height, freq > 0 ? freq : (int?)null);
                     Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => UpdateResolutionControls()));
                 }
                 else
@@ -526,44 +633,46 @@ namespace HandheldCompanion.Views
             }
         }
 
-        private void UpdateResolutionControls(int? expectedW = null, int? expectedH = null)
+        private void UpdateResolutionControls(int? expectedW = null, int? expectedH = null, int? expectedHz = null)
         {
-            int currentW = 0, currentH = 0;
+            int currentW = 0, currentH = 0, currentHz = expectedHz ?? 0;
             if (expectedW.HasValue && expectedH.HasValue)
             {
                 currentW = expectedW.Value;
                 currentH = expectedH.Value;
             }
-            else
-            {
-                var primary = ManagerFactory.multimediaManager?.PrimaryDesktop;
-                string? deviceName = primary?.screen?.DeviceName ?? System.Windows.Forms.Screen.PrimaryScreen?.DeviceName;
-                if (!string.IsNullOrEmpty(deviceName))
-                {
-                    var liveDm = MultimediaManager.GetDisplay(deviceName);
-                    if (liveDm.dmPelsWidth > 0 && liveDm.dmPelsHeight > 0)
-                    {
-                        currentW = liveDm.dmPelsWidth;
-                        currentH = liveDm.dmPelsHeight;
-                    }
-                }
 
-                if (currentW == 0 || currentH == 0)
+            var primary = ManagerFactory.multimediaManager?.PrimaryDesktop;
+            string? deviceName = primary?.screen?.DeviceName ?? System.Windows.Forms.Screen.PrimaryScreen?.DeviceName;
+            if (!string.IsNullOrEmpty(deviceName))
+            {
+                var liveDm = MultimediaManager.GetDisplay(deviceName);
+                if (currentW == 0 && liveDm.dmPelsWidth > 0 && liveDm.dmPelsHeight > 0)
                 {
-                    var current = primary?.GetResolution();
-                    if (current != null)
+                    currentW = liveDm.dmPelsWidth;
+                    currentH = liveDm.dmPelsHeight;
+                }
+                if (currentHz == 0 && liveDm.dmDisplayFrequency > 0)
+                {
+                    currentHz = liveDm.dmDisplayFrequency;
+                }
+            }
+
+            if (currentW == 0 || currentH == 0)
+            {
+                var current = primary?.GetResolution();
+                if (current != null)
+                {
+                    currentW = current.Width;
+                    currentH = current.Height;
+                }
+                else
+                {
+                    var scr = System.Windows.Forms.Screen.PrimaryScreen;
+                    if (scr != null)
                     {
-                        currentW = current.Width;
-                        currentH = current.Height;
-                    }
-                    else
-                    {
-                        var scr = System.Windows.Forms.Screen.PrimaryScreen;
-                        if (scr != null)
-                        {
-                            currentW = scr.Bounds.Width;
-                            currentH = scr.Bounds.Height;
-                        }
+                        currentW = scr.Bounds.Width;
+                        currentH = scr.Bounds.Height;
                     }
                 }
             }
@@ -571,7 +680,7 @@ namespace HandheldCompanion.Views
             int w = Math.Max(currentW, currentH);
             int h = Math.Min(currentW, currentH);
 
-            txtCurrentRes.Text = $"Current: {w}x{h}";
+            txtCurrentRes.Text = currentHz > 0 ? $"Current: {w}x{h} @ {currentHz}Hz" : $"Current: {w}x{h}";
 
             var activeStyle = (Style)FindResource("ActiveTouchButton");
             var normalStyle = (Style)FindResource("TouchButton");
@@ -581,7 +690,392 @@ namespace HandheldCompanion.Views
             btnRes1200.Style = (w == 1920 && h == 1200) ? activeStyle : normalStyle;
             btnRes1440.Style = (w == 2304 && h == 1440) ? activeStyle : normalStyle;
             btnRes1600.Style = (w == 2560 && h == 1600) ? activeStyle : normalStyle;
+
+            btnHz60.Style = (currentHz >= 58 && currentHz <= 62) ? activeStyle : normalStyle;
+            btnHz144.Style = (currentHz >= 140 && currentHz <= 148) ? activeStyle : normalStyle;
         }
+
+        #region Performance View (CPU Boost, EPP, GPU Clock, AMD ADLX, Per-Game Profiles)
+        private void InitializePerformanceView()
+        {
+            GameProfileService.Instance.ActiveProfileChanged += (activeName) =>
+            {
+                if (_isExiting) return;
+                Dispatcher.BeginInvoke(() =>
+                {
+                    if (_isExiting) return;
+                    txtActiveGameProfile.Text = string.IsNullOrEmpty(activeName)
+                        ? "Active Profile: None (Desktop)"
+                        : $"Active Profile: {activeName}";
+                    UpdateResolutionControls();
+                    RefreshPerformanceControls();
+                });
+            };
+
+            RefreshRunningAppsCombo();
+            RebuildGameProfilesList();
+            RefreshPerformanceControls();
+        }
+
+        private void RefreshPerformanceControls()
+        {
+            try
+            {
+                var activeStyle = (Style)FindResource("ActiveTouchButton");
+                var normalStyle = (Style)FindResource("TouchButton");
+
+                // CPU Boost
+                bool boostOn = PerformanceManager.GetCpuBoostEnabled();
+                btnCpuBoostOn.Style = boostOn ? activeStyle : normalStyle;
+                btnCpuBoostOff.Style = !boostOn ? activeStyle : normalStyle;
+
+                // EPP
+                uint epp = PerformanceManager.GetEppValue();
+                btnEpp80.Style = (epp >= 70) ? activeStyle : normalStyle;
+                btnEpp50.Style = (epp >= 35 && epp < 70) ? activeStyle : normalStyle;
+                btnEpp20.Style = (epp >= 10 && epp < 35) ? activeStyle : normalStyle;
+                btnEpp0.Style = (epp < 10) ? activeStyle : normalStyle;
+
+                // GPU Clock
+                _currentGpuClockMhz = PerformanceManager.GetManualGpuClock();
+                UpdateGpuClockVisuals();
+
+                // Per-Game Profiles status
+                bool profilesOn = GameProfileService.Instance.Enabled;
+                btnProfilesOn.Style = profilesOn ? activeStyle : normalStyle;
+                btnProfilesOff.Style = !profilesOn ? activeStyle : normalStyle;
+                string? activeName = GameProfileService.Instance.ActiveProfileName;
+                txtActiveGameProfile.Text = string.IsNullOrEmpty(activeName)
+                    ? "Active Profile: None (Desktop)"
+                    : $"Active Profile: {activeName}";
+
+                // AMD ADLX (queried on background thread so UI never stalls)
+                RefreshAdlxControlsAsync();
+            }
+            catch { }
+        }
+
+        private void UpdateGpuClockVisuals()
+        {
+            var activeStyle = (Style)FindResource("ActiveTouchButton");
+            var normalStyle = (Style)FindResource("TouchButton");
+
+            btnGpuAuto.Style = (_currentGpuClockMhz <= 0) ? activeStyle : normalStyle;
+            btnGpu1200.Style = (_currentGpuClockMhz == 1200) ? activeStyle : normalStyle;
+            btnGpu1600.Style = (_currentGpuClockMhz == 1600) ? activeStyle : normalStyle;
+            btnGpu2000.Style = (_currentGpuClockMhz == 2000) ? activeStyle : normalStyle;
+            btnGpu2400.Style = (_currentGpuClockMhz == 2400) ? activeStyle : normalStyle;
+            btnGpu2700.Style = (_currentGpuClockMhz == 2700) ? activeStyle : normalStyle;
+            txtGpuClockCurrent.Text = _currentGpuClockMhz <= 0 ? "Auto" : $"{_currentGpuClockMhz} MHz";
+        }
+
+        private void BtnCpuBoost_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button b && b.Tag is string s)
+            {
+                bool enable = s == "1";
+                var activeStyle = (Style)FindResource("ActiveTouchButton");
+                var normalStyle = (Style)FindResource("TouchButton");
+                btnCpuBoostOn.Style = enable ? activeStyle : normalStyle;
+                btnCpuBoostOff.Style = !enable ? activeStyle : normalStyle;
+                Task.Run(() => PerformanceManager.SetCpuBoostEnabled(enable));
+            }
+        }
+
+        private void BtnEpp_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button b && b.Tag is string s && uint.TryParse(s, out uint epp))
+            {
+                var activeStyle = (Style)FindResource("ActiveTouchButton");
+                var normalStyle = (Style)FindResource("TouchButton");
+                btnEpp80.Style = (epp == 80) ? activeStyle : normalStyle;
+                btnEpp50.Style = (epp == 50) ? activeStyle : normalStyle;
+                btnEpp20.Style = (epp == 20) ? activeStyle : normalStyle;
+                btnEpp0.Style = (epp == 0) ? activeStyle : normalStyle;
+                Task.Run(() => PerformanceManager.SetEppValue(epp));
+            }
+        }
+
+        private void BtnGpuClockPreset_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button b && b.Tag is string s && int.TryParse(s, out int mhz))
+            {
+                ApplyGpuClock(mhz);
+            }
+        }
+
+        private void BtnGpuClockMinus_Click(object sender, RoutedEventArgs e)
+        {
+            int next = _currentGpuClockMhz <= 400 ? 0 : _currentGpuClockMhz - 100;
+            ApplyGpuClock(next);
+        }
+
+        private void BtnGpuClockPlus_Click(object sender, RoutedEventArgs e)
+        {
+            int next = _currentGpuClockMhz <= 0 ? 1200 : Math.Min(3000, _currentGpuClockMhz + 100);
+            ApplyGpuClock(next);
+        }
+
+        private void ApplyGpuClock(int mhz)
+        {
+            _currentGpuClockMhz = mhz <= 0 ? 0 : Math.Clamp(mhz, 400, 3000);
+            UpdateGpuClockVisuals();
+            int target = _currentGpuClockMhz;
+            Task.Run(() => PerformanceManager.SetManualGpuClock(target));
+        }
+
+        private void RefreshAdlxControlsAsync()
+        {
+            Task.Run(() =>
+            {
+                bool ready = false;
+                bool supInt = false, valInt = false;
+                bool supGpuScale = false, valGpuScale = false;
+                bool supFsr = false, valFsr = false;
+                bool supAfmf = false, valAfmf = false;
+                bool supSharp = false, valSharp = false;
+
+                try
+                {
+                    supInt = ADLXBackend.HasIntegerScalingSupport(0);
+                    if (supInt) valInt = ADLXBackend.GetIntegerScaling(0);
+
+                    supGpuScale = ADLXBackend.HasGPUScalingSupport(0);
+                    if (supGpuScale) valGpuScale = ADLXBackend.GetGPUScaling(0);
+
+                    supFsr = ADLXBackend.HasFSRSupport(0);
+                    if (supFsr) valFsr = ADLXBackend.GetFSR(0);
+
+                    supAfmf = ADLXBackend.HasFFXFrameGenSupport(0);
+                    if (supAfmf) valAfmf = ADLXBackend.GetFFXFrameGen(0);
+
+                    supSharp = ADLXBackend.HasSharpenDesktopSupport(0);
+                    if (supSharp) valSharp = ADLXBackend.GetSharpenDesktop(0);
+
+                    ready = supInt || supGpuScale || supFsr || supAfmf || supSharp;
+                }
+                catch { }
+
+                if (_isExiting) return;
+                Dispatcher.BeginInvoke(() =>
+                {
+                    if (_isExiting) return;
+                    var activeStyle = (Style)FindResource("ActiveTouchButton");
+                    var normalStyle = (Style)FindResource("TouchButton");
+
+                    btnAdlxInteger.IsEnabled = supInt;
+                    btnAdlxInteger.Content = valInt ? "Integer Scaling: On" : "Integer Scaling: Off";
+                    btnAdlxInteger.Style = valInt ? activeStyle : normalStyle;
+
+                    btnAdlxGpuScale.IsEnabled = supGpuScale;
+                    btnAdlxGpuScale.Content = valGpuScale ? "GPU Scaling: On" : "GPU Scaling: Off";
+                    btnAdlxGpuScale.Style = valGpuScale ? activeStyle : normalStyle;
+
+                    btnAdlxFsr.IsEnabled = supFsr;
+                    btnAdlxFsr.Content = valFsr ? "RSR / FSR: On" : "RSR / FSR: Off";
+                    btnAdlxFsr.Style = valFsr ? activeStyle : normalStyle;
+
+                    btnAdlxAfmf.IsEnabled = supAfmf;
+                    btnAdlxAfmf.Content = valAfmf ? "Frame Gen (AFMF): On" : "Frame Gen (AFMF): Off";
+                    btnAdlxAfmf.Style = valAfmf ? activeStyle : normalStyle;
+
+                    btnAdlxSharpen.IsEnabled = supSharp;
+                    btnAdlxSharpen.Content = valSharp ? "Sharpening: On" : "Sharpening: Off";
+                    btnAdlxSharpen.Style = valSharp ? activeStyle : normalStyle;
+
+                    txtAdlxStatus.Text = ready
+                        ? "ADLX: Connected to AMD Radeon driver"
+                        : "ADLX: Waiting for AMD Radeon driver (or unsupported on current display)";
+                    txtAdlxStatus.Foreground = ready ? BrushGreen : BrushGray;
+                });
+            });
+        }
+
+        private void BtnAdlxToggle_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Button b || b.Tag is not string feature)
+                return;
+
+            Task.Run(() =>
+            {
+                try
+                {
+                    switch (feature)
+                    {
+                        case "IntegerScaling":
+                            bool curInt = ADLXBackend.GetIntegerScaling(0);
+                            if (!curInt && ADLXBackend.HasGPUScalingSupport(0))
+                                ADLXBackend.SetGPUScaling(0, true);
+                            ADLXBackend.SetIntegerScaling(0, !curInt);
+                            break;
+                        case "GPUScaling":
+                            ADLXBackend.SetGPUScaling(0, !ADLXBackend.GetGPUScaling(0));
+                            break;
+                        case "FSR":
+                            ADLXBackend.SetFSR(0, !ADLXBackend.GetFSR(0));
+                            break;
+                        case "AFMF":
+                            ADLXBackend.SetFFXFrameGen(0, !ADLXBackend.GetFFXFrameGen(0));
+                            break;
+                        case "Sharpen":
+                            ADLXBackend.SetSharpenDesktop(0, !ADLXBackend.GetSharpenDesktop(0));
+                            break;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    LogManager.LogError("ADLX toggle '{0}' failed: {1}", feature, ex.Message);
+                }
+
+                RefreshAdlxControlsAsync();
+            });
+        }
+
+        private void BtnProfilesToggle_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button b && b.Tag is string s)
+            {
+                bool enable = s == "1";
+                GameProfileService.Instance.Enabled = enable;
+                var activeStyle = (Style)FindResource("ActiveTouchButton");
+                var normalStyle = (Style)FindResource("TouchButton");
+                btnProfilesOn.Style = enable ? activeStyle : normalStyle;
+                btnProfilesOff.Style = !enable ? activeStyle : normalStyle;
+            }
+        }
+
+        private void BtnRefreshApps_Click(object sender, RoutedEventArgs e)
+        {
+            RefreshRunningAppsCombo();
+        }
+
+        private void RefreshRunningAppsCombo()
+        {
+            string prev = cmbRunningApps.Text;
+            cmbRunningApps.Items.Clear();
+            foreach (var proc in GameProfileService.GetRunningWindowedProcesses())
+            {
+                cmbRunningApps.Items.Add(proc);
+            }
+            if (!string.IsNullOrWhiteSpace(prev))
+                cmbRunningApps.Text = prev;
+            else if (cmbRunningApps.Items.Count > 0)
+                cmbRunningApps.SelectedIndex = 0;
+        }
+
+        private void BtnSaveGameProfile_Click(object sender, RoutedEventArgs e)
+        {
+            string procName = (cmbRunningApps.Text ?? "").Trim();
+            if (string.IsNullOrWhiteSpace(procName))
+                return;
+
+            int curResH = 0, curHz = 0;
+            try
+            {
+                var dev = ManagerFactory.multimediaManager?.PrimaryDesktop?.screen?.DeviceName ?? System.Windows.Forms.Screen.PrimaryScreen?.DeviceName;
+                if (!string.IsNullOrEmpty(dev))
+                {
+                    var dm = MultimediaManager.GetDisplay(dev);
+                    curResH = Math.Min(dm.dmPelsWidth, dm.dmPelsHeight);
+                    curHz = dm.dmDisplayFrequency;
+                }
+            }
+            catch { }
+
+            var profile = new GamePerformanceProfile
+            {
+                ProcessName = procName,
+                TdpWatts = _currentTdp,
+                FanMode = _currentFanMode,
+                ResolutionHeight = curResH,
+                RefreshRate = curHz,
+                CpuBoost = PerformanceManager.GetCpuBoostEnabled(),
+                Epp = (int)PerformanceManager.GetEppValue(),
+                GpuClockMhz = _currentGpuClockMhz
+            };
+
+            GameProfileService.Instance.AddOrUpdateProfile(profile);
+            RebuildGameProfilesList();
+        }
+
+        private void RebuildGameProfilesList()
+        {
+            panelGameProfilesList.Children.Clear();
+            var profiles = GameProfileService.Instance.GetProfiles();
+
+            if (profiles.Count == 0)
+            {
+                panelGameProfilesList.Children.Add(new TextBlock
+                {
+                    Text = "No saved game profiles yet. Configure TDP/Fan/Res/Boost/GPU Clock, pick a running game above, and tap 'Save Current Settings for App'.",
+                    FontSize = 11.5,
+                    Foreground = BrushGray,
+                    TextWrapping = TextWrapping.Wrap,
+                    Margin = new Thickness(2, 2, 0, 0)
+                });
+                return;
+            }
+
+            var normalStyle = (Style)FindResource("TouchButton");
+            foreach (var p in profiles)
+            {
+                var row = new Border
+                {
+                    Background = BrushProfileCardBg,
+                    BorderBrush = BrushProfileCardBorder,
+                    BorderThickness = new Thickness(1),
+                    CornerRadius = new CornerRadius(6),
+                    Padding = new Thickness(10, 6, 8, 6),
+                    Margin = new Thickness(0, 0, 0, 5)
+                };
+
+                var grid = new Grid();
+                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+                var textStack = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+                textStack.Children.Add(new TextBlock
+                {
+                    Text = p.ProcessName,
+                    FontSize = 12.5,
+                    FontWeight = FontWeights.SemiBold,
+                    Foreground = BrushWhite
+                });
+                textStack.Children.Add(new TextBlock
+                {
+                    Text = p.Summary,
+                    FontSize = 11,
+                    Foreground = BrushGray,
+                    Margin = new Thickness(0, 1, 0, 0)
+                });
+
+                var btnDel = new Button
+                {
+                    Content = "Delete",
+                    Height = 28,
+                    Padding = new Thickness(10, 2, 10, 2),
+                    FontSize = 11.5,
+                    Style = normalStyle,
+                    Tag = p.ProcessName
+                };
+                btnDel.Click += (s, _) =>
+                {
+                    if (s is Button btn && btn.Tag is string name)
+                    {
+                        GameProfileService.Instance.RemoveProfile(name);
+                        RebuildGameProfilesList();
+                    }
+                };
+
+                Grid.SetColumn(textStack, 0);
+                Grid.SetColumn(btnDel, 1);
+                grid.Children.Add(textStack);
+                grid.Children.Add(btnDel);
+                row.Child = grid;
+                panelGameProfilesList.Children.Add(row);
+            }
+        }
+        #endregion
 
         private void UpdateVolumeControls()
         {
@@ -1326,10 +1820,10 @@ namespace HandheldCompanion.Views
                 bool controllerOk = ControllerManager.HasTargetController;
 
                 txtVigemStatus.Text = vigemOk ? "ViGEm: OK" : "ViGEm: Missing";
-                txtVigemStatus.Foreground = vigemOk ? new SolidColorBrush(Color.FromRgb(48, 209, 88)) : new SolidColorBrush(Color.FromRgb(255, 69, 58));
+                txtVigemStatus.Foreground = vigemOk ? BrushGreen : BrushRed;
 
                 txtHidHideStatus.Text = hidHideOk ? "HidHide: OK" : "HidHide: Missing";
-                txtHidHideStatus.Foreground = hidHideOk ? new SolidColorBrush(Color.FromRgb(48, 209, 88)) : new SolidColorBrush(Color.FromRgb(255, 69, 58));
+                txtHidHideStatus.Foreground = hidHideOk ? BrushGreen : BrushRed;
             }
             catch { }
         }
@@ -1504,6 +1998,12 @@ namespace HandheldCompanion.Views
             this.Topmost = false;
             this.Activate();
             this.Focus();
+
+            if (_diagnosticsTimer != null && !_diagnosticsTimer.IsEnabled)
+            {
+                _diagnosticsTimer.Start();
+                UpdateDiagnostics();
+            }
         }
 
         public static void ToggleOrShowWindow()
@@ -1519,6 +2019,7 @@ namespace HandheldCompanion.Views
                     if (inst._isExiting) return;
                     if (inst.IsVisible && inst.WindowState != WindowState.Minimized && inst.IsActive)
                     {
+                        inst._diagnosticsTimer?.Stop();
                         inst.Hide();
                     }
                     else
@@ -1556,7 +2057,11 @@ namespace HandheldCompanion.Views
             {
                 d.BeginInvoke(() =>
                 {
-                    if (!inst._isExiting) inst.Hide();
+                    if (!inst._isExiting)
+                    {
+                        inst._diagnosticsTimer?.Stop();
+                        inst.Hide();
+                    }
                 });
             }
             catch { }
@@ -1633,6 +2138,7 @@ namespace HandheldCompanion.Views
                 if (keepRunning)
                 {
                     e.Cancel = true;
+                    _diagnosticsTimer?.Stop();
                     this.Hide();
                     if (_trayIcon != null)
                     {

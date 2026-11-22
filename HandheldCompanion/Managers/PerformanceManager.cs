@@ -1059,6 +1059,73 @@ public static class PerformanceManager
         }
     }
 
+    public static bool GetCpuBoostEnabled()
+    {
+        try
+        {
+            uint[] val = PowerScheme.ReadPowerCfg(PowerSubGroup.SUB_PROCESSOR, PowerSetting.PERFBOOSTMODE);
+            return val != null && val.Length > 0 && val[0] != 0;
+        }
+        catch { return true; }
+    }
+
+    public static void SetCpuBoostEnabled(bool enabled)
+    {
+        try
+        {
+            uint mode = enabled ? 2u : 0u; // 2 = Aggressive (default enabled), 0 = Disabled
+            RequestPerfBoostMode(mode);
+            PerfBoostModeChanged?.Invoke(mode);
+        }
+        catch (Exception ex)
+        {
+            LogManager.LogError("SetCpuBoostEnabled failed: {0}", ex.Message);
+        }
+    }
+
+    public static uint GetEppValue()
+    {
+        try
+        {
+            uint[] val = PowerScheme.ReadPowerCfg(PowerSubGroup.SUB_PROCESSOR, PowerSetting.PERFEPP);
+            return (val != null && val.Length > 0) ? val[0] : 50u;
+        }
+        catch { return 50u; }
+    }
+
+    public static void SetEppValue(uint epp)
+    {
+        try
+        {
+            uint clamped = Math.Clamp(epp, 0u, 100u);
+            PowerScheme.WritePowerCfg(PowerSubGroup.SUB_PROCESSOR, PowerSetting.PERFEPP, clamped, clamped);
+            PowerScheme.WritePowerCfg(PowerSubGroup.SUB_PROCESSOR, PowerSetting.PERFEPP1, clamped, clamped);
+            EPPChanged?.Invoke(clamped);
+        }
+        catch (Exception ex)
+        {
+            LogManager.LogError("SetEppValue failed: {0}", ex.Message);
+        }
+    }
+
+    public static int GetManualGpuClock()
+    {
+        return (int)Math.Round(StoredGfxClock);
+    }
+
+    public static void SetManualGpuClock(int mhz)
+    {
+        try
+        {
+            double target = mhz <= 0 ? 0 : Math.Clamp(mhz, 400, 3000);
+            RequestGPUClock(target, immediate: true);
+        }
+        catch (Exception ex)
+        {
+            LogManager.LogError("SetManualGpuClock failed: {0}", ex.Message);
+        }
+    }
+
     private static void RequestGPUClock(double value, bool immediate = false)
     {
         // update value read by timer

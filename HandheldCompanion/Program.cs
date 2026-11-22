@@ -213,46 +213,85 @@ namespace HandheldCompanion
         [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
         private static extern int GetClassName(IntPtr hWnd, System.Text.StringBuilder lpClassName, int nMaxCount);
 
+        private delegate void WinEventDelegate(
+            IntPtr hWinEventHook,
+            uint eventType,
+            IntPtr hwnd,
+            int idObject,
+            int idChild,
+            uint dwEventThread,
+            uint dwmsEventTime);
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr SetWinEventHook(
+            uint eventMin,
+            uint eventMax,
+            IntPtr hmodWinEventProc,
+            WinEventDelegate lpfnWinEventProc,
+            uint idProcess,
+            uint idThread,
+            uint dwFlags);
+
+        private const uint EVENT_OBJECT_CREATE = 0x8000;
+        private const uint EVENT_OBJECT_SHOW = 0x8002;
+        private const uint WINEVENT_OUTOFCONTEXT = 0x0000;
+        private static WinEventDelegate? _consoleSuppressorDelegate;
+        private static IntPtr _consoleSuppressorHook = IntPtr.Zero;
+
+        private static void TryHideSuppressedConsole(IntPtr hWnd)
+        {
+            if (hWnd == IntPtr.Zero) return;
+            try
+            {
+                var classSb = new System.Text.StringBuilder(64);
+                if (GetClassName(hWnd, classSb, classSb.Capacity) > 0 && classSb.ToString() == "ConsoleWindowClass")
+                {
+                    var titleSb = new System.Text.StringBuilder(256);
+                    GetWindowText(hWnd, titleSb, titleSb.Capacity);
+                    string title = titleSb.ToString();
+                    if (title.Contains("usbip", StringComparison.OrdinalIgnoreCase) ||
+                        title.Contains("viiper", StringComparison.OrdinalIgnoreCase))
+                    {
+                        ShowWindow(hWnd, SW_HIDE);
+                    }
+                }
+            }
+            catch { }
+        }
+
         private static void StartWindowSuppressor()
         {
-            var suppressorThread = new Thread(() =>
+            // One-shot sweep for any already-open console windows
+            try
             {
-                var titleSb = new System.Text.StringBuilder(256);
-                var classSb = new System.Text.StringBuilder(256);
-
-                while (true)
+                EnumWindows((hWnd, lParam) =>
                 {
-                    try
-                    {
-                        EnumWindows((hWnd, lParam) =>
-                        {
-                            classSb.Clear();
-                            GetClassName(hWnd, classSb, classSb.Capacity);
-                            string cls = classSb.ToString();
-                            if (cls == "ConsoleWindowClass")
-                            {
-                                titleSb.Clear();
-                                GetWindowText(hWnd, titleSb, titleSb.Capacity);
-                                string title = titleSb.ToString();
-                                if (title.Contains("usbip", StringComparison.OrdinalIgnoreCase) ||
-                                    title.Contains("viiper", StringComparison.OrdinalIgnoreCase))
-                                {
-                                    ShowWindow(hWnd, SW_HIDE);
-                                }
-                            }
-                            return true;
-                        }, IntPtr.Zero);
-                    }
-                    catch { }
+                    TryHideSuppressedConsole(hWnd);
+                    return true;
+                }, IntPtr.Zero);
+            }
+            catch { }
 
-                    Thread.Sleep(20);
-                }
-            })
+            // Event-driven hook on STA message loop (zero idle CPU polling)
+            try
             {
-                IsBackground = true,
-                Priority = ThreadPriority.Lowest
-            };
-            suppressorThread.Start();
+                _consoleSuppressorDelegate = (hWinEventHook, eventType, hwnd, idObject, idChild, dwEventThread, dwmsEventTime) =>
+                {
+                    if (idObject == 0 && idChild == 0 && (eventType == EVENT_OBJECT_CREATE || eventType == EVENT_OBJECT_SHOW))
+                    {
+                        TryHideSuppressedConsole(hwnd);
+                    }
+                };
+                _consoleSuppressorHook = SetWinEventHook(
+                    EVENT_OBJECT_CREATE,
+                    EVENT_OBJECT_SHOW,
+                    IntPtr.Zero,
+                    _consoleSuppressorDelegate,
+                    0,
+                    0,
+                    WINEVENT_OUTOFCONTEXT);
+            }
+            catch { }
         }
 
         private static void KillPreviousInstances()
@@ -426,6 +465,12 @@ namespace HandheldCompanion
                     LogManager.LogInformation("Loading ManagerFactory managers...");
                     foreach (IManager manager in ManagerFactory.Managers)
                     {
+                        // Skip settingsManager (already started) and unused legacy UI/game-library managers
+                        if (ReferenceEquals(manager, ManagerFactory.settingsManager) ||
+                            ReferenceEquals(manager, ManagerFactory.platformManager) ||
+                            ReferenceEquals(manager, ManagerFactory.notificationManager))
+                            continue;
+
                         Task.Run(() => manager.Start());
                     }
 
