@@ -486,11 +486,7 @@ namespace HandheldCompanion.GraphicsProcessingUnit
             };
             UpdateTimer.Elapsed += UpdateTimer_Elapsed;
 
-            TelemetryTimer = new Timer(TelemetryInterval)
-            {
-                AutoReset = true
-            };
-            TelemetryTimer.Elapsed += TelemetryTimer_Elapsed;
+            // TelemetryTimer disabled: UI does not consume live ADLX telemetry, avoiding 1s driver polling overhead.
         }
 
         private void TelemetryTimer_Elapsed(object? sender, ElapsedEventArgs e)

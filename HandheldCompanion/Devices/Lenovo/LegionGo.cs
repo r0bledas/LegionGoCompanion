@@ -64,7 +64,7 @@ public class LegionGo : IDevice
     }
 
     #region WMI
-    protected bool GetFanFullSpeed()
+    public bool GetFanFullSpeed()
     {
         try
         {
@@ -184,6 +184,23 @@ public class LegionGo : IDevice
         catch (Exception ex)
         {
             LogManager.LogError("Error in SetCPUPowerLimit: {0}, Capability: {1}, Limit: {2}", ex.Message, capabilityID, limit);
+        }
+    }
+
+    public bool GetBatteryChargeLimit()
+    {
+        try
+        {
+            return WMI.Call<bool>("root\\WMI",
+                "SELECT * FROM LENOVO_OTHER_METHOD",
+                "GetFeatureValue",
+                new() { { "IDs", (int)CapabilityID.InstantBootAc } },
+                pdc => Convert.ToInt32(pdc["Value"].Value) == 1);
+        }
+        catch (Exception ex)
+        {
+            LogManager.LogError("Error in GetBatteryChargeLimit: {0}", ex.Message);
+            return false;
         }
     }
 
@@ -317,16 +334,13 @@ public class LegionGo : IDevice
 
     public override void Close()
     {
+        // Restore default touchpad behavior BEFORE disposing HID handles so the write succeeds
+        try { SetPassthrough(false); } catch { }
+
         // close devices
         foreach (HidDevice hidDevice in hidDevices.Values)
             hidDevice.Dispose();
         hidDevices.Clear();
-
-        // Reset the fan speed to default before device shutdown/restart
-        SetFanFullSpeed(false);
-
-        // restore default touchpad behavior
-        SetPassthrough(false);
 
         // unload SapientiaUsb
         FreeSapientiaUsb();

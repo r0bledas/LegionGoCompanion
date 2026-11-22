@@ -309,6 +309,8 @@ namespace HandheldCompanion.Views
             panelSettings.Visibility = Visibility.Collapsed;
             UpdateResolutionControls();
             RefreshPerformanceControls();
+            if (!_adlxBusy)
+                RefreshAdlxControlsAsync();
         }
 
         private void NavPerformance_Click(object sender, RoutedEventArgs e)
@@ -342,6 +344,7 @@ namespace HandheldCompanion.Views
             panelPerformance.Visibility = Visibility.Collapsed;
             panelController.Visibility = Visibility.Collapsed;
             panelSettings.Visibility = Visibility.Visible;
+            RefreshBatteryLimitStatusAsync();
         }
 
         private void SetNavActive(Button activeBtn)
@@ -387,6 +390,64 @@ namespace HandheldCompanion.Views
             ApplyTdp(_currentTdp);
             UpdateResolutionControls();
             UpdateVolumeControls();
+
+            // Re-sync TDP, Fan state, and Battery Charge Limit once low-level drivers (PawnIO / WMI / DeviceManager) finish initializing
+            PerformanceManager.Initialized += (_, _) =>
+            {
+                if (!_isExiting)
+                    Dispatcher.BeginInvoke(() => ApplyTdp(_currentTdp));
+            };
+            SyncHardwareOnStartupAsync();
+        }
+
+        private void SyncHardwareOnStartupAsync()
+        {
+            Task.Run(async () =>
+            {
+                try
+                {
+                    for (int i = 0; i < 20; i++)
+                    {
+                        if (_isExiting) return;
+                        if (PerformanceManager.IsInitialized && IDevice.GetCurrent() is LegionGo)
+                            break;
+                        await Task.Delay(500);
+                    }
+
+                    if (_isExiting) return;
+
+                    // 1. Re-apply saved TDP so SMU + Lenovo OEM Power Mode & Power LED sync accurately
+                    Dispatcher.BeginInvoke(() => ApplyTdp(_currentTdp));
+
+                    // 2. Sync real hardware Fan state (e.g. if fan is running at 100% full speed)
+                    if (IDevice.GetCurrent() is LegionGo lego)
+                    {
+                        bool hwFullSpeed = lego.GetFanFullSpeed();
+                        string savedFan = ManagerFactory.settingsManager.GetString("FanMode") ?? "Auto";
+
+                        Dispatcher.BeginInvoke(() =>
+                        {
+                            if (_isExiting) return;
+                            if (hwFullSpeed)
+                            {
+                                UpdateFanUi(isAuto: false, isFullSpeed: true, percentage: 100);
+                            }
+                            else if (int.TryParse(savedFan, out int pct) && (pct == 50 || pct == 70))
+                            {
+                                ApplyFanMode(isAuto: false, isFullSpeed: false, percentage: pct);
+                            }
+                            else
+                            {
+                                UpdateFanUi(isAuto: true, isFullSpeed: false, percentage: 0);
+                            }
+                        });
+                    }
+
+                    // 3. Sync real hardware Battery Charge Limit
+                    RefreshBatteryLimitStatusAsync();
+                }
+                catch { }
+            });
         }
 
         private void UpdateActiveControllerHighlight(ControllerTargetMode mode)
@@ -514,18 +575,24 @@ namespace HandheldCompanion.Views
             }
         }
 
+        private void UpdateFanUi(bool isAuto, bool isFullSpeed, int percentage)
+        {
+            var activeStyle = (Style)FindResource("ActiveTouchButton");
+            var normalStyle = (Style)FindResource("TouchButton");
+
+            btnFanAuto.Style = isAuto ? activeStyle : normalStyle;
+            btnFanFull.Style = isFullSpeed ? activeStyle : normalStyle;
+            btnFan50.Style = (!isAuto && !isFullSpeed && percentage == 50) ? activeStyle : normalStyle;
+            btnFan70.Style = (!isAuto && !isFullSpeed && percentage == 70) ? activeStyle : normalStyle;
+            _currentFanMode = isAuto ? "Auto" : (isFullSpeed ? "100" : percentage.ToString());
+        }
+
         private void ApplyFanMode(bool isAuto, bool isFullSpeed, int percentage)
         {
             try
             {
-                var activeStyle = (Style)FindResource("ActiveTouchButton");
-                var normalStyle = (Style)FindResource("TouchButton");
-
-                btnFanAuto.Style = isAuto ? activeStyle : normalStyle;
-                btnFanFull.Style = isFullSpeed ? activeStyle : normalStyle;
-                btnFan50.Style = (!isAuto && !isFullSpeed && percentage == 50) ? activeStyle : normalStyle;
-                btnFan70.Style = (!isAuto && !isFullSpeed && percentage == 70) ? activeStyle : normalStyle;
-                _currentFanMode = isAuto ? "Auto" : (isFullSpeed ? "100" : percentage.ToString());
+                UpdateFanUi(isAuto, isFullSpeed, percentage);
+                ManagerFactory.settingsManager.SetProperty("FanMode", _currentFanMode);
 
                 Task.Run(() =>
                 {
@@ -1333,11 +1400,18 @@ namespace HandheldCompanion.Views
         }
         #endregion
 
-        #region Controller View (Gyro, Joystick LED, Pointer Mode, Hold Cycle, Remap)
+        #region Controller View (Gyro, Haptics, Joystick LED, Pointer Mode, Hold Cycle, Remap)
+        private int _currentVibrationStrength = 100;
+
         private void InitializeControllerView()
         {
             // Gyro
             UpdateGyroStatus();
+
+            // Haptics / Vibration Strength
+            string? savedVib = ManagerFactory.settingsManager.GetString("VibrationStrength");
+            _currentVibrationStrength = int.TryParse(savedVib, out int v) ? Math.Clamp(v, 0, 100) : 100;
+            UpdateVibrationUi(_currentVibrationStrength);
 
             // LED Service events
             JoystickLedService.Instance.ConfigChanged += () =>
@@ -1412,6 +1486,45 @@ namespace HandheldCompanion.Views
                 txtGyroStatus.Text = "Gyro Aiming is Active (DualShock 4 motion feed running).";
                 txtGyroStatus.Foreground = new SolidColorBrush(Color.FromRgb(48, 209, 88));
             }
+        }
+
+        private void UpdateVibrationUi(int pct)
+        {
+            var activeStyle = (Style)FindResource("ActiveTouchButton");
+            var normalStyle = (Style)FindResource("TouchButton");
+
+            btnVib0.Style = (pct == 0) ? activeStyle : normalStyle;
+            btnVib30.Style = (pct == 30) ? activeStyle : normalStyle;
+            btnVib60.Style = (pct == 60) ? activeStyle : normalStyle;
+            btnVib100.Style = (pct == 100) ? activeStyle : normalStyle;
+            txtVibCurrent.Text = $"{pct}%";
+        }
+
+        private void ApplyVibrationStrength(int pct, bool pulse = false)
+        {
+            _currentVibrationStrength = Math.Clamp(pct, 0, 100);
+            UpdateVibrationUi(_currentVibrationStrength);
+            ManagerFactory.settingsManager.SetProperty("VibrationStrength", _currentVibrationStrength.ToString());
+            if (pulse && _currentVibrationStrength > 0)
+            {
+                Task.Run(() => ControllerManager.TestRumble(180, 180, 180));
+            }
+        }
+
+        private void BtnVibPreset_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button b && b.Tag is string s && int.TryParse(s, out int pct))
+                ApplyVibrationStrength(pct, pulse: true);
+        }
+
+        private void BtnVibMinus_Click(object sender, RoutedEventArgs e) => ApplyVibrationStrength(_currentVibrationStrength - 10, pulse: true);
+        private void BtnVibPlus_Click(object sender, RoutedEventArgs e) => ApplyVibrationStrength(_currentVibrationStrength + 10, pulse: true);
+        private void BtnTestRumble_Click(object sender, RoutedEventArgs e)
+        {
+            Task.Run(() =>
+            {
+                ControllerManager.TestRumble(220, 220, 300);
+            });
         }
 
         private void BtnGyroOn_Click(object sender, RoutedEventArgs e)
@@ -1861,6 +1974,8 @@ namespace HandheldCompanion.Views
         {
             bool val = chkBatteryLimit.IsChecked ?? false;
             ManagerFactory.settingsManager.SetProperty("BatteryChargeLimit", val);
+            txtBatteryLimitStatus.Text = val ? "Hardware Charge Limit: Applying 80% cap..." : "Hardware Charge Limit: Disabling (100% full charge)...";
+            txtBatteryLimitStatus.Foreground = BrushGray;
             Task.Run(() =>
             {
                 try
@@ -1868,6 +1983,31 @@ namespace HandheldCompanion.Views
                     if (IDevice.GetCurrent() is LegionGo lego)
                     {
                         lego.SetBatteryChargeLimit(val);
+                    }
+                }
+                catch { }
+                RefreshBatteryLimitStatusAsync();
+            });
+        }
+
+        private void RefreshBatteryLimitStatusAsync()
+        {
+            Task.Run(() =>
+            {
+                try
+                {
+                    if (IDevice.GetCurrent() is LegionGo lego)
+                    {
+                        bool active = lego.GetBatteryChargeLimit();
+                        Dispatcher.BeginInvoke(() =>
+                        {
+                            if (_isExiting) return;
+                            chkBatteryLimit.IsChecked = active;
+                            txtBatteryLimitStatus.Text = active
+                                ? "Hardware Status: Active (Charging capped at 80%)"
+                                : "Hardware Status: Inactive (Charges to 100%)";
+                            txtBatteryLimitStatus.Foreground = active ? BrushGreen : BrushGray;
+                        });
                     }
                 }
                 catch { }
@@ -1996,11 +2136,6 @@ namespace HandheldCompanion.Views
 
                 txtHidHideStatus.Text = hidHideOk ? "HidHide: OK" : "HidHide: Missing";
                 txtHidHideStatus.Foreground = hidHideOk ? BrushGreen : BrushRed;
-
-                if (panelGraphics.Visibility == Visibility.Visible && !_adlxBusy)
-                {
-                    RefreshAdlxControlsAsync();
-                }
             }
             catch { }
         }
@@ -2293,6 +2428,20 @@ namespace HandheldCompanion.Views
             try
             {
                 Task.Run(() => { try { Targets.Viiper.UsbipCli.DetachAll(); } catch { } }).Wait(800);
+            }
+            catch { }
+
+            try
+            {
+                // Uncloak HidHide so Windows and other apps immediately regain access to physical controller & trackpad
+                HidHide.SetCloaking(false);
+            }
+            catch { }
+
+            try
+            {
+                // Restore default hardware touchpad passthrough & cleanly release SapientiaUsb/HID handles
+                IDevice.GetCurrent()?.Close();
             }
             catch { }
 

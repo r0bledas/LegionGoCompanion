@@ -1711,6 +1711,19 @@ public static class ControllerManager
         targetController?.SetVibration(LargeMotor, SmallMotor);
     }
 
+    public static void TestRumble(byte largeMotor = 200, byte smallMotor = 200, int durationMs = 300)
+    {
+        var ctrl = targetController;
+        if (ctrl == null) return;
+        try
+        {
+            ctrl.SetVibration(largeMotor, smallMotor);
+            Thread.Sleep(durationMs);
+            ctrl.SetVibration(0, 0);
+        }
+        catch { }
+    }
+
     public static void Unplug(IController controller)
     {
         string baseContainerDeviceInstanceId = controller.GetContainerInstanceId();
