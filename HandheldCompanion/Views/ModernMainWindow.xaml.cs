@@ -1505,10 +1505,16 @@ namespace HandheldCompanion.Views
             _currentVibrationStrength = Math.Clamp(pct, 0, 100);
             UpdateVibrationUi(_currentVibrationStrength);
             ManagerFactory.settingsManager.SetProperty("VibrationStrength", _currentVibrationStrength.ToString());
-            if (pulse && _currentVibrationStrength > 0)
+            int targetPct = _currentVibrationStrength;
+            Task.Run(() =>
             {
-                Task.Run(() => ControllerManager.TestRumble(180, 180, 180));
-            }
+                ControllerManager.SetHardwareVibrationEnabled(targetPct > 0);
+                if (pulse && targetPct > 0)
+                {
+                    byte s = (byte)Math.Clamp(targetPct * 255 / 100, 30, 255);
+                    ControllerManager.TestRumble(s, s, 180);
+                }
+            });
         }
 
         private void BtnVibPreset_Click(object sender, RoutedEventArgs e)
@@ -1521,9 +1527,11 @@ namespace HandheldCompanion.Views
         private void BtnVibPlus_Click(object sender, RoutedEventArgs e) => ApplyVibrationStrength(_currentVibrationStrength + 10, pulse: true);
         private void BtnTestRumble_Click(object sender, RoutedEventArgs e)
         {
+            int targetPct = _currentVibrationStrength;
             Task.Run(() =>
             {
-                ControllerManager.TestRumble(220, 220, 300);
+                byte s = targetPct > 0 ? (byte)Math.Clamp(targetPct * 255 / 100, 30, 255) : (byte)160;
+                ControllerManager.TestRumble(s, s, 300);
             });
         }
 

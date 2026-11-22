@@ -1711,15 +1711,49 @@ public static class ControllerManager
         targetController?.SetVibration(LargeMotor, SmallMotor);
     }
 
+    public static void SetHardwareVibrationEnabled(bool enabled)
+    {
+        try
+        {
+            Devices.Lenovo.SapientiaUsb.Init();
+            int status = enabled ? 1 : 0;
+            Devices.Lenovo.SapientiaUsb.SetVibrationStatus(3, status);
+            Devices.Lenovo.SapientiaUsb.SetVibrationStatus(4, status);
+        }
+        catch { }
+    }
+
     public static void TestRumble(byte largeMotor = 200, byte smallMotor = 200, int durationMs = 300)
     {
         var ctrl = targetController;
-        if (ctrl == null) return;
         try
         {
-            ctrl.SetVibration(largeMotor, smallMotor);
-            Thread.Sleep(durationMs);
-            ctrl.SetVibration(0, 0);
+            ctrl?.SetVibration(largeMotor, smallMotor);
+        }
+        catch { }
+
+        try
+        {
+            Devices.Lenovo.SapientiaUsb.Init();
+            Devices.Lenovo.SapientiaUsb.SetVibrationStatus(3, 1);
+            Devices.Lenovo.SapientiaUsb.SetVibrationStatus(4, 1);
+            Devices.Lenovo.SapientiaUsb.SendVibrate(0, largeMotor);
+            Devices.Lenovo.SapientiaUsb.SendVibrate(1, smallMotor);
+        }
+        catch { }
+
+        Thread.Sleep(durationMs);
+
+        try
+        {
+            ctrl?.SetVibration(0, 0);
+        }
+        catch { }
+
+        try
+        {
+            Devices.Lenovo.SapientiaUsb.SendVibrate(0, 0);
+            Devices.Lenovo.SapientiaUsb.SendVibrate(1, 0);
         }
         catch { }
     }
