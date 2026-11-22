@@ -867,8 +867,9 @@ public static class InputsManager
             }
             else
             {
-                // Normal button without hold-cycle: execute immediately on key down
-                if (isDown && !wasDown)
+                bool fireOnUp = mapping.TriggerMode == RemapTriggerMode.OnUp;
+                bool edgeMatch = fireOnUp ? (!isDown && wasDown) : (isDown && !wasDown);
+                if (edgeMatch)
                 {
                     if (mapping.TargetType == MappingType.Action)
                     {

@@ -114,6 +114,9 @@ namespace HandheldCompanion.Actions
         [JsonProperty("HasInterruptable")]
         public bool HasInterruptable = true;
         public float TurboDelay = 30.0f;
+        public int TriggerMode = 0; // 0 = Default (1.6.0), 1 = OnDown (Press), 2 = OnUp (Release)
+        [JsonIgnore] private bool _edgePrevRaw = false;
+        [JsonIgnore] private float _edgePulseRemainingMs = 0.0f;
 
         // --- Start delay ---
         [JsonProperty("StartDelay")]
@@ -159,6 +162,7 @@ namespace HandheldCompanion.Actions
             HasToggle = source.HasToggle;
             HasInterruptable = source.HasInterruptable;
             TurboDelay = source.TurboDelay;
+            TriggerMode = source.TriggerMode;
             StartDelay = source.StartDelay;
             ShiftSlot = source.ShiftSlot;
             ShiftMatchAny = source.ShiftMatchAny;
@@ -214,6 +218,48 @@ namespace HandheldCompanion.Actions
             // Shift gating
             if (!IsShiftAllowed(shiftSlot, ShiftSlot, ShiftMatchAny))
                 value = false;
+
+            // Optional OnDown / OnUp edge pulse mode for custom button remappings
+            if (TriggerMode == 1) // On Down (Press)
+            {
+                if (value && !_edgePrevRaw)
+                {
+                    _edgePulseRemainingMs = 45.0f;
+                }
+                _edgePrevRaw = value;
+
+                if (_edgePulseRemainingMs > 0.0f)
+                {
+                    _edgePulseRemainingMs -= Math.Max(1.0f, delta);
+                    outBool = true;
+                    prevBool = true;
+                    return;
+                }
+
+                outBool = false;
+                prevBool = false;
+                return;
+            }
+            else if (TriggerMode == 2) // On Up (Release)
+            {
+                if (!value && _edgePrevRaw)
+                {
+                    _edgePulseRemainingMs = 45.0f;
+                }
+                _edgePrevRaw = value;
+
+                if (_edgePulseRemainingMs > 0.0f)
+                {
+                    _edgePulseRemainingMs -= Math.Max(1.0f, delta);
+                    outBool = true;
+                    prevBool = true;
+                    return;
+                }
+
+                outBool = false;
+                prevBool = false;
+                return;
+            }
 
             // Start delay — may gate the action for a period before firing
             if (!ProcessStartDelay(ref value, delta))

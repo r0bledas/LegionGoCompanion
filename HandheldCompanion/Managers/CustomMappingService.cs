@@ -22,6 +22,13 @@ namespace HandheldCompanion.Managers
         Action = 3
     }
 
+    public enum RemapTriggerMode
+    {
+        Default = 0, // Current v1.6.0 behavior
+        OnDown = 1,  // Triggers immediately when button goes Down (Press)
+        OnUp = 2     // Triggers when button goes Up (Release)
+    }
+
     public enum CustomActionType
     {
         None = 0,
@@ -59,6 +66,7 @@ namespace HandheldCompanion.Managers
         public CustomActionType TargetAction { get; set; } = CustomActionType.None;
         public bool HasTurbo { get; set; } = false;
         public int TurboDelayMs { get; set; } = 50;
+        public RemapTriggerMode TriggerMode { get; set; } = RemapTriggerMode.Default;
     }
 
     public class CustomMappingService
@@ -302,7 +310,8 @@ namespace HandheldCompanion.Managers
         }
 
         public void SetMapping(ButtonFlags button, MappingType type, ButtonFlags targetBtn, VirtualKeyCode targetKey,
-            CustomActionType targetAction = CustomActionType.None, bool hasTurbo = false, int turboDelayMs = 50)
+            CustomActionType targetAction = CustomActionType.None, bool hasTurbo = false, int turboDelayMs = 50,
+            RemapTriggerMode triggerMode = RemapTriggerMode.Default)
         {
             lock (_lock)
             {
@@ -314,7 +323,8 @@ namespace HandheldCompanion.Managers
                     TargetKey = targetKey,
                     TargetAction = targetAction,
                     HasTurbo = hasTurbo,
-                    TurboDelayMs = Math.Clamp(turboDelayMs, 10, 1000)
+                    TurboDelayMs = Math.Clamp(turboDelayMs, 10, 1000),
+                    TriggerMode = triggerMode
                 };
             }
             Save();
@@ -368,6 +378,7 @@ namespace HandheldCompanion.Managers
                         var action = new ButtonActions(item.TargetButton);
                         action.HasTurbo = item.HasTurbo;
                         action.TurboDelay = Math.Clamp(item.TurboDelayMs, 10, 1000);
+                        action.TriggerMode = (int)item.TriggerMode;
                         plans[item.PhysicalButton] = new IActions[] { action };
                     }
                     else if (item.TargetType == MappingType.Keyboard && item.TargetKey != VirtualKeyCode.NONAME)
@@ -375,6 +386,7 @@ namespace HandheldCompanion.Managers
                         var action = new KeyboardActions(item.TargetKey);
                         action.HasTurbo = item.HasTurbo;
                         action.TurboDelay = Math.Clamp(item.TurboDelayMs, 10, 1000);
+                        action.TriggerMode = (int)item.TriggerMode;
                         plans[item.PhysicalButton] = new IActions[] { action };
                     }
                 }

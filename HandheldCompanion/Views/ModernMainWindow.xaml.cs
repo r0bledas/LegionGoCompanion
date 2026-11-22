@@ -156,7 +156,7 @@ namespace HandheldCompanion.Views
             ("Volume Up", VirtualKeyCode.VOLUME_UP)
         };
 
-        private readonly Dictionary<ButtonFlags, (ComboBox typeCombo, ComboBox targetCombo, CheckBox chkRepeat, TextBlock txtRate)> _remappingControls = new();
+        private readonly Dictionary<ButtonFlags, (ComboBox typeCombo, ComboBox targetCombo, ComboBox triggerCombo, CheckBox chkRepeat, TextBlock txtRate)> _remappingControls = new();
 
         public ModernMainWindow()
         {
@@ -456,54 +456,67 @@ namespace HandheldCompanion.Views
             if (_isExiting) return;
             try
             {
-                if (IDevice.GetCurrent() is not LegionGo lego)
-                    return;
+                int cpuTemp = 0;
+                int gpuTemp = 0;
+                int fanRpm = 0;
 
-                int cpuTemp = lego.GetCpuTemperature();
-                int gpuTemp = lego.GetGpuTemperature();
-                int fanRpm = lego.GetCpuFanSpeed();
+                if (IDevice.GetCurrent() is LegionGo lego)
+                {
+                    cpuTemp = lego.GetCpuTemperature();
+                    gpuTemp = lego.GetGpuTemperature();
+                    fanRpm = lego.GetCpuFanSpeed();
+                }
+                else if (ADLX.ADLXBackend.IsInitialized)
+                {
+                    gpuTemp = (int)Math.Round(ADLX.ADLXBackend.GetGPUTemperature(0));
+                    fanRpm = ADLX.ADLXBackend.GetGPUFanSpeed(0);
+                }
+
                 int maxTemp = Math.Max(cpuTemp, gpuTemp);
                 bool guardEnabled = ManagerFactory.settingsManager.GetBoolean("ThermalGuard90");
 
-                if (guardEnabled && maxTemp >= 90 && !_thermalGuardTriggered)
+                if (IDevice.GetCurrent() is LegionGo legoGuard)
                 {
-                    _thermalGuardTriggered = true;
-                    _fanModeBeforeThermalGuard = _currentFanMode;
-                    lego.SetFanFullSpeed(true);
-                    Dispatcher.BeginInvoke(() =>
+                    if (guardEnabled && maxTemp >= 90 && !_thermalGuardTriggered)
                     {
-                        if (!_isExiting)
-                            UpdateFanUi(isAuto: false, isFullSpeed: true, percentage: 100);
-                    });
-                }
-                else if (_thermalGuardTriggered && (!guardEnabled || (maxTemp > 0 && maxTemp <= 82)))
-                {
-                    _thermalGuardTriggered = false;
-                    string restore = _fanModeBeforeThermalGuard;
-                    Dispatcher.BeginInvoke(() =>
+                        _thermalGuardTriggered = true;
+                        _fanModeBeforeThermalGuard = _currentFanMode;
+                        legoGuard.SetFanFullSpeed(true);
+                        Dispatcher.BeginInvoke(() =>
+                        {
+                            if (!_isExiting)
+                                UpdateFanUi(isAuto: false, isFullSpeed: true, percentage: 100);
+                        });
+                    }
+                    else if (_thermalGuardTriggered && (!guardEnabled || (maxTemp > 0 && maxTemp <= 82)))
                     {
-                        if (_isExiting) return;
-                        if (restore == "100") ApplyFanMode(false, true, 100);
-                        else if (restore == "Silent" || restore == "Cool") ApplyFanCurvePreset(restore);
-                        else if (int.TryParse(restore, out int p) && p > 0) ApplyFanMode(false, false, p);
-                        else ApplyFanMode(true, false, 0);
-                    });
+                        _thermalGuardTriggered = false;
+                        string restore = _fanModeBeforeThermalGuard;
+                        Dispatcher.BeginInvoke(() =>
+                        {
+                            if (_isExiting) return;
+                            if (restore == "100") ApplyFanMode(false, true, 100);
+                            else if (restore == "Silent" || restore == "Cool") ApplyFanCurvePreset(restore);
+                            else if (int.TryParse(restore, out int p) && p > 0) ApplyFanMode(false, false, p);
+                            else ApplyFanMode(true, false, 0);
+                        });
+                    }
                 }
 
-                if (IsVisible && WindowState != WindowState.Minimized && panelGeneral.Visibility == Visibility.Visible)
+                Dispatcher.BeginInvoke(() =>
                 {
-                    Dispatcher.BeginInvoke(() =>
-                    {
-                        if (_isExiting) return;
-                        string tempStr = cpuTemp > 0
-                            ? (gpuTemp > 0 ? $"CPU: {cpuTemp}°C  |  GPU: {gpuTemp}°C" : $"APU Temp: {cpuTemp}°C")
-                            : "Temp: --";
-                        string rpmStr = fanRpm > 0 ? $"  |  Fan: {fanRpm} RPM" : "";
-                        string guardTag = _thermalGuardTriggered ? "  [90°C GUARD ACTIVE: 100%]" : "";
-                        txtFanLiveTelemetry.Text = tempStr + rpmStr + guardTag;
-                        txtFanLiveTelemetry.Foreground = (maxTemp >= 90 || _thermalGuardTriggered) ? BrushRed : BrushGreen;
-                    });
-                }
+                    if (_isExiting) return;
+                    if (!IsVisible || WindowState == WindowState.Minimized || panelGeneral.Visibility != Visibility.Visible)
+                        return;
+
+                    string tempStr = cpuTemp > 0
+                        ? (gpuTemp > 0 ? $"CPU: {cpuTemp}°C  |  GPU: {gpuTemp}°C" : $"APU Temp: {cpuTemp}°C")
+                        : (gpuTemp > 0 ? $"GPU Temp: {gpuTemp}°C" : "Temp: --");
+                    string rpmStr = fanRpm > 0 ? $"  |  Fan: {fanRpm} RPM" : "";
+                    string guardTag = _thermalGuardTriggered ? "  [90°C GUARD ACTIVE: 100%]" : "";
+                    txtFanLiveTelemetry.Text = tempStr + rpmStr + guardTag;
+                    txtFanLiveTelemetry.Foreground = (maxTemp >= 90 || _thermalGuardTriggered) ? BrushRed : BrushGreen;
+                });
             }
             catch { }
         }
@@ -2001,9 +2014,10 @@ namespace HandheldCompanion.Views
                 };
 
                 var grid = new Grid();
-                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(170) });
-                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(135) });
-                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(160) });
+                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(165) });
+                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(130) });
+                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(150) });
+                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(115) });
                 grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
 
                 var lblBtn = new TextBlock
@@ -2026,6 +2040,13 @@ namespace HandheldCompanion.Views
 
                 var comboTarget = new ComboBox { Margin = new Thickness(3, 0, 6, 0), VerticalAlignment = VerticalAlignment.Center };
                 Grid.SetColumn(comboTarget, 2);
+
+                var comboTrigger = new ComboBox { Margin = new Thickness(3, 0, 6, 0), VerticalAlignment = VerticalAlignment.Center, ToolTip = "When remapped output triggers: Default (v1.6.0), On Down (Press), or On Up (Release)" };
+                comboTrigger.Items.Add(new ComboBoxItem { Content = "Default" });
+                comboTrigger.Items.Add(new ComboBoxItem { Content = "On Down" });
+                comboTrigger.Items.Add(new ComboBoxItem { Content = "On Up" });
+                comboTrigger.SelectedIndex = (int)item.TriggerMode;
+                Grid.SetColumn(comboTrigger, 3);
 
                 var stackTurbo = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
                 var chkTurbo = new CheckBox { Content = "Repeat", IsChecked = item.HasTurbo, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(4, 0, 4, 0) };
@@ -2056,16 +2077,17 @@ namespace HandheldCompanion.Views
                 stackTurbo.Children.Add(btnMinus);
                 stackTurbo.Children.Add(borderRate);
                 stackTurbo.Children.Add(btnPlus);
-                Grid.SetColumn(stackTurbo, 3);
+                Grid.SetColumn(stackTurbo, 4);
 
                 grid.Children.Add(lblBtn);
                 grid.Children.Add(comboType);
                 grid.Children.Add(comboTarget);
+                grid.Children.Add(comboTrigger);
                 grid.Children.Add(stackTurbo);
                 border.Child = grid;
 
                 stackRemapRows.Children.Add(border);
-                _remappingControls[btn] = (comboType, comboTarget, chkTurbo, txtRate);
+                _remappingControls[btn] = (comboType, comboTarget, comboTrigger, chkTurbo, txtRate);
 
                 PopulateTargetDropdown(comboTarget, item.TargetType, item.TargetButton, item.TargetKey, item.TargetAction);
 
@@ -2078,6 +2100,12 @@ namespace HandheldCompanion.Views
                 };
 
                 comboTarget.SelectionChanged += (s, e) =>
+                {
+                    if (_updatingUi) return;
+                    SaveRowMapping(btn);
+                };
+
+                comboTrigger.SelectionChanged += (s, e) =>
                 {
                     if (_updatingUi) return;
                     SaveRowMapping(btn);
@@ -2154,7 +2182,7 @@ namespace HandheldCompanion.Views
         private void SaveRowMapping(ButtonFlags btn, int? overrideDelay = null)
         {
             if (!_remappingControls.TryGetValue(btn, out var row)) return;
-            var (typeCombo, targetCombo, chkRepeat, txtRate) = row;
+            var (typeCombo, targetCombo, triggerCombo, chkRepeat, txtRate) = row;
 
             var type = (MappingType)typeCombo.SelectedIndex;
             ButtonFlags targetBtn = ButtonFlags.None;
@@ -2175,7 +2203,8 @@ namespace HandheldCompanion.Views
             }
 
             int delay = overrideDelay ?? int.Parse(txtRate.Text.Replace("ms", ""));
-            CustomMappingService.Instance.SetMapping(btn, type, targetBtn, targetKey, targetAction, chkRepeat.IsChecked ?? false, delay);
+            var triggerMode = triggerCombo.SelectedIndex >= 0 ? (RemapTriggerMode)triggerCombo.SelectedIndex : RemapTriggerMode.Default;
+            CustomMappingService.Instance.SetMapping(btn, type, targetBtn, targetKey, targetAction, chkRepeat.IsChecked ?? false, delay, triggerMode);
         }
 
         private void BtnResetRemap_Click(object sender, RoutedEventArgs e)

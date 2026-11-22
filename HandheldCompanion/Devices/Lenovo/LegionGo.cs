@@ -247,6 +247,28 @@ public class LegionGo : IDevice
             }
         }
         catch { }
+
+        try
+        {
+            using var searcher = new System.Management.ManagementObjectSearcher("root\\CIMV2", "SELECT Temperature FROM Win32_PerfFormattedData_Counters_ThermalZoneInformation");
+            foreach (System.Management.ManagementObject obj in searcher.Get())
+            {
+                int raw = Convert.ToInt32(obj["Temperature"]);
+                int c = raw > 200 ? (raw - 273) : raw;
+                if (c > 0 && c < 130) return c;
+            }
+        }
+        catch { }
+
+        try
+        {
+            if (ADLX.ADLXBackend.IsInitialized)
+            {
+                int adlxTemp = (int)Math.Round(ADLX.ADLXBackend.GetGPUTemperature(0));
+                if (adlxTemp > 0 && adlxTemp < 130) return adlxTemp;
+            }
+        }
+        catch { }
         return 0;
     }
 
@@ -262,6 +284,16 @@ public class LegionGo : IDevice
             if (val > 0 && val < 130) return val;
         }
         catch { }
+
+        try
+        {
+            if (ADLX.ADLXBackend.IsInitialized)
+            {
+                int adlxTemp = (int)Math.Round(ADLX.ADLXBackend.GetGPUTemperature(0));
+                if (adlxTemp > 0 && adlxTemp < 130) return adlxTemp;
+            }
+        }
+        catch { }
         return 0;
     }
 
@@ -274,7 +306,17 @@ public class LegionGo : IDevice
                 "GetFeatureValue",
                 new() { { "IDs", (int)CapabilityID.CpuCurrentFanSpeed } },
                 pdc => Convert.ToInt32(pdc["Value"].Value));
-            if (val >= 0) return val;
+            if (val > 0) return val;
+        }
+        catch { }
+
+        try
+        {
+            if (ADLX.ADLXBackend.IsInitialized)
+            {
+                int adlxFan = ADLX.ADLXBackend.GetGPUFanSpeed(0);
+                if (adlxFan > 0) return adlxFan;
+            }
         }
         catch { }
         return 0;
