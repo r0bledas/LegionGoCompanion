@@ -436,7 +436,11 @@ namespace HandheldCompanion.Views
                 });
             };
 
-            chkThermalGuard90.IsChecked = ManagerFactory.settingsManager.GetBoolean("ThermalGuard90");
+            if (string.IsNullOrEmpty(ManagerFactory.settingsManager.GetString("ThermalGuard90")))
+                ManagerFactory.settingsManager.SetProperty("ThermalGuard90", true);
+            bool thermalGuardOn = ManagerFactory.settingsManager.GetBoolean("ThermalGuard90");
+            chkThermalGuard90.IsChecked = thermalGuardOn;
+            chkThermalGuard90Settings.IsChecked = thermalGuardOn;
             StartThermalGuardMonitor();
             SyncHardwareOnStartupAsync();
         }
@@ -523,7 +527,23 @@ namespace HandheldCompanion.Views
 
         private void ChkThermalGuard90_Click(object sender, RoutedEventArgs e)
         {
-            bool enabled = chkThermalGuard90.IsChecked ?? false;
+            bool enabled = (sender as CheckBox)?.IsChecked ?? false;
+            if (!enabled)
+            {
+                var result = MessageBox.Show(
+                    "Disabling the 90°C Thermal Guard can allow the APU to overheat under load and cause an unexpected thermal shutdown.\n\nAre you sure you want to turn it off?",
+                    "Disable 90°C Thermal Guard?",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Warning,
+                    MessageBoxResult.No);
+                if (result != MessageBoxResult.Yes)
+                {
+                    enabled = true;
+                }
+            }
+
+            chkThermalGuard90.IsChecked = enabled;
+            chkThermalGuard90Settings.IsChecked = enabled;
             ManagerFactory.settingsManager.SetProperty("ThermalGuard90", enabled);
             Task.Run(PollThermalAndFanTelemetry);
         }
@@ -547,7 +567,24 @@ namespace HandheldCompanion.Views
                     // 1. Re-apply saved TDP so SMU + Lenovo OEM Power Mode & Power LED sync accurately
                     Dispatcher.BeginInvoke(() => ApplyTdp(_currentTdp));
 
-                    // 2. Sync real hardware Fan state (e.g. if fan is running at 100% full speed)
+                    // 2. Restore saved CPU Boost after TDP/power profile sync
+                    if (!string.IsNullOrEmpty(ManagerFactory.settingsManager.GetString("CpuBoostEnabled")))
+                    {
+                        bool savedBoost = ManagerFactory.settingsManager.GetBoolean("CpuBoostEnabled");
+                        await Task.Delay(300);
+                        if (_isExiting) return;
+                        PerformanceManager.SetCpuBoostEnabled(savedBoost);
+                        Dispatcher.BeginInvoke(() =>
+                        {
+                            if (_isExiting) return;
+                            var activeStyle = (Style)FindResource("ActiveTouchButton");
+                            var normalStyle = (Style)FindResource("TouchButton");
+                            btnCpuBoostOn.Style = savedBoost ? activeStyle : normalStyle;
+                            btnCpuBoostOff.Style = !savedBoost ? activeStyle : normalStyle;
+                        });
+                    }
+
+                    // 3. Restore saved Fan Curve / Mode (Silent, Cool, 100%, percentage, or Auto)
                     if (IDevice.GetCurrent() is LegionGo lego)
                     {
                         bool hwFullSpeed = lego.GetFanFullSpeed();
@@ -556,22 +593,50 @@ namespace HandheldCompanion.Views
                         Dispatcher.BeginInvoke(() =>
                         {
                             if (_isExiting) return;
-                            if (hwFullSpeed)
+                            if (savedFan == "100")
                             {
-                                UpdateFanUi(isAuto: false, isFullSpeed: true, percentage: 100);
+                                ApplyFanMode(isAuto: false, isFullSpeed: true, percentage: 100);
                             }
-                            else if (int.TryParse(savedFan, out int pct) && (pct == 50 || pct == 70))
+                            else if (savedFan == "Silent" || savedFan == "Cool")
+                            {
+                                ApplyFanCurvePreset(savedFan);
+                            }
+                            else if (int.TryParse(savedFan, out int pct) && pct > 0)
                             {
                                 ApplyFanMode(isAuto: false, isFullSpeed: false, percentage: pct);
                             }
+                            else if (hwFullSpeed && string.IsNullOrEmpty(ManagerFactory.settingsManager.GetString("FanMode")))
+                            {
+                                UpdateFanUi(isAuto: false, isFullSpeed: true, percentage: 100);
+                            }
                             else
                             {
-                                UpdateFanUi(isAuto: true, isFullSpeed: false, percentage: 0);
+                                ApplyFanMode(isAuto: true, isFullSpeed: false, percentage: 0);
                             }
                         });
                     }
 
-                    // 3. Sync real hardware Battery Charge Limit
+                    // 4. Restore saved Trackpad Enabled state
+                    if (!string.IsNullOrEmpty(ManagerFactory.settingsManager.GetString("TrackpadEnabled")))
+                    {
+                        bool savedTp = ManagerFactory.settingsManager.GetBoolean("TrackpadEnabled");
+                        _trackpadEnabled = savedTp;
+                        try
+                        {
+                            if (IDevice.GetCurrent() is LegionGo legoTp)
+                                legoTp.SetPassthrough(!savedTp);
+                            Devices.Lenovo.SapientiaUsb.Init();
+                            Devices.Lenovo.SapientiaUsb.SetTouchPadStatus(savedTp ? 1 : 0);
+                            Devices.Lenovo.SapientiaUsb.SetTrackpadStatus(4, savedTp ? 1 : 0);
+                        }
+                        catch { }
+                        Dispatcher.BeginInvoke(() =>
+                        {
+                            if (!_isExiting) UpdateTuningUi();
+                        });
+                    }
+
+                    // 5. Sync real hardware Battery Charge Limit
                     RefreshBatteryLimitStatusAsync();
                 }
                 catch { }
@@ -1022,6 +1087,7 @@ namespace HandheldCompanion.Views
                 var normalStyle = (Style)FindResource("TouchButton");
                 btnCpuBoostOn.Style = enable ? activeStyle : normalStyle;
                 btnCpuBoostOff.Style = !enable ? activeStyle : normalStyle;
+                ManagerFactory.settingsManager.SetProperty("CpuBoostEnabled", enable);
                 Task.Run(() => PerformanceManager.SetCpuBoostEnabled(enable));
             }
         }
@@ -2475,6 +2541,7 @@ namespace HandheldCompanion.Views
             _trackpadEnabled = !_trackpadEnabled;
             UpdateTuningUi();
             bool en = _trackpadEnabled;
+            ManagerFactory.settingsManager.SetProperty("TrackpadEnabled", en);
             Task.Run(() =>
             {
                 try
