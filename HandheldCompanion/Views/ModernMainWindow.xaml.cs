@@ -1688,6 +1688,12 @@ namespace HandheldCompanion.Views
             cmbTriggerBtn.SelectedIndex = trigIdx >= 0 ? trigIdx + 1 : 0;
             UpdateCycleSummary();
 
+            int ds4ShareMode = Math.Clamp(ManagerFactory.settingsManager.GetInt("Ds4ShareMode"), 0, 2);
+            Targets.DualShock4Target.Ds4ShareMode = ds4ShareMode;
+            _updatingUi = true;
+            try { comboDs4ShareMode.SelectedIndex = ds4ShareMode; }
+            finally { _updatingUi = false; }
+
             // Build Remapping rows
             BuildRemappingRows();
         }
@@ -1988,6 +1994,14 @@ namespace HandheldCompanion.Views
                 txtCycleSummary.Text = "Select at least 2 modes to cycle between.";
                 txtCycleSummary.Foreground = new SolidColorBrush(Color.FromRgb(255, 69, 58));
             }
+        }
+
+        private void ComboDs4ShareMode_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_updatingUi) return;
+            int mode = Math.Clamp(comboDs4ShareMode.SelectedIndex, 0, 2);
+            Targets.DualShock4Target.Ds4ShareMode = mode;
+            ManagerFactory.settingsManager.SetProperty("Ds4ShareMode", mode);
         }
 
         // Remapping Grid

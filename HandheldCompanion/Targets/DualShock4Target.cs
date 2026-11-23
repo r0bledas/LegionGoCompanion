@@ -10,6 +10,7 @@ namespace HandheldCompanion.Targets
 {
     internal class DualShock4Target : VIIPERTarget
     {
+        public static volatile int Ds4ShareMode = 0; // 0 = Default (Share), 1 = PS4 Touchpad Click, 2 = Menu (Options)
         protected override string DeviceType => "dualshock4";
         protected override int InputLength => 31;
 
@@ -39,7 +40,13 @@ namespace HandheldCompanion.Targets
             if (inputs.ButtonState[ButtonFlags.R1]) buttons |= 0x0200;
             if (inputs.AxisState[AxisFlags.L2] > 0) buttons |= 0x0400;
             if (inputs.AxisState[AxisFlags.R2] > 0) buttons |= 0x0800;
-            if (inputs.ButtonState[ButtonFlags.Back]) buttons |= 0x1000;
+            if (inputs.ButtonState[ButtonFlags.Back])
+            {
+                int shareMode = Ds4ShareMode;
+                if (shareMode == 1) buttons |= 0x0002;      // PS4 Touchpad Click
+                else if (shareMode == 2) buttons |= 0x2000; // Menu (Options)
+                else buttons |= 0x1000;                     // Default Share
+            }
             if (inputs.ButtonState[ButtonFlags.Start]) buttons |= 0x2000;
             if (inputs.ButtonState[ButtonFlags.LeftStickClick]) buttons |= 0x4000;
             if (inputs.ButtonState[ButtonFlags.RightStickClick]) buttons |= 0x8000;

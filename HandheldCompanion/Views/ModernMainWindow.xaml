@@ -912,6 +912,21 @@
                         </StackPanel>
                     </Border>
 
+                    <!-- PS4 (DS4) Share Button Replacement -->
+                    <Border Background="#1C1F26" BorderBrush="#2D323E" BorderThickness="1" CornerRadius="8" Padding="14,12" Margin="0,0,0,10">
+                        <Grid>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="PS4 (DS4) Share Button Replacement" FontSize="13.5" FontWeight="Bold" Foreground="#FFFFFF" />
+                                <TextBlock Text="Replace the Back/Share button in DS4 mode with PS4 Trackpad Click or Menu (Options) for games that ignore Share." FontSize="11.5" Foreground="#9EA4B0" Margin="0,2,0,0" />
+                            </StackPanel>
+                            <ComboBox x:Name="comboDs4ShareMode" Width="190" Height="32" HorizontalAlignment="Right" VerticalAlignment="Center" SelectionChanged="ComboDs4ShareMode_SelectionChanged">
+                                <ComboBoxItem Content="Default (Share)" />
+                                <ComboBoxItem Content="PS4 Touchpad Click" />
+                                <ComboBoxItem Content="Menu (Options)" />
+                            </ComboBox>
+                        </Grid>
+                    </Border>
+
                     <!-- Button Remapping (NO SLIDERS) -->
                     <Border Background="#1C1F26" BorderBrush="#2D323E" BorderThickness="1" CornerRadius="8" Padding="14,12" Margin="0,0,0,10">
                         <StackPanel>
