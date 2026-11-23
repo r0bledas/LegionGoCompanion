@@ -215,6 +215,17 @@ namespace HandheldCompanion.Views
             }
 
             bool isMax = WindowState == WindowState.Maximized;
+            if (isMax)
+            {
+                var wa = SystemParameters.WorkArea;
+                MaxWidth = wa.Width + 14;
+                MaxHeight = wa.Height + 14;
+            }
+            else
+            {
+                MaxWidth = double.PositiveInfinity;
+                MaxHeight = double.PositiveInfinity;
+            }
             rootGrid.Margin = isMax ? new Thickness(7) : new Thickness(0);
             windowFrame.BorderThickness = isMax ? new Thickness(0) : new Thickness(1);
             btnWinMaxRestore.Content = isMax ? "\uE923" : "\uE922";
@@ -284,7 +295,10 @@ namespace HandheldCompanion.Views
             d.BeginInvoke(DispatcherPriority.Normal, new Action(() =>
             {
                 if (!_isExiting)
+                {
+                    SyncWindowChromeState();
                     UpdateResolutionControls();
+                }
             }));
         }
 
@@ -563,6 +577,17 @@ namespace HandheldCompanion.Views
                     }
 
                     if (_isExiting) return;
+
+                    // 0. Ensure the saved Controller Mode (Desktop / DS4 / X360 / Native) is actively applied
+                    if (ManagerFactory.layoutManager != null)
+                    {
+                        var savedMode = ControllerModeService.GetCurrentMode();
+                        await ControllerModeService.ApplyMode(savedMode);
+                        Dispatcher.BeginInvoke(() =>
+                        {
+                            if (!_isExiting) UpdateActiveControllerHighlight(savedMode);
+                        });
+                    }
 
                     // 1. Re-apply saved TDP so SMU + Lenovo OEM Power Mode & Power LED sync accurately
                     Dispatcher.BeginInvoke(() => ApplyTdp(_currentTdp));
@@ -2902,12 +2927,25 @@ namespace HandheldCompanion.Views
         {
             try
             {
-                bool vigemOk = File.Exists(Path.Combine(Environment.SystemDirectory, "drivers", "ViGEmBus.sys")) || VirtualManager.IsInitialized;
+                bool viiperOk = VirtualManager.IsInitialized;
+                bool vigemSys = File.Exists(Path.Combine(Environment.SystemDirectory, "drivers", "ViGEmBus.sys"));
                 bool hidHideOk = File.Exists(Path.Combine(Environment.SystemDirectory, "drivers", "HidHide.sys"));
-                bool controllerOk = ControllerManager.HasTargetController;
 
-                txtVigemStatus.Text = vigemOk ? "ViGEm: OK" : "ViGEm: Missing";
-                txtVigemStatus.Foreground = vigemOk ? BrushGreen : BrushRed;
+                if (viiperOk)
+                {
+                    txtVigemStatus.Text = "VIIPER: OK";
+                    txtVigemStatus.Foreground = BrushGreen;
+                }
+                else if (vigemSys)
+                {
+                    txtVigemStatus.Text = "ViGEm: OK";
+                    txtVigemStatus.Foreground = BrushGreen;
+                }
+                else
+                {
+                    txtVigemStatus.Text = "Virtual Pad: Off";
+                    txtVigemStatus.Foreground = BrushRed;
+                }
 
                 txtHidHideStatus.Text = hidHideOk ? "HidHide: OK" : "HidHide: Missing";
                 txtHidHideStatus.Foreground = hidHideOk ? BrushGreen : BrushRed;

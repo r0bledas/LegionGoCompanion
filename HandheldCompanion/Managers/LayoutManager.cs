@@ -229,7 +229,8 @@ public class LayoutManager : IManager
         ManagerFactory.settingsManager.SettingValueChanged += SettingsManager_SettingValueChanged;
 
         bool desktopLayoutOnStart = ManagerFactory.settingsManager.GetBoolean("DesktopLayoutOnStart");
-        if (desktopLayoutOnStart)
+        var currentTargetMode = ControllerModeService.GetCurrentMode();
+        if (desktopLayoutOnStart || currentTargetMode == ControllerTargetMode.Desktop || currentTargetMode == ControllerTargetMode.Native)
             ManagerFactory.settingsManager.SetProperty("LayoutMode", (int)LayoutModes.Desktop);
         else
             ManagerFactory.settingsManager.SetProperty("LayoutMode", (int)LayoutModes.Gamepad);

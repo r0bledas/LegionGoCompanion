@@ -499,7 +499,7 @@
                           PanningMode="VerticalOnly"
                           PanningDeceleration="0.001"
                           ManipulationBoundaryFeedback="ScrollViewer_ManipulationBoundaryFeedback"
-                          Padding="14,8">
+                          Padding="14,8,14,28">
             <Grid>
                 <!-- TAB 1: GENERAL VIEW -->
                 <StackPanel x:Name="panelGeneral" Visibility="Visible">
