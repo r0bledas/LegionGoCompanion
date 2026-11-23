@@ -312,6 +312,18 @@ public static class ControllerManager
     }
 
 
+    private static long _lastTickStageErrorMs = 0;
+
+    private static void LogTickErrorThrottled(string stage, Exception ex)
+    {
+        long now = Environment.TickCount64;
+        if (now - _lastTickStageErrorMs > 5000)
+        {
+            _lastTickStageErrorMs = now;
+            LogManager.LogError("ControllerManager.Tick [{0}] exception: {1}", stage, ex.Message);
+        }
+    }
+
     private static void Tick(long ticks, float delta)
     {
         // Snapshot to avoid races after HasTargetController check
@@ -327,6 +339,8 @@ public static class ControllerManager
             if (tc is not null)
             {
                 targetController = tc;
+                try { tc.Plug(); } catch { }
+                PickTargetController();
             }
             else if (PointerModeService.Instance.IsActive)
             {
@@ -334,7 +348,10 @@ public static class ControllerManager
                 tc = (IController?)Controllers.Values.OfType<LegionControllerXInput>().FirstOrDefault(c => c.IsConnected()) ??
                      Controllers.Values.OfType<LegionControllerDInput>().FirstOrDefault();
                 if (tc is not null)
+                {
                     targetController = tc;
+                    try { tc.Plug(); } catch { }
+                }
                 else
                     return;
             }
@@ -345,7 +362,14 @@ public static class ControllerManager
         }
 
         // pull controller
-        tc.Tick(ticks, delta);
+        try
+        {
+            tc.Tick(ticks, delta);
+        }
+        catch (Exception ex)
+        {
+            LogTickErrorThrottled("tc.Tick", ex);
+        }
 
         // snapshot inputs; bail if not ready
         ControllerState controllerState = tc.Inputs;
@@ -356,10 +380,24 @@ public static class ControllerManager
         Dictionary<byte, GamepadMotion>? motions = tc.gamepadMotions;
 
         // Process pointer mode air mouse (only active when in Pointer mode)
-        PointerModeService.Instance.ProcessTick(tc, controllerState, motions, delta);
+        try
+        {
+            PointerModeService.Instance.ProcessTick(tc, controllerState, motions, delta);
+        }
+        catch (Exception ex)
+        {
+            LogTickErrorThrottled("PointerMode", ex);
+        }
 
         // raise event, before layout mapping
-        InputsUpdated?.Invoke(controllerState, false);
+        try
+        {
+            InputsUpdated?.Invoke(controllerState, false);
+        }
+        catch (Exception ex)
+        {
+            LogTickErrorThrottled("InputsUpdated", ex);
+        }
 
         // get main motion safely with fallback to index 1 (Right Joy-Con)
         byte gamepadIndex = tc.gamepadIndex;
@@ -381,29 +419,35 @@ public static class ControllerManager
 
         if (gamepadMotion is not null && gyroActive)
         {
-            // Only use Windows/SerialUSBIMU sensor override when the physical controller does not have its own motion sensor
-            if (tc is not HandheldCompanion.Controllers.Lenovo.LegionControllerBase && !tc.HasMotionSensor())
+            try
             {
-                switch (sensorSelection)
+                // Only use Windows/SerialUSBIMU sensor override when the physical controller does not have its own motion sensor
+                if (tc is not HandheldCompanion.Controllers.Lenovo.LegionControllerBase && !tc.HasMotionSensor())
                 {
-                    case SensorFamily.Windows:
-                    case SensorFamily.SerialUSBIMU:
-                        {
-                            IDevice dev = IDevice.GetCurrent();
-                            GamepadMotion? devMotion = dev?.GamepadMotion;
-                            if (devMotion is null)
-                                break; // keep existing gamepadMotion if device motion not ready
+                    switch (sensorSelection)
+                    {
+                        case SensorFamily.Windows:
+                        case SensorFamily.SerialUSBIMU:
+                            {
+                                IDevice dev = IDevice.GetCurrent();
+                                GamepadMotion? devMotion = dev?.GamepadMotion;
+                                if (devMotion is null)
+                                    break; // keep existing gamepadMotion if device motion not ready
 
-                            gamepadMotion = devMotion;
-                            SensorsManager.UpdateReport(controllerState, gamepadMotion, ref delta);
-                            break;
-                        }
+                                gamepadMotion = devMotion;
+                                SensorsManager.UpdateReport(controllerState, gamepadMotion, ref delta);
+                                break;
+                            }
+                    }
                 }
-            }
 
-            // Update motion consumers (null-safe)
-            MotionManager.UpdateReport(controllerState, gamepadMotion, delta);
-            // App.overlayModel?.UpdateReport(controllerState, gamepadMotion, delta);
+                // Update motion consumers (null-safe)
+                MotionManager.UpdateReport(controllerState, gamepadMotion, delta);
+            }
+            catch (Exception ex)
+            {
+                LogTickErrorThrottled("Motion", ex);
+            }
         }
         else
         {
@@ -413,12 +457,23 @@ public static class ControllerManager
         }
 
         // compute layout (null-safe mapping)
-        ControllerState mapped = ManagerFactory.layoutManager?.MapController(controllerState, delta) ?? controllerState;
+        ControllerState mapped = controllerState;
+        try
+        {
+            mapped = ManagerFactory.layoutManager?.MapController(controllerState, delta) ?? controllerState;
+        }
+        catch (Exception ex)
+        {
+            LogTickErrorThrottled("MapController", ex);
+        }
+
         InputsUpdatedEventHandler? inputsUpdated = InputsUpdated;
         if (inputsUpdated is not null)
         {
             if (ReferenceEquals(mapped, controllerState))
-                inputsUpdated(mapped, true);
+            {
+                try { inputsUpdated(mapped, true); } catch (Exception ex) { LogTickErrorThrottled("InputsUpdatedMapped", ex); }
+            }
             else
                 EventHelper.RaiseInputsUpdatedAsync(inputsUpdated, mapped, true);
         }
@@ -2435,15 +2490,18 @@ public static class ControllerManager
             if (!Controllers.TryGetValue(baseContainerDeviceInstanceId, out IController? controller))
                 return;
 
-            // already self
-            if (IsTargetController(controller.GetInstanceId()))
+            // already self and fully initialized via SetTargetController
+            string currentHidPath = ManagerFactory.settingsManager.GetString("HIDInstancePath");
+            if (IsTargetController(controller.GetInstanceId()) &&
+                string.Equals(currentHidPath, baseContainerDeviceInstanceId, StringComparison.OrdinalIgnoreCase))
             {
                 controller.Plug();
                 return;
             }
 
-            // clear current target
-            ClearTargetControllerInternal();
+            // clear current target (only if switching to a different controller instance)
+            if (!IsTargetController(controller.GetInstanceId()))
+                ClearTargetControllerInternal();
 
             // update target controller
             targetController = controller;

@@ -46,8 +46,24 @@ public static class HidHide
             };
             if (!p.Start()) return false;
             try { p.StandardInput.Close(); } catch { }
-            output = p.StandardOutput.ReadToEnd();
-            return p.WaitForExit(3000);
+
+            var outTask = p.StandardOutput.ReadToEndAsync();
+            var errTask = p.StandardError.ReadToEndAsync();
+            if (!p.WaitForExit(3000))
+            {
+                try { p.Kill(); } catch { }
+                LogManager.LogWarning("HidHideCLI timed out for args: {0}", arguments);
+                return false;
+            }
+
+            output = outTask.IsCompletedSuccessfully ? outTask.Result : string.Empty;
+            string err = errTask.IsCompletedSuccessfully ? errTask.Result : string.Empty;
+            if (p.ExitCode != 0)
+            {
+                LogManager.LogWarning("HidHideCLI failed (exit={0}) for args '{1}': {2}", p.ExitCode, arguments, err.Trim());
+                return false;
+            }
+            return true;
         }
         catch { return false; }
     }
@@ -136,7 +152,12 @@ public static class HidHide
         {
             try
             {
-                if (!_service.ApplicationPaths.Contains(fileName))
+                if (_service.IsAppListInverted)
+                {
+                    _service.IsAppListInverted = false;
+                    LogManager.LogInformation("HideDevice IsAppListInverted set to false (whitelist mode)");
+                }
+                if (!_service.ApplicationPaths.Contains(fileName, StringComparer.OrdinalIgnoreCase))
                 {
                     _service.AddApplicationPath(fileName);
                     LogManager.LogInformation("HideDevice AddApplicationPath: {0}", fileName);
@@ -145,6 +166,7 @@ public static class HidHide
             }
             catch
             {
+                RunCli("--inv-off", out _);
                 if (RunCli($"--app-reg \"{fileName}\"", out _))
                 {
                     LogManager.LogInformation("HideDevice AddApplicationPath (CLI): {0}", fileName);
@@ -161,6 +183,11 @@ public static class HidHide
         {
             try
             {
+                if (status && _service.IsAppListInverted)
+                {
+                    _service.IsAppListInverted = false;
+                    LogManager.LogInformation("HideDevice IsAppListInverted set to false (whitelist mode)");
+                }
                 if (_service.IsActive != status)
                 {
                     _service.IsActive = status;
@@ -170,6 +197,8 @@ public static class HidHide
             }
             catch
             {
+                if (status)
+                    RunCli("--inv-off", out _);
                 string arg = status ? "--cloak-on" : "--cloak-off";
                 if (RunCli(arg, out _))
                 {

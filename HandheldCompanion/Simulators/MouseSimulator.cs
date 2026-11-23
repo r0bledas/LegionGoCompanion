@@ -165,6 +165,9 @@ public static class MouseSimulator
 
     public static void MoveBy(int x, int y)
     {
+        if (x == 0 && y == 0)
+            return;
+
         try
         {
             mouse_event(MOUSEEVENTF_MOVE, x, y, 0, UIntPtr.Zero);

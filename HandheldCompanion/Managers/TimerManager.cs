@@ -163,11 +163,25 @@ public static class TimerManager
         LogManager.LogInformation("{0} has stopped", "TimerManager");
     }
 
+    private static long _lastTickErrorMs = 0;
+
     private static void DoWork()
     {
-        // update timestamp
-        float delta = GetDelta();
-        Tick?.Invoke(Stopwatch.ElapsedTicks, delta);
+        try
+        {
+            // update timestamp
+            float delta = GetDelta();
+            Tick?.Invoke(Stopwatch.ElapsedTicks, delta);
+        }
+        catch (Exception ex)
+        {
+            long now = Environment.TickCount64;
+            if (now - _lastTickErrorMs > 5000)
+            {
+                _lastTickErrorMs = now;
+                LogManager.LogError("TimerManager.DoWork exception: {0}", ex.Message);
+            }
+        }
     }
 
     public static float GetDelta()

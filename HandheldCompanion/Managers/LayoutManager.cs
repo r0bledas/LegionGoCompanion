@@ -118,11 +118,12 @@ public class LayoutManager : IManager
         foreach (LayoutTemplate template in Templates)
             Updated?.Invoke(template);
 
-        // Load or initialize the desktop layout
+        // Load or initialize the desktop layout (validate axis bindings so a corrupt desktop.json never leaves sticks dead)
         string desktopFile = Path.Combine(ManagerPath, $"{desktopLayoutFile}.json");
         desktopLayout = ProcessLayout(desktopFile);
-        if (desktopLayout is null)
+        if (desktopLayout is null || desktopLayout.AxisLayout is null || !desktopLayout.AxisLayout.ContainsKey(AxisLayoutFlags.RightStick))
         {
+            LogManager.LogWarning("LayoutManager: desktop.json missing or lacks RightStick binding — restoring default DesktopLayout");
             desktopLayout = (Layout)LayoutTemplate.DesktopLayout.Layout.Clone();
             DesktopLayout_Updated(desktopLayout);
         }
@@ -173,6 +174,7 @@ public class LayoutManager : IManager
 
         base.Start();
         CustomMappingService.Instance.ApplyMappings();
+        ApplyLayoutImmediate(force: true);
     }
 
     public override void Stop()
@@ -228,12 +230,13 @@ public class LayoutManager : IManager
     {
         ManagerFactory.settingsManager.SettingValueChanged += SettingsManager_SettingValueChanged;
 
-        bool desktopLayoutOnStart = ManagerFactory.settingsManager.GetBoolean("DesktopLayoutOnStart");
+        bool hasTargetMode = ManagerFactory.settingsManager.HasSetting("TargetMode");
         var currentTargetMode = ControllerModeService.GetCurrentMode();
-        if (desktopLayoutOnStart || currentTargetMode == ControllerTargetMode.Desktop || currentTargetMode == ControllerTargetMode.Native)
-            ManagerFactory.settingsManager.SetProperty("LayoutMode", (int)LayoutModes.Desktop);
-        else
-            ManagerFactory.settingsManager.SetProperty("LayoutMode", (int)LayoutModes.Gamepad);
+        bool useDesktop = hasTargetMode
+            ? (currentTargetMode == ControllerTargetMode.Desktop || currentTargetMode == ControllerTargetMode.Pointer)
+            : ManagerFactory.settingsManager.GetBoolean("DesktopLayoutOnStart");
+
+        ManagerFactory.settingsManager.SetProperty("LayoutMode", (int)(useDesktop ? LayoutModes.Desktop : LayoutModes.Gamepad));
     }
 
     private void SettingsManager_SettingValueChanged(string? name, object? value, bool temporary, bool initializing)
@@ -268,20 +271,38 @@ public class LayoutManager : IManager
 
     private void LayoutTimer_Elapsed(object? sender, ElapsedEventArgs e)
     {
-        LayoutModes layoutMode = (LayoutModes)ManagerFactory.settingsManager.GetInt("LayoutMode");
+        ApplyLayoutImmediate(force: false);
+    }
 
-        Layout? target = layoutMode switch
+    public void ApplyLayoutImmediate(bool force = false)
+    {
+        try
         {
-            LayoutModes.Gamepad => profileLayout,
-            LayoutModes.Desktop => desktopLayout,
-            LayoutModes.Auto => ResolveAutoLayout(),
-            _ => null,
-        };
+            LayoutModes layoutMode = (LayoutModes)ManagerFactory.settingsManager.GetInt("LayoutMode");
 
-        if (target is not null && !ReferenceEquals(target, activeLayoutSource))
+            if (layoutMode == LayoutModes.Desktop && (desktopLayout is null || desktopLayout.AxisLayout is null || desktopLayout.AxisLayout.Count == 0))
+            {
+                desktopLayout = (Layout)LayoutTemplate.DesktopLayout.Layout.Clone();
+            }
+
+            Layout? target = layoutMode switch
+            {
+                LayoutModes.Gamepad => profileLayout,
+                LayoutModes.Desktop => desktopLayout,
+                LayoutModes.Auto => ResolveAutoLayout(),
+                _ => null,
+            };
+
+            bool axesMissing = target is not null && target.AxisLayout.Count > 0 && _plannedAxes.Length == 0;
+            if (target is not null && (force || axesMissing || !ReferenceEquals(target, activeLayoutSource)))
+            {
+                SetActiveLayout(target);
+                ApplyControllerIsolationForLayout(ReferenceEquals(target, desktopLayout));
+            }
+        }
+        catch (Exception ex)
         {
-            SetActiveLayout(target);
-            ApplyControllerIsolationForLayout(target == desktopLayout);
+            LogManager.LogError("LayoutManager.ApplyLayoutImmediate error: {0}", ex.Message);
         }
     }
 
@@ -386,6 +407,10 @@ public class LayoutManager : IManager
 
     private void SetActiveLayout(Layout layout)
     {
+        string layoutName = ReferenceEquals(layout, desktopLayout) ? "Desktop" : "Profile";
+        string axesSummary;
+        int buttonCount;
+
         lock (updateLock)
         {
             activeLayoutSource = layout;
@@ -396,8 +421,14 @@ public class LayoutManager : IManager
             BuildPlans();
             BuildMouseKeyboardInputSets(currentLayout);
 
+            axesSummary = string.Join(",", _plannedAxes);
+            buttonCount = _plannedButtons.Length;
+
             LayoutChanged?.Invoke(currentLayout);
         }
+
+        LogManager.LogInformation("LayoutManager: Active layout={0} (Mode={1}, Axes=[{2}], Buttons={3})",
+            layoutName, GetCurrentMode(), axesSummary, buttonCount);
     }
 
     // Buttons / axes whose active-layout binding includes at least one Keyboard or Mouse action.
@@ -1009,10 +1040,20 @@ public class LayoutManager : IManager
 
     public LayoutModes GetCurrentMode() => (LayoutModes)ManagerFactory.settingsManager.GetInt("LayoutMode");
 
+    public string GetDiagnosticSummary()
+    {
+        lock (updateLock)
+        {
+            string active = activeLayoutSource is null ? "None" : (ReferenceEquals(activeLayoutSource, desktopLayout) ? "Desktop" : "Profile");
+            return $"Mode={GetCurrentMode()} Active={active} Axes=[{string.Join(",", _plannedAxes)}] Buttons={_plannedButtons.Length}";
+        }
+    }
+
     public void SetLayoutMode(LayoutModes mode)
     {
-        ManagerFactory.settingsManager.SetProperty("LayoutMode", (int)mode);
-        CheckProfileLayout();
+        ManagerFactory.settingsManager.SetProperty("LayoutMode", (int)mode, force: true);
+        layoutTimer.Stop();
+        ApplyLayoutImmediate(force: true);
     }
 
     //  Events

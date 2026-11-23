@@ -36,8 +36,9 @@ namespace HandheldCompanion.Managers
 
             try
             {
-                int saved = ManagerFactory.settingsManager?.GetInt("TargetMode") ?? -1;
-                if (saved >= 0 && Enum.IsDefined(typeof(ControllerTargetMode), saved))
+                bool hasSaved = ManagerFactory.settingsManager?.HasSetting("TargetMode") == true;
+                int saved = hasSaved ? (ManagerFactory.settingsManager?.GetInt("TargetMode") ?? -1) : -1;
+                if (hasSaved && saved >= 0 && Enum.IsDefined(typeof(ControllerTargetMode), saved))
                 {
                     _currentMode = (ControllerTargetMode)saved;
                 }
@@ -106,8 +107,8 @@ namespace HandheldCompanion.Managers
                             ManagerFactory.settingsManager.SetProperty("HIDcloakonconnect", true);
                             SetLegionPassthrough(false);
                             EnsurePhysicalControllerHidden();
-                            ManagerFactory.settingsManager.SetProperty("LayoutMode", (int)LayoutModes.Desktop);
-                            ManagerFactory.layoutManager.SetLayoutMode(LayoutModes.Desktop);
+                            ManagerFactory.settingsManager.SetProperty("LayoutMode", (int)LayoutModes.Desktop, force: true);
+                            ManagerFactory.layoutManager?.SetLayoutMode(LayoutModes.Desktop);
                             await VirtualManager.SetControllerMode(HIDmode.NoController).ConfigureAwait(false);
                             await VirtualManager.SetControllerStatus(HIDstatus.Disconnected).ConfigureAwait(false);
                             PlaySound();
@@ -165,6 +166,17 @@ namespace HandheldCompanion.Managers
                             PlaySound();
                             break;
                     }
+
+                    var diagTarget = ControllerManager.TargetController;
+                    string layoutDiag = ManagerFactory.layoutManager?.GetDiagnosticSummary() ?? "LayoutManager=null";
+                    LogManager.LogInformation("ControllerModeService.ApplyMode({0}): Target={1} Connected={2} Plugged={3} Busy={4} UserIdx={5} | {6}",
+                        mode,
+                        diagTarget?.GetType().Name ?? "null",
+                        diagTarget?.IsConnected() ?? false,
+                        diagTarget?.IsPlugged ?? false,
+                        diagTarget?.IsBusy ?? false,
+                        diagTarget?.GetUserIndex() ?? -1,
+                        layoutDiag);
 
                     ToastManager.SendToast($"Controller Mode: {GetModeDisplayName(mode)}");
                     ModeChanged?.Invoke(mode);

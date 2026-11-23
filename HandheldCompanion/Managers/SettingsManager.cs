@@ -128,11 +128,22 @@ public class SettingsManager : IManager
         base.Stop();
     }
 
+    public bool HasSetting(string name)
+    {
+        if (PropertyExists(name))
+            return true;
+        lock (_prefsLock)
+        {
+            return Settings.ContainsKey(name);
+        }
+    }
+
     public void SetProperty(string name, object? value, bool force = false, bool temporary = false)
     {
-        var prevValue = GetProperty(name, temporary);
+        bool hadExisting = HasSetting(name);
+        var prevValue = hadExisting ? GetProperty(name, temporary) : null;
 
-        if (prevValue is not null)
+        if (hadExisting && prevValue is not null)
         {
             switch (prevValue.GetType().Name)
             {
@@ -167,8 +178,11 @@ public class SettingsManager : IManager
         }
         catch (Exception) { }
 
-        // update internal settings dictionary
-        Settings[name] = value;
+        // update internal settings dictionary (thread-safe)
+        lock (_prefsLock)
+        {
+            Settings[name] = value;
+        }
         if (!temporary)
             SaveCustomPreferences();
 
@@ -252,31 +266,49 @@ public class SettingsManager : IManager
                 return ManagerFactory.multimediaManager.HasVolumeSupport();
 
             case "GyroAimingEnabled":
-                if (Settings.TryGetValue("GyroAimingEnabled", out var gyroVal))
-                    return Convert.ToBoolean(gyroVal);
+                lock (_prefsLock)
+                {
+                    if (Settings.TryGetValue("GyroAimingEnabled", out var gyroVal))
+                        return Convert.ToBoolean(gyroVal);
+                }
                 return true;
 
             case "ModernFlyoutEnabled":
-                if (Settings.TryGetValue("ModernFlyoutEnabled", out var flyoutVal))
-                    return Convert.ToBoolean(flyoutVal);
+                lock (_prefsLock)
+                {
+                    if (Settings.TryGetValue("ModernFlyoutEnabled", out var flyoutVal))
+                        return Convert.ToBoolean(flyoutVal);
+                }
                 return true;
 
             case "VolumeStep":
-                if (Settings.TryGetValue("VolumeStep", out var stepVal))
+                lock (_prefsLock)
                 {
-                    int s = Convert.ToInt32(stepVal);
-                    if (s > 0 && s <= 25) return s;
+                    if (Settings.TryGetValue("VolumeStep", out var stepVal))
+                    {
+                        int s = Convert.ToInt32(stepVal);
+                        if (s > 0 && s <= 25) return s;
+                    }
                 }
                 return 10;
 
             default:
                 {
-                    if (temporary && Settings.TryGetValue(name, out var property))
-                        return property ?? false;
+                    if (temporary)
+                    {
+                        lock (_prefsLock)
+                        {
+                            if (Settings.TryGetValue(name, out var property))
+                                return property ?? false;
+                        }
+                    }
                     if (PropertyExists(name))
                         return Properties.Settings.Default[name] ?? false;
-                    if (Settings.TryGetValue(name, out var customVal))
-                        return customVal ?? false;
+                    lock (_prefsLock)
+                    {
+                        if (Settings.TryGetValue(name, out var customVal))
+                            return customVal ?? false;
+                    }
 
                     return false;
                 }
@@ -285,7 +317,13 @@ public class SettingsManager : IManager
 
     public string GetString(string name, bool temporary = false)
     {
-        try { return Convert.ToString(GetProperty(name, temporary)) ?? string.Empty; }
+        try
+        {
+            if (name != "GyroAimingEnabled" && name != "ModernFlyoutEnabled" && name != "VolumeStep" &&
+                name != "HasBrightnessSupport" && name != "HasVolumeSupport" && !HasSetting(name))
+                return string.Empty;
+            return Convert.ToString(GetProperty(name, temporary)) ?? string.Empty;
+        }
         catch { return string.Empty; }
     }
 

@@ -238,7 +238,12 @@ namespace HandheldCompanion.Views
             RefreshAllStates();
             var currentMode = ControllerModeService.GetCurrentMode();
             UpdateActiveControllerHighlight(currentMode);
-            await ControllerModeService.ApplyMode(currentMode);
+            if (ControllerManager.IsInitialized &&
+                ManagerFactory.layoutManager != null &&
+                ManagerFactory.layoutManager.Status.HasFlag(ManagerStatus.Initialized))
+            {
+                await ControllerModeService.ApplyMode(currentMode);
+            }
         }
 
         private void BtnWinMinimize_Click(object sender, RoutedEventArgs e)
@@ -450,7 +455,7 @@ namespace HandheldCompanion.Views
                 });
             };
 
-            if (string.IsNullOrEmpty(ManagerFactory.settingsManager.GetString("ThermalGuard90")))
+            if (!ManagerFactory.settingsManager.HasSetting("ThermalGuard90"))
                 ManagerFactory.settingsManager.SetProperty("ThermalGuard90", true);
             bool thermalGuardOn = ManagerFactory.settingsManager.GetBoolean("ThermalGuard90");
             chkThermalGuard90.IsChecked = thermalGuardOn;
@@ -568,10 +573,15 @@ namespace HandheldCompanion.Views
             {
                 try
                 {
-                    for (int i = 0; i < 20; i++)
+                    for (int i = 0; i < 24; i++)
                     {
                         if (_isExiting) return;
-                        if (PerformanceManager.IsInitialized && IDevice.GetCurrent() is LegionGo)
+                        bool layoutReady = ManagerFactory.layoutManager != null &&
+                                           ManagerFactory.layoutManager.Status.HasFlag(ManagerStatus.Initialized);
+                        if (PerformanceManager.IsInitialized &&
+                            IDevice.GetCurrent() is LegionGo &&
+                            ControllerManager.IsInitialized &&
+                            layoutReady)
                             break;
                         await Task.Delay(500);
                     }
@@ -579,9 +589,9 @@ namespace HandheldCompanion.Views
                     if (_isExiting) return;
 
                     // 0. Ensure the saved Controller Mode (Desktop / DS4 / X360 / Native) is actively applied
+                    var savedMode = ControllerModeService.GetCurrentMode();
                     if (ManagerFactory.layoutManager != null)
                     {
-                        var savedMode = ControllerModeService.GetCurrentMode();
                         await ControllerModeService.ApplyMode(savedMode);
                         Dispatcher.BeginInvoke(() =>
                         {
@@ -592,8 +602,8 @@ namespace HandheldCompanion.Views
                     // 1. Re-apply saved TDP so SMU + Lenovo OEM Power Mode & Power LED sync accurately
                     Dispatcher.BeginInvoke(() => ApplyTdp(_currentTdp));
 
-                    // 2. Restore saved CPU Boost after TDP/power profile sync
-                    if (!string.IsNullOrEmpty(ManagerFactory.settingsManager.GetString("CpuBoostEnabled")))
+                    // 2. Restore saved CPU Boost after TDP/power profile sync (only if explicitly saved)
+                    if (ManagerFactory.settingsManager.HasSetting("CpuBoostEnabled"))
                     {
                         bool savedBoost = ManagerFactory.settingsManager.GetBoolean("CpuBoostEnabled");
                         await Task.Delay(300);
@@ -613,7 +623,8 @@ namespace HandheldCompanion.Views
                     if (IDevice.GetCurrent() is LegionGo lego)
                     {
                         bool hwFullSpeed = lego.GetFanFullSpeed();
-                        string savedFan = ManagerFactory.settingsManager.GetString("FanMode") ?? "Auto";
+                        bool hasSavedFan = ManagerFactory.settingsManager.HasSetting("FanMode");
+                        string savedFan = hasSavedFan ? (ManagerFactory.settingsManager.GetString("FanMode") ?? "Auto") : string.Empty;
 
                         Dispatcher.BeginInvoke(() =>
                         {
@@ -630,7 +641,7 @@ namespace HandheldCompanion.Views
                             {
                                 ApplyFanMode(isAuto: false, isFullSpeed: false, percentage: pct);
                             }
-                            else if (hwFullSpeed && string.IsNullOrEmpty(ManagerFactory.settingsManager.GetString("FanMode")))
+                            else if (hwFullSpeed && !hasSavedFan)
                             {
                                 UpdateFanUi(isAuto: false, isFullSpeed: true, percentage: 100);
                             }
@@ -641,25 +652,25 @@ namespace HandheldCompanion.Views
                         });
                     }
 
-                    // 4. Restore saved Trackpad Enabled state
-                    if (!string.IsNullOrEmpty(ManagerFactory.settingsManager.GetString("TrackpadEnabled")))
+                    // 4. Restore saved Trackpad Enabled state (default ON when unset so trackpad is never stuck disabled)
+                    bool savedTp = ManagerFactory.settingsManager.HasSetting("TrackpadEnabled")
+                        ? ManagerFactory.settingsManager.GetBoolean("TrackpadEnabled")
+                        : true;
+                    _trackpadEnabled = savedTp;
+                    try
                     {
-                        bool savedTp = ManagerFactory.settingsManager.GetBoolean("TrackpadEnabled");
-                        _trackpadEnabled = savedTp;
-                        try
-                        {
-                            if (IDevice.GetCurrent() is LegionGo legoTp)
-                                legoTp.SetPassthrough(!savedTp);
-                            Devices.Lenovo.SapientiaUsb.Init();
-                            Devices.Lenovo.SapientiaUsb.SetTouchPadStatus(savedTp ? 1 : 0);
-                            Devices.Lenovo.SapientiaUsb.SetTrackpadStatus(4, savedTp ? 1 : 0);
-                        }
-                        catch { }
-                        Dispatcher.BeginInvoke(() =>
-                        {
-                            if (!_isExiting) UpdateTuningUi();
-                        });
+                        bool wantPassthrough = !savedTp || savedMode == ControllerTargetMode.Native || savedMode == ControllerTargetMode.Pointer;
+                        if (IDevice.GetCurrent() is LegionGo legoTp)
+                            legoTp.SetPassthrough(wantPassthrough);
+                        Devices.Lenovo.SapientiaUsb.Init();
+                        Devices.Lenovo.SapientiaUsb.SetTouchPadStatus(savedTp ? 1 : 0);
+                        Devices.Lenovo.SapientiaUsb.SetTrackpadStatus(4, savedTp ? 1 : 0);
                     }
+                    catch { }
+                    Dispatcher.BeginInvoke(() =>
+                    {
+                        if (!_isExiting) UpdateTuningUi();
+                    });
 
                     // 5. Sync real hardware Battery Charge Limit
                     RefreshBatteryLimitStatusAsync();
