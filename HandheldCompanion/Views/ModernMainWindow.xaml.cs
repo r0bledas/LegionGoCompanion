@@ -11,6 +11,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Threading;
 using Microsoft.Win32;
@@ -51,11 +52,48 @@ namespace HandheldCompanion.Views
         [DllImport("user32.dll", SetLastError = true)]
         private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
 
+        [DllImport("user32.dll")]
+        private static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint dwFlags);
+
+        [DllImport("user32.dll", CharSet = CharSet.Auto)]
+        private static extern bool GetMonitorInfo(IntPtr hMonitor, ref MONITORINFO lpmi);
+
+        private const int WM_GETMINMAXINFO = 0x0024;
+        private const int WM_DISPLAYCHANGE = 0x007E;
+        private const uint MONITOR_DEFAULTTONEAREST = 0x00000002;
+        private const uint SWP_NOZORDER = 0x0004;
+        private const uint SWP_NOACTIVATE = 0x0010;
+        private const uint SWP_FRAMECHANGED = 0x0020;
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct WIN32_POINT { public int x; public int y; }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct WIN32_RECT { public int left; public int top; public int right; public int bottom; }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct MINMAXINFO
+        {
+            public WIN32_POINT ptReserved;
+            public WIN32_POINT ptMaxSize;
+            public WIN32_POINT ptMaxPosition;
+            public WIN32_POINT ptMinTrackSize;
+            public WIN32_POINT ptMaxTrackSize;
+        }
+
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
+        private struct MONITORINFO
+        {
+            public int cbSize;
+            public WIN32_RECT rcMonitor;
+            public WIN32_RECT rcWork;
+            public uint dwFlags;
+        }
+
         private static readonly IntPtr HWND_TOPMOST = new IntPtr(-1);
         private static readonly IntPtr HWND_NOTOPMOST = new IntPtr(-2);
         private const uint SWP_NOSIZE = 0x0001;
         private const uint SWP_NOMOVE = 0x0002;
-        private const uint SWP_NOACTIVATE = 0x0010;
         private const uint SWP_SHOWWINDOW = 0x0040;
         private const int SW_RESTORE = 9;
 
@@ -204,6 +242,87 @@ namespace HandheldCompanion.Views
 
         private WindowState _lastNonMinimizedState = WindowState.Maximized;
 
+        protected override void OnSourceInitialized(EventArgs e)
+        {
+            base.OnSourceInitialized(e);
+            IntPtr hwnd = new WindowInteropHelper(this).Handle;
+            if (hwnd != IntPtr.Zero)
+            {
+                HwndSource.FromHwnd(hwnd)?.AddHook(WndProc);
+            }
+        }
+
+        private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+        {
+            if (msg == WM_GETMINMAXINFO)
+            {
+                HandleGetMinMaxInfo(hwnd, lParam);
+                handled = true;
+            }
+            else if (msg == WM_DISPLAYCHANGE)
+            {
+                Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() =>
+                {
+                    if (!_isExiting)
+                    {
+                        ReapplyMaximizedBounds();
+                        SyncWindowChromeState();
+                    }
+                }));
+            }
+            return IntPtr.Zero;
+        }
+
+        private void HandleGetMinMaxInfo(IntPtr hwnd, IntPtr lParam)
+        {
+            var mmi = Marshal.PtrToStructure<MINMAXINFO>(lParam);
+            IntPtr monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+            if (monitor != IntPtr.Zero)
+            {
+                var mi = new MONITORINFO { cbSize = Marshal.SizeOf<MONITORINFO>() };
+                if (GetMonitorInfo(monitor, ref mi))
+                {
+                    var rcWork = mi.rcWork;
+                    var rcMonitor = mi.rcMonitor;
+                    mmi.ptMaxPosition.x = Math.Abs(rcWork.left - rcMonitor.left);
+                    mmi.ptMaxPosition.y = Math.Abs(rcWork.top - rcMonitor.top);
+                    mmi.ptMaxSize.x = Math.Abs(rcWork.right - rcWork.left);
+                    mmi.ptMaxSize.y = Math.Abs(rcWork.bottom - rcWork.top);
+                }
+            }
+
+            var source = PresentationSource.FromVisual(this);
+            double dpiX = source?.CompositionTarget?.TransformToDevice.M11 ?? 1.0;
+            double dpiY = source?.CompositionTarget?.TransformToDevice.M22 ?? 1.0;
+            mmi.ptMinTrackSize.x = (int)Math.Ceiling(MinWidth * dpiX);
+            mmi.ptMinTrackSize.y = (int)Math.Ceiling(MinHeight * dpiY);
+
+            Marshal.StructureToPtr(mmi, lParam, true);
+        }
+
+        private void ReapplyMaximizedBounds()
+        {
+            if (WindowState != WindowState.Maximized)
+                return;
+
+            IntPtr hwnd = new WindowInteropHelper(this).Handle;
+            if (hwnd == IntPtr.Zero)
+                return;
+
+            IntPtr monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+            if (monitor == IntPtr.Zero)
+                return;
+
+            var mi = new MONITORINFO { cbSize = Marshal.SizeOf<MONITORINFO>() };
+            if (GetMonitorInfo(monitor, ref mi))
+            {
+                int w = Math.Abs(mi.rcWork.right - mi.rcWork.left);
+                int h = Math.Abs(mi.rcWork.bottom - mi.rcWork.top);
+                SetWindowPos(hwnd, IntPtr.Zero, mi.rcWork.left, mi.rcWork.top, w, h,
+                    SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+            }
+        }
+
         private void SyncWindowChromeState()
         {
             if (rootGrid == null || windowFrame == null || btnWinMaxRestore == null)
@@ -215,18 +334,9 @@ namespace HandheldCompanion.Views
             }
 
             bool isMax = WindowState == WindowState.Maximized;
-            if (isMax)
-            {
-                var wa = SystemParameters.WorkArea;
-                MaxWidth = wa.Width + 14;
-                MaxHeight = wa.Height + 14;
-            }
-            else
-            {
-                MaxWidth = double.PositiveInfinity;
-                MaxHeight = double.PositiveInfinity;
-            }
-            rootGrid.Margin = isMax ? new Thickness(7) : new Thickness(0);
+            MaxWidth = double.PositiveInfinity;
+            MaxHeight = double.PositiveInfinity;
+            rootGrid.Margin = new Thickness(0);
             windowFrame.BorderThickness = isMax ? new Thickness(0) : new Thickness(1);
             btnWinMaxRestore.Content = isMax ? "\uE923" : "\uE922";
             btnWinMaxRestore.ToolTip = isMax ? "Restore" : "Maximize";
@@ -234,6 +344,7 @@ namespace HandheldCompanion.Views
 
         private async void ModernMainWindow_Loaded(object sender, RoutedEventArgs e)
         {
+            ReapplyMaximizedBounds();
             SyncWindowChromeState();
             RefreshAllStates();
             var currentMode = ControllerModeService.GetCurrentMode();
@@ -297,10 +408,11 @@ namespace HandheldCompanion.Views
             if (d == null || d.HasShutdownStarted || d.HasShutdownFinished)
                 return;
 
-            d.BeginInvoke(DispatcherPriority.Normal, new Action(() =>
+            d.BeginInvoke(DispatcherPriority.Loaded, new Action(() =>
             {
                 if (!_isExiting)
                 {
+                    ReapplyMaximizedBounds();
                     SyncWindowChromeState();
                     UpdateResolutionControls();
                 }

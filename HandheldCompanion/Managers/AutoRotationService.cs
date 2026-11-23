@@ -50,6 +50,8 @@ namespace HandheldCompanion.Managers
 
                 if (enabled)
                 {
+                    bool portraitNative = ManagerFactory.multimediaManager?.IsPortraitNativePanel() ?? true;
+                    LogManager.LogInformation("AutoRotation: Enabled (PortraitNative={0})", portraitNative);
                     _pollTimer ??= new Timer(_ => PollOrientation(), null, 300, 150);
                     _pollTimer.Change(300, 150);
                 }
@@ -74,7 +76,7 @@ namespace HandheldCompanion.Managers
         /// Classifies an accelerometer gravity vector (in g units) into a Windows display orientation.
         /// Returns null when the device is held nearly flat (tabletop) or between thresholds.
         /// </summary>
-        public static DMDO? ClassifyOrientation(float accelX, float accelY, float accelZ)
+        public static DMDO? ClassifyOrientation(float accelX, float accelY, float accelZ, bool portraitNative = false)
         {
             float absX = MathF.Abs(accelX);
             float absY = MathF.Abs(accelY);
@@ -84,20 +86,45 @@ namespace HandheldCompanion.Managers
             if (absZ >= FlatZThreshold && absX < DominantAxisThreshold && absY < DominantAxisThreshold)
                 return null;
 
+            bool isLandscape = false;
+            bool isLandscapeFlipped = false;
+            bool isPortrait = false;
+            bool isPortraitFlipped = false;
+
             if (absY >= absX && absY >= DominantAxisThreshold)
             {
-                // Gravity along Y: upright landscape vs upside-down landscape
-                return accelY < 0 ? DMDO.DEFAULT : DMDO.D180;
+                if (accelY < 0) isLandscape = true;
+                else isLandscapeFlipped = true;
+            }
+            else if (absX > absY && absX >= DominantAxisThreshold)
+            {
+                if (accelX > 0) isPortrait = true;
+                else isPortraitFlipped = true;
+            }
+            else
+            {
+                return null;
             }
 
-            if (absX > absY && absX >= DominantAxisThreshold)
+            if (portraitNative)
             {
-                // Gravity along X: rotated 90° vs 270°
-                return accelX < 0 ? DMDO.D270 : DMDO.D90;
+                if (isLandscape) return DMDO.D90;
+                if (isPortrait) return DMDO.DEFAULT;
+                if (isLandscapeFlipped) return DMDO.D270;
+                if (isPortraitFlipped) return DMDO.D180;
+            }
+            else
+            {
+                if (isLandscape) return DMDO.DEFAULT;
+                if (isPortrait) return DMDO.D90;
+                if (isLandscapeFlipped) return DMDO.D180;
+                if (isPortraitFlipped) return DMDO.D270;
             }
 
             return null;
         }
+
+        private DateTime _lastNoAccelLogUtc = DateTime.MinValue;
 
         private void PollOrientation()
         {
@@ -106,17 +133,24 @@ namespace HandheldCompanion.Managers
             try
             {
                 if (!TryReadAccelerometer(out float ax, out float ay, out float az))
-                    return;
-
-                DMDO? detected = ClassifyOrientation(ax, ay, az);
-                if (detected is null)
                 {
-                    _pendingOrientation = null;
+                    if ((DateTime.UtcNow - _lastNoAccelLogUtc).TotalSeconds > 15)
+                    {
+                        _lastNoAccelLogUtc = DateTime.UtcNow;
+                        LogManager.LogWarning("AutoRotation: Waiting for accelerometer data (no active IMU readings yet).");
+                    }
                     return;
                 }
 
                 var mm = ManagerFactory.multimediaManager;
                 if (mm is null) return;
+
+                DMDO? detected = ClassifyOrientation(ax, ay, az, mm.IsPortraitNativePanel());
+                if (detected is null)
+                {
+                    _pendingOrientation = null;
+                    return;
+                }
 
                 DMDO current = mm.GetDisplayOrientation();
                 if (detected.Value == current)

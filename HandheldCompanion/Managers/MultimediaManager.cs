@@ -817,6 +817,13 @@ public class MultimediaManager : IManager
         return GetDisplay(deviceName).dmDisplayOrientation;
     }
 
+    public bool IsPortraitNativePanel()
+    {
+        DisplayDevice dm = GetDisplay(GetPrimaryDisplayDeviceName());
+        bool isOdd = ((int)dm.dmDisplayOrientation % 2) == 1;
+        return isOdd ? (dm.dmPelsWidth > dm.dmPelsHeight) : (dm.dmPelsHeight > dm.dmPelsWidth);
+    }
+
     public bool SetDisplayOrientation(DMDO targetOrientation)
     {
         try
@@ -837,11 +844,21 @@ public class MultimediaManager : IManager
             }
 
             dm.dmDisplayOrientation = targetOrientation;
-            dm.dmFields |= DisplayDevice.DM_DISPLAYORIENTATION | DisplayDevice.DM_PELSWIDTH | DisplayDevice.DM_PELSHEIGHT;
+            dm.dmFields = DisplayDevice.DM_DISPLAYORIENTATION | DisplayDevice.DM_PELSWIDTH | DisplayDevice.DM_PELSHEIGHT | DisplayDevice.DM_DISPLAYFREQUENCY | DisplayDevice.DM_BITSPERPEL;
 
             int testResult = ChangeDisplaySettingsEx(deviceName, ref dm, IntPtr.Zero, CDS_TEST, IntPtr.Zero);
             if (testResult != DISP_CHANGE_SUCCESSFUL)
+            {
+                dm.dmFields &= ~DisplayDevice.DM_DISPLAYFIXEDOUTPUT;
+                dm.dmDisplayFixedOutput = DisplayDevice.DMDFO_DEFAULT;
+                testResult = ChangeDisplaySettingsEx(deviceName, ref dm, IntPtr.Zero, CDS_TEST, IntPtr.Zero);
+            }
+            if (testResult != DISP_CHANGE_SUCCESSFUL)
+            {
+                LogManager.LogWarning("SetDisplayOrientation({0}) CDS_TEST failed (code={1}, {2}x{3})",
+                    targetOrientation, testResult, dm.dmPelsWidth, dm.dmPelsHeight);
                 return false;
+            }
 
             int applyResult = ChangeDisplaySettingsEx(deviceName, ref dm, IntPtr.Zero, CDS_UPDATEREGISTRY | CDS_RESET, IntPtr.Zero);
             if (applyResult == DISP_CHANGE_SUCCESSFUL)
@@ -849,6 +866,7 @@ public class MultimediaManager : IManager
                 PrimaryDesktop?.RefreshDisplayMode();
                 return true;
             }
+            LogManager.LogWarning("SetDisplayOrientation({0}) apply failed (code={1})", targetOrientation, applyResult);
             return false;
         }
         catch (Exception ex)
