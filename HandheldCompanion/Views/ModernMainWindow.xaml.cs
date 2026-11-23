@@ -672,8 +672,17 @@ namespace HandheldCompanion.Views
                         if (!_isExiting) UpdateTuningUi();
                     });
 
-                    // 5. Sync real hardware Battery Charge Limit
+                    // 5. Sync real hardware Battery Charge Limit & Auto-Rotation
                     RefreshBatteryLimitStatusAsync();
+                    AutoRotationService.Instance.InitializeFromSettings();
+                    Dispatcher.BeginInvoke(() =>
+                    {
+                        if (!_isExiting)
+                        {
+                            chkAutoRotation.IsChecked = AutoRotationService.Instance.IsEnabled;
+                            UpdateGyroStatus();
+                        }
+                    });
                 }
                 catch { }
             });
@@ -1809,6 +1818,11 @@ namespace HandheldCompanion.Views
             btnGyroOn.Style = enabled ? activeStyle : normalStyle;
             btnGyroOff.Style = !enabled ? activeStyle : normalStyle;
 
+            var gyroSrc = ControllerManager.GyroSource;
+            btnGyroSrcLeft.Style = (gyroSrc == ControllerManager.GyroSourceMode.Left) ? activeStyle : normalStyle;
+            btnGyroSrcTablet.Style = (gyroSrc == ControllerManager.GyroSourceMode.Tablet) ? activeStyle : normalStyle;
+            btnGyroSrcRight.Style = (gyroSrc == ControllerManager.GyroSourceMode.Right) ? activeStyle : normalStyle;
+
             bool isDesktop = ManagerFactory.layoutManager?.GetCurrentMode() == LayoutModes.Desktop;
             bool isDS4 = ControllerModeService.GetCurrentMode() == ControllerTargetMode.DS4;
 
@@ -1829,7 +1843,13 @@ namespace HandheldCompanion.Views
             }
             else
             {
-                txtGyroStatus.Text = "Gyro Aiming is Active (DualShock 4 motion feed running).";
+                string srcLabel = gyroSrc switch
+                {
+                    ControllerManager.GyroSourceMode.Left => "Left Controller",
+                    ControllerManager.GyroSourceMode.Tablet => "Tablet IMU",
+                    _ => "Right Controller"
+                };
+                txtGyroStatus.Text = $"Gyro Aiming is Active ({srcLabel} -> DualShock 4).";
                 txtGyroStatus.Foreground = new SolidColorBrush(Color.FromRgb(48, 209, 88));
             }
         }
@@ -1891,6 +1911,21 @@ namespace HandheldCompanion.Views
         {
             ControllerManager.GyroAimingEnabled = false;
             UpdateGyroStatus();
+        }
+
+        private void BtnGyroSource_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button b && b.Tag is string tag)
+            {
+                var mode = tag switch
+                {
+                    "Left" => ControllerManager.GyroSourceMode.Left,
+                    "Tablet" => ControllerManager.GyroSourceMode.Tablet,
+                    _ => ControllerManager.GyroSourceMode.Right
+                };
+                ControllerManager.SetGyroSource(mode);
+                UpdateGyroStatus();
+            }
         }
 
         // Joystick LED Lighting
@@ -2743,6 +2778,7 @@ namespace HandheldCompanion.Views
             chkBatteryLimit.IsChecked = ManagerFactory.settingsManager.GetBoolean("BatteryChargeLimit");
             chkCloseMinimises.IsChecked = ManagerFactory.settingsManager.GetBoolean("CloseMinimises");
             chkKeepTrackpadOnExitSettings.IsChecked = ManagerFactory.settingsManager.GetBoolean("KeepTrackpadOnExit");
+            chkAutoRotation.IsChecked = ManagerFactory.settingsManager.GetBoolean("AutoRotationEnabled");
             chkRunAtStartup.IsChecked = ManagerFactory.settingsManager.GetBoolean("RunAtStartup");
             chkStartMinimized.IsChecked = ManagerFactory.settingsManager.GetBoolean("StartMinimized");
             chkDesktopOnStart.IsChecked = ManagerFactory.settingsManager.GetBoolean("DesktopLayoutOnStart");
@@ -2760,6 +2796,12 @@ namespace HandheldCompanion.Views
                 }
                 catch { }
             });
+        }
+
+        private void ChkAutoRotation_Click(object sender, RoutedEventArgs e)
+        {
+            bool enabled = chkAutoRotation.IsChecked ?? false;
+            AutoRotationService.Instance.SetEnabled(enabled);
         }
 
         private void BtnOpenRealtek_Click(object sender, RoutedEventArgs e)

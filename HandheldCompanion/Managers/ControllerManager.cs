@@ -134,6 +134,46 @@ public static class ControllerManager
     private static Timer pickTimer = new(500) { AutoReset = false };
 
     #region settings
+    public enum GyroSourceMode
+    {
+        Right = 0,
+        Left = 1,
+        Tablet = 2
+    }
+
+    private static GyroSourceMode _gyroSource = GyroSourceMode.Right;
+    public static GyroSourceMode GyroSource => _gyroSource;
+
+    public static void SetGyroSource(GyroSourceMode source, bool persist = true)
+    {
+        _gyroSource = source;
+        if (persist)
+            ManagerFactory.settingsManager?.SetProperty("GyroSource", (int)source);
+
+        switch (source)
+        {
+            case GyroSourceMode.Left:
+                ManagerFactory.settingsManager?.SetProperty("LegionControllerGyroIndex", 0);
+                ManagerFactory.settingsManager?.SetProperty("SensorSelection", (int)SensorFamily.Controller);
+                if (targetController is IController lc)
+                    lc.gamepadIndex = 0;
+                break;
+
+            case GyroSourceMode.Right:
+                ManagerFactory.settingsManager?.SetProperty("LegionControllerGyroIndex", 1);
+                ManagerFactory.settingsManager?.SetProperty("SensorSelection", (int)SensorFamily.Controller);
+                if (targetController is IController rc)
+                    rc.gamepadIndex = 1;
+                break;
+
+            case GyroSourceMode.Tablet:
+                ManagerFactory.settingsManager?.SetProperty("SensorSelection", (int)SensorFamily.Windows);
+                break;
+        }
+
+        LogManager.LogInformation("ControllerManager: DS4 GyroSource set to {0}", source);
+    }
+
     private static bool HIDuncloakonclose => ManagerFactory.settingsManager.GetBoolean("HIDuncloakonclose");
     private static bool HIDuncloakondisconnect => ManagerFactory.settingsManager.GetBoolean("HIDuncloakondisconnect");
     private static bool _gyroAimingEnabled = true;
@@ -275,6 +315,12 @@ public static class ControllerManager
         PickTargetController();
 
         _gyroAimingEnabled = ManagerFactory.settingsManager?.GetBoolean("GyroAimingEnabled") ?? true;
+        if (ManagerFactory.settingsManager?.HasSetting("GyroSource") == true)
+        {
+            int rawSrc = ManagerFactory.settingsManager.GetInt("GyroSource");
+            if (Enum.IsDefined(typeof(GyroSourceMode), rawSrc))
+                SetGyroSource((GyroSourceMode)rawSrc, persist: false);
+        }
 
         IsInitialized = true;
         Initialized?.Invoke();
@@ -399,8 +445,8 @@ public static class ControllerManager
             LogTickErrorThrottled("InputsUpdated", ex);
         }
 
-        // get main motion safely with fallback to index 1 (Right Joy-Con)
-        byte gamepadIndex = tc.gamepadIndex;
+        // get main motion safely based on user-selected GyroSource (Right = 1, Left = 0, Tablet = Windows sensor)
+        byte gamepadIndex = _gyroSource == GyroSourceMode.Left ? (byte)0 : (_gyroSource == GyroSourceMode.Right ? (byte)1 : tc.gamepadIndex);
         GamepadMotion? gamepadMotion = null;
         if (motions is not null && motions.Count > 0)
         {
@@ -417,32 +463,30 @@ public static class ControllerManager
         bool isDesktop = ControllerModeService.GetCurrentMode() == ControllerTargetMode.Desktop || ManagerFactory.layoutManager?.GetCurrentMode() == LayoutModes.Desktop;
         bool gyroActive = isDS4 && !isDesktop && GyroAimingEnabled;
 
-        if (gamepadMotion is not null && gyroActive)
+        if ((gamepadMotion is not null || _gyroSource == GyroSourceMode.Tablet) && gyroActive)
         {
             try
             {
-                // Only use Windows/SerialUSBIMU sensor override when the physical controller does not have its own motion sensor
-                if (tc is not HandheldCompanion.Controllers.Lenovo.LegionControllerBase && !tc.HasMotionSensor())
-                {
-                    switch (sensorSelection)
-                    {
-                        case SensorFamily.Windows:
-                        case SensorFamily.SerialUSBIMU:
-                            {
-                                IDevice dev = IDevice.GetCurrent();
-                                GamepadMotion? devMotion = dev?.GamepadMotion;
-                                if (devMotion is null)
-                                    break; // keep existing gamepadMotion if device motion not ready
+                bool useTabletSensor = _gyroSource == GyroSourceMode.Tablet ||
+                    (tc is not HandheldCompanion.Controllers.Lenovo.LegionControllerBase && !tc.HasMotionSensor() &&
+                     (sensorSelection == SensorFamily.Windows || sensorSelection == SensorFamily.SerialUSBIMU));
 
-                                gamepadMotion = devMotion;
-                                SensorsManager.UpdateReport(controllerState, gamepadMotion, ref delta);
-                                break;
-                            }
+                if (useTabletSensor)
+                {
+                    IDevice dev = IDevice.GetCurrent();
+                    GamepadMotion? devMotion = dev?.GamepadMotion;
+                    if (devMotion is not null)
+                    {
+                        gamepadMotion = devMotion;
+                        SensorsManager.UpdateReport(controllerState, gamepadMotion, ref delta);
                     }
                 }
 
-                // Update motion consumers (null-safe)
-                MotionManager.UpdateReport(controllerState, gamepadMotion, delta);
+                if (gamepadMotion is not null)
+                {
+                    // Update motion consumers (null-safe)
+                    MotionManager.UpdateReport(controllerState, gamepadMotion, delta);
+                }
             }
             catch (Exception ex)
             {

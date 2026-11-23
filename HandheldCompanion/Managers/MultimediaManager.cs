@@ -806,6 +806,58 @@ public class MultimediaManager : IManager
         return dm;
     }
 
+    public string GetPrimaryDisplayDeviceName()
+    {
+        return PrimaryDesktop?.screen?.DeviceName ?? Screen.PrimaryScreen?.DeviceName ?? @"\\.\DISPLAY1";
+    }
+
+    public DMDO GetDisplayOrientation()
+    {
+        string deviceName = GetPrimaryDisplayDeviceName();
+        return GetDisplay(deviceName).dmDisplayOrientation;
+    }
+
+    public bool SetDisplayOrientation(DMDO targetOrientation)
+    {
+        try
+        {
+            string deviceName = GetPrimaryDisplayDeviceName();
+            DisplayDevice dm = GetDisplay(deviceName);
+            if (dm.dmPelsWidth == 0 || dm.dmPelsHeight == 0)
+                return false;
+
+            if (dm.dmDisplayOrientation == targetOrientation)
+                return true;
+
+            bool currentOdd = ((int)dm.dmDisplayOrientation % 2) == 1;
+            bool targetOdd = ((int)targetOrientation % 2) == 1;
+            if (currentOdd != targetOdd)
+            {
+                (dm.dmPelsWidth, dm.dmPelsHeight) = (dm.dmPelsHeight, dm.dmPelsWidth);
+            }
+
+            dm.dmDisplayOrientation = targetOrientation;
+            dm.dmFields |= DisplayDevice.DM_DISPLAYORIENTATION | DisplayDevice.DM_PELSWIDTH | DisplayDevice.DM_PELSHEIGHT;
+
+            int testResult = ChangeDisplaySettingsEx(deviceName, ref dm, IntPtr.Zero, CDS_TEST, IntPtr.Zero);
+            if (testResult != DISP_CHANGE_SUCCESSFUL)
+                return false;
+
+            int applyResult = ChangeDisplaySettingsEx(deviceName, ref dm, IntPtr.Zero, CDS_UPDATEREGISTRY | CDS_RESET, IntPtr.Zero);
+            if (applyResult == DISP_CHANGE_SUCCESSFUL)
+            {
+                PrimaryDesktop?.RefreshDisplayMode();
+                return true;
+            }
+            return false;
+        }
+        catch (Exception ex)
+        {
+            LogManager.LogError("SetDisplayOrientation({0}) error: {1}", targetOrientation, ex.Message);
+            return false;
+        }
+    }
+
     public List<DisplayDevice> GetResolutions(string deviceName)
     {
         List<DisplayDevice> allMode = [];

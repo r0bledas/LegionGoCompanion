@@ -756,6 +756,12 @@
                                 <Button x:Name="btnGyroOff" Content="Off" Width="75" Height="34" Style="{StaticResource ActiveTouchButton}" Click="BtnGyroOff_Click" />
                             </StackPanel>
                             <TextBlock x:Name="txtGyroStatus" Text="Gyro Aiming is Off." FontSize="11.5" Foreground="#9EA4B0" Margin="4,6,0,0" />
+                            <TextBlock Text="Main Gyro Source (DS4 Mode)" FontSize="12" FontWeight="SemiBold" Foreground="#C8CDD6" Margin="4,10,0,6" />
+                            <StackPanel Orientation="Horizontal">
+                                <Button x:Name="btnGyroSrcLeft" Content="Left Controller" Tag="Left" Width="118" Height="32" Style="{StaticResource TouchButton}" Click="BtnGyroSource_Click" />
+                                <Button x:Name="btnGyroSrcTablet" Content="Tablet" Tag="Tablet" Width="90" Height="32" Style="{StaticResource TouchButton}" Click="BtnGyroSource_Click" />
+                                <Button x:Name="btnGyroSrcRight" Content="Right Controller" Tag="Right" Width="124" Height="32" Style="{StaticResource ActiveTouchButton}" Click="BtnGyroSource_Click" />
+                            </StackPanel>
                         </StackPanel>
                     </Border>
 
@@ -1064,6 +1070,7 @@
                             <CheckBox x:Name="chkPowerLight" Content="Power Button LED Light Enabled (Uncheck to turn off power button LED at night)" IsChecked="True" Click="ChkPowerLight_Click" />
                             <CheckBox x:Name="chkCloseMinimises" Content="Keep running in system tray after closing window" Click="ChkCloseMinimises_Click" />
                             <CheckBox x:Name="chkKeepTrackpadOnExitSettings" Content="Keep trackpad working when app is closed" Click="ChkKeepTrackpadOnExit_Click" ToolTip="Restores hardware Windows mouse mode and enables the trackpad on exit so it keeps working after closing the app." />
+                            <CheckBox x:Name="chkAutoRotation" Content="Auto-Rotation (Rotate screen automatically with device orientation)" Click="ChkAutoRotation_Click" ToolTip="Uses the device accelerometer to automatically rotate the display between Landscape and Portrait orientations." />
                             <CheckBox x:Name="chkRunAtStartup" Content="Run at Startup (Elevated via Task Scheduler)" Click="ChkRunAtStartup_Click" />
                             <CheckBox x:Name="chkStartMinimized" Content="Silent Launch on Startup (Start minimized in tray)" Click="ChkStartMinimized_Click" />
                             <CheckBox x:Name="chkDesktopOnStart" Content="Default to Desktop Layout on Startup" Click="ChkDesktopOnStart_Click" />

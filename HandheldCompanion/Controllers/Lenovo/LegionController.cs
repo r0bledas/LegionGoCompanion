@@ -245,8 +245,10 @@ namespace HandheldCompanion.Controllers.Lenovo
 
         protected override void QuerySettings()
         {
+            bool explicitLeft = ManagerFactory.settingsManager.HasSetting("GyroSource") &&
+                                (ControllerManager.GyroSourceMode)ManagerFactory.settingsManager.GetInt("GyroSource") == ControllerManager.GyroSourceMode.Left;
             int gyroIdx = ManagerFactory.settingsManager.GetInt("LegionControllerGyroIndex");
-            if (gyroIdx == 0)
+            if (gyroIdx == 0 && !explicitLeft)
             {
                 gyroIdx = 1;
                 ManagerFactory.settingsManager.SetProperty("LegionControllerGyroIndex", 1);
