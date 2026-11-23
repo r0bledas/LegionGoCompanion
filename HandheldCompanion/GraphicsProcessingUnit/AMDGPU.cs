@@ -197,7 +197,7 @@ namespace HandheldCompanion.GraphicsProcessingUnit
             if (!IsInitialized)
                 return false;
 
-            return Execute(() => ADLXBackend.SetAntiLag(displayIdx, enable), false);
+            return Execute(() => ADLXBackend.SetAntiLag(deviceIdx, enable), false);
         }
 
         public bool GetAntiLag()
@@ -205,7 +205,7 @@ namespace HandheldCompanion.GraphicsProcessingUnit
             if (!IsInitialized)
                 return false;
 
-            return Execute(() => ADLXBackend.GetAntiLag(displayIdx), false);
+            return Execute(() => ADLXBackend.GetAntiLag(deviceIdx), false);
         }
 
         public override int GetScalingMode()

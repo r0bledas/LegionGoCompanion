@@ -836,13 +836,17 @@ public class MultimediaManager : IManager
             if (dm.dmDisplayOrientation == targetOrientation)
                 return true;
 
+            short structSize = (short)Marshal.SizeOf(typeof(DisplayDevice));
             bool currentOdd = ((int)dm.dmDisplayOrientation % 2) == 1;
             bool targetOdd = ((int)targetOrientation % 2) == 1;
-            if (currentOdd != targetOdd)
-            {
-                (dm.dmPelsWidth, dm.dmPelsHeight) = (dm.dmPelsHeight, dm.dmPelsWidth);
-            }
+            int targetWidth = currentOdd != targetOdd ? dm.dmPelsHeight : dm.dmPelsWidth;
+            int targetHeight = currentOdd != targetOdd ? dm.dmPelsWidth : dm.dmPelsHeight;
+            int targetFreq = dm.dmDisplayFrequency;
 
+            dm.dmSize = structSize;
+            dm.dmDeviceName = deviceName;
+            dm.dmPelsWidth = targetWidth;
+            dm.dmPelsHeight = targetHeight;
             dm.dmDisplayOrientation = targetOrientation;
             dm.dmFields = DisplayDevice.DM_DISPLAYORIENTATION | DisplayDevice.DM_PELSWIDTH | DisplayDevice.DM_PELSHEIGHT | DisplayDevice.DM_DISPLAYFREQUENCY | DisplayDevice.DM_BITSPERPEL;
 
@@ -852,6 +856,32 @@ public class MultimediaManager : IManager
                 dm.dmFields &= ~DisplayDevice.DM_DISPLAYFIXEDOUTPUT;
                 dm.dmDisplayFixedOutput = DisplayDevice.DMDFO_DEFAULT;
                 testResult = ChangeDisplaySettingsEx(deviceName, ref dm, IntPtr.Zero, CDS_TEST, IntPtr.Zero);
+            }
+            if (testResult != DISP_CHANGE_SUCCESSFUL)
+            {
+                // Fallback: pick an exact driver-enumerated rotated mode (EDS_ROTATEDMODE = 0x4)
+                const int EDS_ROTATEDMODE = 0x00000004;
+                int modeIdx = 0;
+                while (true)
+                {
+                    DisplayDevice cand = new DisplayDevice { dmSize = structSize };
+                    if (!EnumDisplaySettingsEx(deviceName, modeIdx++, ref cand, EDS_ROTATEDMODE))
+                        break;
+                    if (cand.dmDisplayOrientation == targetOrientation &&
+                        cand.dmPelsWidth == targetWidth &&
+                        cand.dmPelsHeight == targetHeight &&
+                        cand.dmDisplayFrequency == targetFreq)
+                    {
+                        cand.dmSize = structSize;
+                        cand.dmDeviceName = deviceName;
+                        if (ChangeDisplaySettingsEx(deviceName, ref cand, IntPtr.Zero, CDS_TEST, IntPtr.Zero) == DISP_CHANGE_SUCCESSFUL)
+                        {
+                            dm = cand;
+                            testResult = DISP_CHANGE_SUCCESSFUL;
+                            break;
+                        }
+                    }
+                }
             }
             if (testResult != DISP_CHANGE_SUCCESSFUL)
             {

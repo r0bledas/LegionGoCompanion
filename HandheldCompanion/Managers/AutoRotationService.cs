@@ -73,14 +73,23 @@ namespace HandheldCompanion.Managers
         }
 
         /// <summary>
-        /// Classifies an accelerometer gravity vector (in g units) into a Windows display orientation.
-        /// Returns null when the device is held nearly flat (tabletop) or between thresholds.
+        /// Classifies an accelerometer gravity vector into a Windows display orientation.
+        /// Normalizes the vector so it works regardless of IMU full-scale range (e.g. Legion Go's 0.25/g scaling or 1.0/g).
+        /// Returns null when the device is held nearly flat (tabletop), zeroed, or between thresholds.
         /// </summary>
         public static DMDO? ClassifyOrientation(float accelX, float accelY, float accelZ, bool portraitNative = false)
         {
-            float absX = MathF.Abs(accelX);
-            float absY = MathF.Abs(accelY);
-            float absZ = MathF.Abs(accelZ);
+            float mag = MathF.Sqrt(accelX * accelX + accelY * accelY + accelZ * accelZ);
+            if (mag < 0.05f)
+                return null;
+
+            float nx = accelX / mag;
+            float ny = accelY / mag;
+            float nz = accelZ / mag;
+
+            float absX = MathF.Abs(nx);
+            float absY = MathF.Abs(ny);
+            float absZ = MathF.Abs(nz);
 
             // Ignore when lying flat on a table/lap
             if (absZ >= FlatZThreshold && absX < DominantAxisThreshold && absY < DominantAxisThreshold)
@@ -93,12 +102,12 @@ namespace HandheldCompanion.Managers
 
             if (absY >= absX && absY >= DominantAxisThreshold)
             {
-                if (accelY < 0) isLandscape = true;
+                if (ny < 0) isLandscape = true;
                 else isLandscapeFlipped = true;
             }
             else if (absX > absY && absX >= DominantAxisThreshold)
             {
-                if (accelX > 0) isPortrait = true;
+                if (nx > 0) isPortrait = true;
                 else isPortraitFlipped = true;
             }
             else
@@ -181,7 +190,14 @@ namespace HandheldCompanion.Managers
                     }
                 }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                if ((DateTime.UtcNow - _lastNoAccelLogUtc).TotalSeconds > 15)
+                {
+                    _lastNoAccelLogUtc = DateTime.UtcNow;
+                    LogManager.LogWarning("AutoRotation: PollOrientation error: {0}", ex.Message);
+                }
+            }
         }
 
         private static bool TryReadAccelerometer(out float ax, out float ay, out float az)

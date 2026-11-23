@@ -1299,6 +1299,7 @@ namespace HandheldCompanion.Views
                 btnAdlxGpuScale.IsEnabled = false;
                 btnAdlxFsr.IsEnabled = false;
                 btnAdlxAfmf.IsEnabled = false;
+                btnAdlxAntiLag.IsEnabled = false;
                 btnAdlxSharpen.IsEnabled = false;
                 btnAdlxVivid.IsEnabled = false;
                 btnScalePreserve.IsEnabled = false;
@@ -1321,6 +1322,7 @@ namespace HandheldCompanion.Views
                 int valScaleMode = -1;
                 bool supRsr = false, valRsr = false;
                 bool supAfmf = false, valAfmf = false;
+                bool supAntiLag = false, valAntiLag = false;
                 bool supSharp = false, valSharp = false;
                 bool supVivid = false, valVivid = false;
 
@@ -1348,6 +1350,9 @@ namespace HandheldCompanion.Views
                     supAfmf = gpu.HasAFMFSupport();
                     if (supAfmf) valAfmf = gpu.GetAFMF();
 
+                    valAntiLag = gpu.GetAntiLag();
+                    supAntiLag = true;
+
                     supSharp = gpu.GetImageSharpeningSharpness() >= 0;
                     if (supSharp) valSharp = gpu.GetImageSharpening();
 
@@ -1358,7 +1363,7 @@ namespace HandheldCompanion.Views
                     int chillFps = chillOn ? gpu.GetChillMaxFPS() : 0;
                     _currentChillFps = chillOn && chillFps >= 30 ? chillFps : 0;
 
-                    ready = supInt || supGpuScale || supScaleMode || supRsr || supAfmf || supSharp || supVivid;
+                    ready = supInt || supGpuScale || supScaleMode || supRsr || supAfmf || supAntiLag || supSharp || supVivid;
                 }
                 catch { }
 
@@ -1396,6 +1401,10 @@ namespace HandheldCompanion.Views
                     btnAdlxAfmf.Content = valAfmf ? "Frame Gen (AFMF): On" : "Frame Gen (AFMF): Off";
                     btnAdlxAfmf.Style = valAfmf ? activeStyle : normalStyle;
 
+                    btnAdlxAntiLag.IsEnabled = supAntiLag;
+                    btnAdlxAntiLag.Content = valAntiLag ? "Anti-Lag: On" : "Anti-Lag: Off";
+                    btnAdlxAntiLag.Style = valAntiLag ? activeStyle : normalStyle;
+
                     btnAdlxSharpen.IsEnabled = supSharp;
                     btnAdlxSharpen.Content = valSharp ? "Sharpening: On" : "Sharpening: Off";
                     btnAdlxSharpen.Style = valSharp ? activeStyle : normalStyle;
@@ -1407,7 +1416,7 @@ namespace HandheldCompanion.Views
                     if (ready)
                     {
                         string intDetail = valInt ? "ON (2x Pixel Doubling @ 800p)" : "OFF";
-                        txtAdlxStatus.Text = $"Driver Active  |  GPU Scale: {(valGpuScale ? "ON" : "OFF")}  |  Integer: {intDetail}  |  AFMF: {(valAfmf ? "ON" : "OFF")}  |  Vivid: {(valVivid ? "ON" : "OFF")}";
+                        txtAdlxStatus.Text = $"Driver Active  |  GPU Scale: {(valGpuScale ? "ON" : "OFF")}  |  Integer: {intDetail}  |  AFMF: {(valAfmf ? "ON" : "OFF")}  |  Anti-Lag: {(valAntiLag ? "ON" : "OFF")}  |  Vivid: {(valVivid ? "ON" : "OFF")}";
                     }
                     else
                     {
@@ -1450,6 +1459,8 @@ namespace HandheldCompanion.Views
                     if (GPUManager.GetCurrent() is AMDGPU gpu && gpu.IsInitialized)
                     {
                         gpu.ApplyChillFpsCap(target);
+                        Thread.Sleep(120);
+                        if (!_isExiting) Dispatcher.BeginInvoke(RefreshAdlxControlsAsync);
                     }
                 }
                 catch (Exception ex)
@@ -1606,6 +1617,10 @@ namespace HandheldCompanion.Views
                             if (profile is not null) profile.AFMFEnabled = nextAfmf;
                             gpu.SetAFMF(nextAfmf);
                             break;
+                        case "AntiLag":
+                            bool nextAntiLag = !gpu.GetAntiLag();
+                            gpu.SetAntiLag(nextAntiLag);
+                            break;
                         case "Sharpen":
                             bool nextSharp = !gpu.GetImageSharpening();
                             if (profile is not null) profile.RISEnabled = nextSharp;
@@ -1616,7 +1631,7 @@ namespace HandheldCompanion.Views
                             gpu.SetVividColors(nextVivid);
                             break;
                     }
-                    Thread.Sleep(feature == "Vivid" || feature == "AFMF" || feature == "Sharpen" ? 120 : 350);
+                    Thread.Sleep(feature == "Vivid" || feature == "AFMF" || feature == "AntiLag" || feature == "Sharpen" ? 120 : 350);
                 }
                 catch (Exception ex)
                 {

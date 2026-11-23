@@ -609,6 +609,7 @@
                                 <Button x:Name="btnAdlxGpuScale" Content="GPU Scaling: Off" Height="34" Padding="14,5" Style="{StaticResource TouchButton}" Click="BtnAdlxToggle_Click" Tag="GPUScaling" />
                                 <Button x:Name="btnAdlxFsr" Content="RSR / FSR: Off" Height="34" Padding="14,5" Style="{StaticResource TouchButton}" Click="BtnAdlxToggle_Click" Tag="FSR" />
                                 <Button x:Name="btnAdlxAfmf" Content="Frame Gen (AFMF): Off" Height="34" Padding="14,5" Style="{StaticResource TouchButton}" Click="BtnAdlxToggle_Click" Tag="AFMF" />
+                                <Button x:Name="btnAdlxAntiLag" Content="Anti-Lag: Off" Height="34" Padding="14,5" Style="{StaticResource TouchButton}" Click="BtnAdlxToggle_Click" Tag="AntiLag" />
                                 <Button x:Name="btnAdlxSharpen" Content="Sharpening: Off" Height="34" Padding="14,5" Style="{StaticResource TouchButton}" Click="BtnAdlxToggle_Click" Tag="Sharpen" />
                                 <Button x:Name="btnAdlxVivid" Content="Vivid Colors: Off" Height="34" Padding="14,5" Style="{StaticResource TouchButton}" Click="BtnAdlxToggle_Click" Tag="Vivid" />
                             </WrapPanel>
@@ -688,6 +689,7 @@
                                 </Border>
                                 <Button x:Name="btnGpuPlus" Content="+" Height="32" Style="{StaticResource StepButton}" Click="BtnGpuClockPlus_Click" />
                             </StackPanel>
+                            <TextBlock Text="• Auto lets the APU balance CPU/GPU power dynamically. Locking (1600–2000 MHz @ 15–20W, 2000–2400 MHz @ 25–30W) prevents downclock stutters; avoid 2700 MHz below 30W so the CPU isn't starved." FontSize="11" Foreground="#888E9E" TextWrapping="Wrap" Margin="2,6,0,0" />
                         </StackPanel>
                     </Border>
                 </StackPanel>
