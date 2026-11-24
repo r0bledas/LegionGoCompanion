@@ -171,6 +171,24 @@ namespace HandheldCompanion.ADLX
             return 0;
         }
 
+        public static double GetGPUPower(int GPU)
+        {
+            try
+            {
+                if (!IsInitialized) return 0;
+                var data = new AdlxTelemetryData();
+                if (GetAdlxTelemetry(GPU, ref data))
+                {
+                    if (data.gpuTotalBoardPowerSupported && data.gpuTotalBoardPowerValue > 0)
+                        return data.gpuTotalBoardPowerValue;
+                    if (data.gpuPowerSupported && data.gpuPowerValue > 0)
+                        return data.gpuPowerValue;
+                }
+            }
+            catch { }
+            return 0;
+        }
+
         #region AMD ADL2 (atiadlxx.dll) Direct Driver Bindings for AFMF & Vivid Colors
         private const string ATI_ADL_DLL = "atiadlxx.dll";
 

@@ -111,6 +111,7 @@ namespace HandheldCompanion.Views
 
         private static readonly SolidColorBrush BrushGreen = CreateFrozenBrush(48, 209, 88);
         private static readonly SolidColorBrush BrushRed = CreateFrozenBrush(255, 69, 58);
+        private static readonly SolidColorBrush BrushAmber = CreateFrozenBrush(255, 159, 10);
         private static readonly SolidColorBrush BrushGray = CreateFrozenBrush(158, 164, 176);
         private static readonly SolidColorBrush BrushBlue = CreateFrozenBrush(0, 145, 255);
         private static readonly SolidColorBrush BrushWhite = CreateFrozenBrush(240, 240, 240);
@@ -534,10 +535,15 @@ namespace HandheldCompanion.Views
             }
 
             UpdateActiveControllerHighlight(ControllerModeService.GetCurrentMode());
-            int savedTdp = ManagerFactory.settingsManager.GetInt("SelectedTdp");
+            bool onAcStartup = IsOnAcPower();
+            string tdpKey = onAcStartup ? "SelectedTdpAc" : "SelectedTdpBattery";
+            int savedTdp = ManagerFactory.settingsManager.HasSetting(tdpKey)
+                ? ManagerFactory.settingsManager.GetInt(tdpKey)
+                : ManagerFactory.settingsManager.GetInt("SelectedTdp");
             if (savedTdp >= 5 && savedTdp <= 35)
                 _currentTdp = savedTdp;
             ApplyTdp(_currentTdp);
+            SystemManager.PowerLineStatusChanged += OnPowerLineStatusChanged;
             UpdateResolutionControls();
             UpdateVolumeControls();
 
@@ -652,6 +658,9 @@ namespace HandheldCompanion.Views
                     txtFanLiveTelemetry.Text = tempStr + rpmStr + guardTag;
                     txtFanLiveTelemetry.Foreground = (maxTemp >= 90 || _thermalGuardTriggered) ? BrushRed : BrushGreen;
                 });
+
+                // Live Power Consumption & Charging Telemetry (TDP card header)
+                UpdatePowerLiveTelemetry();
             }
             catch { }
         }
@@ -838,6 +847,121 @@ namespace HandheldCompanion.Views
         private void BtnTdpMinus_Click(object sender, RoutedEventArgs e) => ApplyTdp(Math.Max(5, _currentTdp - 1));
         private void BtnTdpPlus_Click(object sender, RoutedEventArgs e) => ApplyTdp(Math.Min(35, _currentTdp + 1));
 
+        private static bool IsOnAcPower()
+        {
+            try
+            {
+                return System.Windows.Forms.SystemInformation.PowerStatus.PowerLineStatus == System.Windows.Forms.PowerLineStatus.Online;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private void OnPowerLineStatusChanged(System.Windows.Forms.PowerLineStatus prevStatus, System.Windows.Forms.PowerLineStatus newStatus)
+        {
+            if (_isExiting) return;
+            bool nowOnAc = newStatus == System.Windows.Forms.PowerLineStatus.Online;
+            Dispatcher.BeginInvoke(() =>
+            {
+                if (_isExiting) return;
+                string key = nowOnAc ? "SelectedTdpAc" : "SelectedTdpBattery";
+                int targetTdp;
+                if (ManagerFactory.settingsManager.HasSetting(key))
+                {
+                    targetTdp = ManagerFactory.settingsManager.GetInt(key);
+                }
+                else
+                {
+                    targetTdp = nowOnAc ? Math.Max(_currentTdp, 25) : Math.Min(_currentTdp, 15);
+                }
+
+                if (targetTdp >= 5 && targetTdp <= 35 && targetTdp != _currentTdp)
+                {
+                    LogManager.LogInformation("TDP: Power source changed ({0}) -> switching TDP from {1}W to {2}W",
+                        nowOnAc ? "AC Charging" : "Battery", _currentTdp, targetTdp);
+                    ApplyTdp(targetTdp);
+                }
+                else
+                {
+                    UpdateTdpUi(_currentTdp);
+                }
+
+                Task.Run(UpdatePowerLiveTelemetry);
+            });
+        }
+
+        private void UpdatePowerLiveTelemetry()
+        {
+            if (_isExiting) return;
+            try
+            {
+                bool onAc = IsOnAcPower();
+                double batteryRateW = 0;
+                bool isCharging = false;
+                bool hasBatteryRate = false;
+
+                try
+                {
+                    var report = Windows.Devices.Power.Battery.AggregateBattery.GetReport();
+                    if (report != null)
+                    {
+                        isCharging = report.Status == Windows.System.Power.BatteryStatus.Charging;
+                        if (report.ChargeRateInMilliwatts.HasValue)
+                        {
+                            batteryRateW = report.ChargeRateInMilliwatts.Value / 1000.0;
+                            hasBatteryRate = true;
+                        }
+                    }
+                }
+                catch { }
+
+                double apuW = ADLX.ADLXBackend.IsInitialized ? ADLX.ADLXBackend.GetGPUPower(0) : 0;
+
+                string text;
+                SolidColorBrush color;
+
+                if (onAc || isCharging)
+                {
+                    string apuPart = apuW > 0.5 ? $"APU: {apuW:F1}W  |  " : "";
+                    if (hasBatteryRate && batteryRateW > 0.2)
+                    {
+                        text = $"{apuPart}Charging: +{batteryRateW:F1}W (AC)";
+                        color = BrushGreen;
+                    }
+                    else
+                    {
+                        text = $"{apuPart}Plugged In (AC)";
+                        color = BrushBlue;
+                    }
+                }
+                else
+                {
+                    double drawW = hasBatteryRate ? Math.Abs(batteryRateW) : 0;
+                    if (drawW > 0.5 && apuW > 0.5)
+                        text = $"Consuming: {drawW:F1}W (APU: {apuW:F1}W)  |  Battery";
+                    else if (drawW > 0.5)
+                        text = $"Consuming: {drawW:F1}W  |  Battery";
+                    else if (apuW > 0.5)
+                        text = $"APU: {apuW:F1}W  |  Battery";
+                    else
+                        text = "On Battery";
+                    color = BrushAmber;
+                }
+
+                Dispatcher.BeginInvoke(() =>
+                {
+                    if (_isExiting) return;
+                    if (!IsVisible || WindowState == WindowState.Minimized || panelGeneral.Visibility != Visibility.Visible)
+                        return;
+                    txtTdpLiveTelemetry.Text = text;
+                    txtTdpLiveTelemetry.Foreground = color;
+                });
+            }
+            catch { }
+        }
+
         private void ApplyTdp(int tdp)
         {
             _currentTdp = Math.Clamp(tdp, 5, 35);
@@ -845,6 +969,7 @@ namespace HandheldCompanion.Views
             try
             {
                 ManagerFactory.settingsManager.SetProperty("SelectedTdp", targetTdp);
+                ManagerFactory.settingsManager.SetProperty(IsOnAcPower() ? "SelectedTdpAc" : "SelectedTdpBattery", targetTdp);
                 UpdateTdpUi(targetTdp);
 
                 Task.Run(() =>
@@ -3403,6 +3528,7 @@ namespace HandheldCompanion.Views
         private void FinishExitApplication(bool restart)
         {
             try { _diagnosticsTimer?.Stop(); } catch { }
+            try { SystemManager.PowerLineStatusChanged -= OnPowerLineStatusChanged; } catch { }
             try { _thermalGuardTimer?.Dispose(); _thermalGuardTimer = null; } catch { }
             try { this.Hide(); } catch { }
             try { Program.SingleInstanceMutex?.ReleaseMutex(); Program.SingleInstanceMutex?.Dispose(); } catch { }
